@@ -1,8 +1,11 @@
-use image::DynamicImage;
 use std::time::{Duration, Instant};
 
+use image::DynamicImage;
+
+use crate::errors::{ProviderError, RahmenError, RahmenResult};
+
 pub trait Provider {
-    fn next_image(&mut self) -> Option<DynamicImage>;
+    fn next_image(&mut self) -> RahmenResult<DynamicImage>;
 }
 
 pub struct RateLimitingProvider<P: Provider> {
@@ -22,12 +25,12 @@ impl<P: Provider> RateLimitingProvider<P> {
 }
 
 impl<P: Provider> Provider for RateLimitingProvider<P> {
-    fn next_image(&mut self) -> Option<DynamicImage> {
+    fn next_image(&mut self) -> RahmenResult<DynamicImage> {
         if self.last_updated + self.interval < Instant::now() {
             self.last_updated = Instant::now();
             self.provider.next_image()
         } else {
-            None
+            Err(RahmenError::Provider(ProviderError::Idle))
         }
     }
 }

@@ -1,3 +1,4 @@
+use crate::errors::{ProviderError, RahmenError, RahmenResult};
 use crate::provider::Provider;
 use image::{DynamicImage, GenericImageView, ImageFormat};
 use std::io::{BufRead, BufReader, Read, Seek};
@@ -30,7 +31,7 @@ where
     }
 }
 impl<R: BufRead> Provider for ListProvider<R> {
-    fn next_image(&mut self) -> Option<DynamicImage> {
+    fn next_image(&mut self) -> RahmenResult<DynamicImage> {
         loop {
             self.buffer.clear();
             let length = self
@@ -38,7 +39,7 @@ impl<R: BufRead> Provider for ListProvider<R> {
                 .read_line(&mut self.buffer)
                 .expect("Reading from file failed");
             if length == 0 {
-                return None;
+                return Err(RahmenError::Provider(ProviderError::Eof));
             }
             let trimmed = &self.buffer.trim();
             println!("Reading {}", trimmed);
@@ -46,11 +47,12 @@ impl<R: BufRead> Provider for ListProvider<R> {
             match ImageFormat::from_path(&path) {
                 Ok(format) => {
                     println!("format {:?}", format);
-                    return Some(load_image(
+                    return Ok(load_image(
                         BufReader::new(std::fs::File::open(&path).expect("failed to open")),
                         format,
                     ));
                 }
+                Err(e @ image::error::ImageError::Unsupported(_)) => eprintln!("{}", e),
                 _ => eprintln!("Unknown format: {}", trimmed),
             }
         }

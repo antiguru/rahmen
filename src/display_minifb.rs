@@ -1,4 +1,5 @@
 use crate::display::Display;
+use crate::errors::{ProviderError, RahmenError};
 use crate::image::{GenericImageView, Pixel};
 use crate::provider::Provider;
 use image::DynamicImage;
@@ -56,13 +57,17 @@ impl<P: Provider> Display for MiniFBDisplay<P> {
 
     fn main_loop(&mut self) {
         while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
-            if let Some(img) = self.provider.next_image() {
-                self.render(preprocess_image(
-                    img,
-                    self.dimensions().0,
-                    self.dimensions().1,
-                ))
-                .unwrap();
+            match self.provider.next_image() {
+                Ok(img) => self
+                    .render(preprocess_image(
+                        img,
+                        self.dimensions().0,
+                        self.dimensions().1,
+                    ))
+                    .unwrap(),
+                Err(RahmenError::Provider(ProviderError::Eof)) => break,
+                Err(RahmenError::Provider(ProviderError::Idle)) => continue,
+                Err(e) => panic!("Failed to load image: {}", e),
             }
             self.window.update();
         }
