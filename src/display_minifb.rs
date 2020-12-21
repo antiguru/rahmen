@@ -57,6 +57,7 @@ impl<P: Provider> Display for MiniFBDisplay<P> {
 
     fn main_loop(&mut self) {
         while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
+            self.window.update();
             match self.provider.next_image() {
                 Ok(img) => self
                     .render(preprocess_image(
@@ -69,7 +70,6 @@ impl<P: Provider> Display for MiniFBDisplay<P> {
                 Err(RahmenError::Provider(ProviderError::Idle)) => continue,
                 Err(e) => panic!("Failed to load image: {}", e),
             }
-            self.window.update();
         }
     }
 }
