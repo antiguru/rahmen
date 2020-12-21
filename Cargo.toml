@@ -5,10 +5,7 @@ authors = ["Moritz Hoffmann <antiguru@gmail.com>"]
 edition = "2018"
 
 [[bin]]
-name = "rahmen-client"
-
-[[bin]]
-name = "rahmen-server"
+name = "rahmen"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
