@@ -8,13 +8,14 @@ use minifb::{Window, WindowOptions};
 
 use rahmen::display::Display;
 use rahmen::display_minifb::MiniFBDisplay;
-use rahmen::provider::RateLimitingProvider;
+use rahmen::errors::RahmenResult;
+use rahmen::provider::{ImageErrorToRetryProvider, Provider, RateLimitingProvider, RetryProvider};
 use rahmen::provider_list::ListProvider;
 use std::fs::File;
 use std::path::PathBuf;
 use std::time::Duration;
 
-fn main() {
+fn main() -> RahmenResult<()> {
     let matches = App::new("Rahmen client")
         .arg(
             Arg::new("display")
@@ -32,11 +33,30 @@ fn main() {
                 .long("provider")
                 .about("Image provider")
                 .takes_value(true)
-                .possible_values(&["directory", "list"])
+                .possible_values(&["pattern", "list"])
                 .default_value("list"),
         )
         .arg(Arg::new("input").short('i').long("input").takes_value(true))
         .get_matches();
+
+    let provider: Box<dyn Provider> = match matches.value_of("provider").expect("Provider missing")
+    {
+        "pattern" => Box::new(rahmen::provider_glob::create(
+            matches.value_of("input").expect("Input mising"),
+        )?),
+        "list" => Box::new(ListProvider::new(BufReader::new(
+            File::open(&PathBuf::from(
+                matches.value_of("input").expect("Input mising"),
+            ))
+            .expect("Failed to open input"),
+        ))),
+        other => panic!("Unknown provider: {}", other),
+    };
+
+    let provider = RateLimitingProvider::new(
+        RetryProvider::new(ImageErrorToRetryProvider::new(provider)),
+        Duration::from_secs(10),
+    );
 
     match matches.value_of("display").expect("Display missing") {
         "framebuffer" => unimplemented!(),
@@ -53,20 +73,9 @@ fn main() {
             .unwrap_or_else(|e| panic!("{}", e));
             // Limit to max ~60 fps update rate
             window.limit_update_rate(Some(std::time::Duration::from_secs(1) / 30));
-            MiniFBDisplay::new(
-                window,
-                RateLimitingProvider::new(
-                    ListProvider::new(BufReader::new(
-                        File::open(&PathBuf::from(
-                            matches.value_of("input").expect("Input mising"),
-                        ))
-                        .expect("Failed to open input"),
-                    )),
-                    Duration::from_secs(10),
-                ),
-            )
-            .main_loop();
+            MiniFBDisplay::new(window, provider).main_loop();
         }
         other => panic!("Unexpected display driver: {}", other),
     };
+    Ok(())
 }
