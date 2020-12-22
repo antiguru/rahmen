@@ -1,4 +1,4 @@
-use crate::display::Display;
+use crate::display::{preprocess_image, Display};
 use crate::errors::{ProviderError, RahmenError};
 use crate::image::{GenericImageView, Pixel};
 use crate::provider::Provider;
@@ -22,12 +22,6 @@ impl<P: Provider> MiniFBDisplay<P> {
 fn from_rgb(pixel: &image::Rgb<u8>) -> u32 {
     let (r, g, b, _a) = pixel.channels4();
     ((r as u32) << 16) | ((g as u32) << 8) | b as u32
-}
-
-fn preprocess_image(img: DynamicImage, width: u32, height: u32) -> DynamicImage {
-    let img = img.resize(width, height, image::imageops::FilterType::Triangle);
-    println!("resized img {:?}", img.dimensions());
-    img
 }
 
 impl<P: Provider> Display for MiniFBDisplay<P> {

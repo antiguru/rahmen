@@ -1,10 +1,12 @@
 use std::error::Error;
 use std::fmt;
+use std::fmt::Write;
 
 #[derive(Debug)]
 pub enum RahmenError {
     ImageError(image::error::ImageError),
     IoError(std::io::Error),
+    LinuxFBError(linuxfb::Error),
     Provider(ProviderError),
 }
 
@@ -20,6 +22,7 @@ impl fmt::Display for RahmenError {
         match self {
             RahmenError::ImageError(err) => err.fmt(f),
             RahmenError::IoError(err) => err.fmt(f),
+            RahmenError::LinuxFBError(err) => f.write_str("linuxfb::Error"),
             RahmenError::Provider(err) => err.fmt(f),
         }
     }
@@ -30,6 +33,7 @@ impl Error for RahmenError {
         match self {
             RahmenError::ImageError(err) => err.source(),
             RahmenError::IoError(err) => err.source(),
+            RahmenError::LinuxFBError(err) => None,
             RahmenError::Provider(err) => err.source(),
         }
     }
@@ -44,6 +48,12 @@ impl From<std::io::Error> for RahmenError {
 impl From<image::error::ImageError> for RahmenError {
     fn from(e: image::error::ImageError) -> Self {
         RahmenError::ImageError(e)
+    }
+}
+
+impl From<linuxfb::Error> for RahmenError {
+    fn from(e: linuxfb::Error) -> Self {
+        RahmenError::LinuxFBError(e)
     }
 }
 

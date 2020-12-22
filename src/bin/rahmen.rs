@@ -7,6 +7,7 @@ use clap::{App, Arg};
 use minifb::{Window, WindowOptions};
 
 use rahmen::display::Display;
+use rahmen::display_linuxfb::LinuxFBDisplay;
 use rahmen::display_minifb::MiniFBDisplay;
 use rahmen::errors::RahmenResult;
 use rahmen::provider::{ImageErrorToRetryProvider, Provider, RateLimitingProvider, RetryProvider};
@@ -24,7 +25,7 @@ fn main() -> RahmenResult<()> {
                 .about("Select the display provider")
                 .value_name("display")
                 .takes_value(true)
-                .possible_values(&["framebuffer", "minifb"])
+                .possible_values(&["linuxfb", "minifb"])
                 .default_value("minifb"),
         )
         .arg(
@@ -37,6 +38,12 @@ fn main() -> RahmenResult<()> {
                 .default_value("list"),
         )
         .arg(Arg::new("input").short('i').long("input").takes_value(true))
+        .arg(
+            Arg::new("output")
+                .short('o')
+                .long("output")
+                .takes_value(true),
+        )
         .get_matches();
 
     let provider: Box<dyn Provider> = match matches.value_of("provider").expect("Provider missing")
@@ -59,7 +66,6 @@ fn main() -> RahmenResult<()> {
     );
 
     match matches.value_of("display").expect("Display missing") {
-        "framebuffer" => unimplemented!(),
         "minifb" => {
             const WIDTH: usize = 640;
             const HEIGHT: usize = 480;
@@ -74,6 +80,20 @@ fn main() -> RahmenResult<()> {
             // Limit to max ~60 fps update rate
             window.limit_update_rate(Some(std::time::Duration::from_secs(1) / 30));
             MiniFBDisplay::new(window, provider).main_loop();
+        }
+        "linuxfb" => {
+            let mut framebuffer = linuxfb::Framebuffer::new(
+                matches
+                    .value_of("output")
+                    .expect("Framebuffer output missing"),
+            )?;
+            println!("Framebuffer size: {:?}", framebuffer.get_size());
+            println!(
+                "Framebuffer virtual size: {:?}",
+                framebuffer.get_virtual_size()
+            );
+            rahmen::display_linuxfb::setup_framebuffer(&mut framebuffer);
+            LinuxFBDisplay::new(provider, framebuffer).main_loop();
         }
         other => panic!("Unexpected display driver: {}", other),
     };
