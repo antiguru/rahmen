@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 use image::{DynamicImage, Pixel};
 
 use crate::errors::{ProviderError, RahmenError, RahmenResult};
+use std::io::BufReader;
 use std::path::Path;
 
 pub trait Provider {
@@ -78,7 +79,7 @@ impl<P: Provider> Provider for RetryProvider<P> {
     }
 }
 
-pub fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
+fn load_jpeg<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
     println!("Loading {:?}", path.as_ref());
     let start = Instant::now();
     let d = mozjpeg::Decompress::with_markers(mozjpeg::ALL_MARKERS).from_path(&path)?;
@@ -99,5 +100,18 @@ pub fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImag
     } else {
         eprintln!("Failed to decode image: {:?}", path.as_ref());
         Err(RahmenError::Provider(ProviderError::Retry))
+    }
+}
+
+pub fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
+    println!("Loading {:?}", path.as_ref());
+    let start = Instant::now();
+    match image::ImageFormat::from_path(&path)? {
+        image::ImageFormat::Jpeg => load_jpeg(path),
+        format => Ok(image::io::Reader::with_format(
+            BufReader::new(std::fs::File::open(&path)?),
+            format,
+        )
+        .decode()?),
     }
 }
