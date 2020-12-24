@@ -75,7 +75,7 @@ fn main() -> RahmenResult<()> {
         other => panic!("Unknown provider: {}", other),
     };
 
-    let provider = PathToImageProvider::new(provider);
+    let provider = provider.path_to_image();
     let provider = RateLimitingProvider::new(
         RetryProvider::new(ImageErrorToRetryProvider::new(provider)),
         Duration::from_millis(

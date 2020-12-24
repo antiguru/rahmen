@@ -143,17 +143,21 @@ fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
     }
 }
 
-pub struct PathToImageProvider<P: Provider<PathBuf>> {
+pub trait PathToImageProvider<P: Provider<PathBuf>> {
+    fn path_to_image(self) -> PathToImageProviderImpl<P>;
+}
+
+pub struct PathToImageProviderImpl<P: Provider<PathBuf>> {
     provider: P,
 }
 
-impl<P: Provider<PathBuf>> PathToImageProvider<P> {
-    pub fn new(provider: P) -> Self {
-        Self { provider }
+impl<P: Provider<PathBuf>> PathToImageProvider<P> for P {
+    fn path_to_image(self) -> PathToImageProviderImpl<P> {
+        PathToImageProviderImpl { provider: self }
     }
 }
 
-impl<P: Provider<PathBuf>> Provider<DynamicImage> for PathToImageProvider<P> {
+impl<P: Provider<PathBuf>> Provider<DynamicImage> for PathToImageProviderImpl<P> {
     fn next_image(&mut self) -> RahmenResult<DynamicImage> {
         match self.provider.next_image() {
             Ok(path) => load_image_from_path(path),
