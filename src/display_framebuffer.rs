@@ -1,5 +1,5 @@
 use crate::display::{preprocess_image, Display};
-use crate::errors::{ProviderError, RahmenError};
+use crate::errors::{ProviderError, RahmenError, RahmenResult};
 use crate::provider::Provider;
 use framebuffer::Framebuffer;
 use image::{GenericImageView, Pixel};
@@ -32,12 +32,10 @@ impl<P: Provider> FramebufferDisplay<P> {
 }
 
 impl<P: Provider> Display for FramebufferDisplay<P> {
-    type Error = framebuffer::FramebufferError;
-
     fn render<V: GenericImageView<Pixel = Pi>, Pi: Pixel<Subpixel = u8>>(
         &mut self,
         img: V,
-    ) -> Result<(), Self::Error> {
+    ) -> RahmenResult<()> {
         println!("Clearing buffer");
         self.buffer.clear();
         println!("zeroing buffer");

@@ -1,5 +1,5 @@
 use crate::display::{preprocess_image, Display};
-use crate::errors::{ProviderError, RahmenError};
+use crate::errors::{ProviderError, RahmenError, RahmenResult};
 use crate::provider::Provider;
 use image::{GenericImageView, Pixel};
 use linuxfb::Framebuffer;
@@ -37,12 +37,10 @@ impl<P: Provider> LinuxFBDisplay<P> {
 }
 
 impl<P: Provider> Display for LinuxFBDisplay<P> {
-    type Error = linuxfb::Error;
-
     fn render<V: GenericImageView<Pixel = Pi>, Pi: Pixel<Subpixel = u8>>(
         &mut self,
         img: V,
-    ) -> Result<(), Self::Error> {
+    ) -> RahmenResult<()> {
         let start = Instant::now();
         self.buffer.clear();
         self.buffer

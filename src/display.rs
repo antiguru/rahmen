@@ -1,13 +1,14 @@
-use image::{DynamicImage, GenericImageView, Pixel};
 use std::time::Instant;
 
-pub trait Display {
-    type Error;
+use image::{DynamicImage, GenericImageView, Pixel};
 
+use crate::errors::RahmenResult;
+
+pub trait Display {
     fn render<V: GenericImageView<Pixel = P>, P: Pixel<Subpixel = u8>>(
         &mut self,
         img: V,
-    ) -> Result<(), Self::Error>;
+    ) -> RahmenResult<()>;
 
     fn dimensions(&self) -> (u32, u32);
     fn main_loop(&mut self);

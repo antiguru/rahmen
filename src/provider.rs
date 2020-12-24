@@ -97,6 +97,7 @@ pub fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImag
         println!("Loading took: {}ms", start.elapsed().as_millis());
         Ok(img)
     } else {
-        panic!("Failed to decode image: {:?}", path.as_ref());
+        eprintln!("Failed to decode image: {:?}", path.as_ref());
+        Err(RahmenError::Provider(ProviderError::Retry))
     }
 }

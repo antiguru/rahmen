@@ -1,12 +1,9 @@
 use crate::display::{preprocess_image, Display};
-use crate::errors::{ProviderError, RahmenError};
+use crate::errors::{ProviderError, RahmenError, RahmenResult};
 use crate::image::{GenericImageView, Pixel};
 use crate::provider::Provider;
-use image::DynamicImage;
-use minifb::{Key, Window};
 
-#[derive(Debug)]
-pub struct MiniFBError(minifb::Error);
+use minifb::{Key, Window};
 
 pub struct MiniFBDisplay<P: Provider> {
     window: Window,
@@ -25,12 +22,10 @@ fn from_rgb(pixel: &image::Rgb<u8>) -> u32 {
 }
 
 impl<P: Provider> Display for MiniFBDisplay<P> {
-    type Error = MiniFBError;
-
     fn render<V: GenericImageView<Pixel = Pi>, Pi: Pixel<Subpixel = u8>>(
         &mut self,
         img: V,
-    ) -> Result<(), Self::Error> {
+    ) -> RahmenResult<()> {
         let mut buffer = vec![0; (self.dimensions().0 * self.dimensions().1) as _];
         let x_offset = (self.dimensions().0 - img.dimensions().0) / 2;
         let y_offset = (self.dimensions().1 - img.dimensions().1) / 2;
@@ -40,7 +35,7 @@ impl<P: Provider> Display for MiniFBDisplay<P> {
         }
         self.window
             .update_with_buffer(&buffer, self.dimensions().0 as _, self.dimensions().1 as _)
-            .map_err(MiniFBError)
+            .map_err(RahmenError::MiniFBError)
     }
 
     fn dimensions(&self) -> (u32, u32) {
