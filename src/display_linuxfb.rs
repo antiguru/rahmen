@@ -1,10 +1,10 @@
 use crate::display::{preprocess_image, Display};
 use crate::errors::{ProviderError, RahmenError, RahmenResult};
 use crate::provider::Provider;
-use image::{GenericImageView, Pixel};
+use image::{DynamicImage, GenericImageView, Pixel};
 use linuxfb::Framebuffer;
 use memmap::MmapMut;
-use std::time::{Duration};
+use std::time::Duration;
 
 pub fn setup_framebuffer(framebuffer: &mut Framebuffer) {
     framebuffer.set_bytes_per_pixel(4).unwrap();
@@ -13,14 +13,14 @@ pub fn setup_framebuffer(framebuffer: &mut Framebuffer) {
     assert_eq!(framebuffer.get_bytes_per_pixel(), 4);
 }
 
-pub struct LinuxFBDisplay<P: Provider> {
+pub struct LinuxFBDisplay<P: Provider<DynamicImage>> {
     provider: P,
     framebuffer: Framebuffer,
     map: MmapMut,
     buffer: Vec<u8>,
 }
 
-impl<P: Provider> LinuxFBDisplay<P> {
+impl<P: Provider<DynamicImage>> LinuxFBDisplay<P> {
     pub fn new(provider: P, framebuffer: Framebuffer) -> Self {
         Self {
             map: framebuffer.map().expect("Failed to map framebuffer"),
@@ -36,7 +36,7 @@ impl<P: Provider> LinuxFBDisplay<P> {
     }
 }
 
-impl<P: Provider> Display for LinuxFBDisplay<P> {
+impl<P: Provider<DynamicImage>> Display for LinuxFBDisplay<P> {
     fn render<V: GenericImageView<Pixel = Pi>, Pi: Pixel<Subpixel = u8>>(
         &mut self,
         img: V,

@@ -2,20 +2,20 @@ use crate::display::{preprocess_image, Display};
 use crate::errors::{ProviderError, RahmenError, RahmenResult};
 use crate::provider::Provider;
 use framebuffer::Framebuffer;
-use image::{GenericImageView, Pixel};
+use image::{DynamicImage, GenericImageView, Pixel};
 use std::time::Duration;
 
 pub fn setup_framebuffer(framebuffer: &mut Framebuffer) {
     assert_eq!(framebuffer.var_screen_info.bits_per_pixel, 32);
 }
 
-pub struct FramebufferDisplay<P: Provider> {
+pub struct FramebufferDisplay<P: Provider<DynamicImage>> {
     provider: P,
     framebuffer: Framebuffer,
     buffer: Vec<u8>,
 }
 
-impl<P: Provider> FramebufferDisplay<P> {
+impl<P: Provider<DynamicImage>> FramebufferDisplay<P> {
     pub fn new(provider: P, framebuffer: Framebuffer) -> Self {
         Self {
             buffer: vec![
@@ -31,7 +31,7 @@ impl<P: Provider> FramebufferDisplay<P> {
     }
 }
 
-impl<P: Provider> Display for FramebufferDisplay<P> {
+impl<P: Provider<DynamicImage>> Display for FramebufferDisplay<P> {
     fn render<V: GenericImageView<Pixel = Pi>, Pi: Pixel<Subpixel = u8>>(
         &mut self,
         img: V,

@@ -3,14 +3,15 @@ use crate::errors::{ProviderError, RahmenError, RahmenResult};
 use crate::image::{GenericImageView, Pixel};
 use crate::provider::Provider;
 
+use image::DynamicImage;
 use minifb::{Key, Window};
 
-pub struct MiniFBDisplay<P: Provider> {
+pub struct MiniFBDisplay<P: Provider<DynamicImage>> {
     window: Window,
     provider: P,
 }
 
-impl<P: Provider> MiniFBDisplay<P> {
+impl<P: Provider<DynamicImage>> MiniFBDisplay<P> {
     pub fn new(window: Window, provider: P) -> Self {
         Self { window, provider }
     }
@@ -21,7 +22,7 @@ fn from_rgb(pixel: &image::Rgb<u8>) -> u32 {
     ((r as u32) << 16) | ((g as u32) << 8) | b as u32
 }
 
-impl<P: Provider> Display for MiniFBDisplay<P> {
+impl<P: Provider<DynamicImage>> Display for MiniFBDisplay<P> {
     fn render<V: GenericImageView<Pixel = Pi>, Pi: Pixel<Subpixel = u8>>(
         &mut self,
         img: V,

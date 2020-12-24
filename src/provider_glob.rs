@@ -16,7 +16,7 @@ pub fn create(pattern: &str) -> RahmenResult<GlobProvider<impl Iterator<Item = P
     })
 }
 
-impl<I: Iterator<Item = PathBuf>> Provider for GlobProvider<I> {
+impl<I: Iterator<Item = PathBuf>> Provider<DynamicImage> for GlobProvider<I> {
     fn next_image(&mut self) -> RahmenResult<DynamicImage> {
         self.path_iter
             .next()

@@ -5,26 +5,27 @@ use image::{DynamicImage, Pixel};
 use crate::errors::{ProviderError, RahmenError, RahmenResult};
 use std::error::Error;
 use std::io::BufReader;
+use std::marker::PhantomData;
 use std::path::Path;
 
-pub trait Provider {
-    fn next_image(&mut self) -> RahmenResult<DynamicImage>;
+pub trait Provider<D> {
+    fn next_image(&mut self) -> RahmenResult<D>;
 }
 
-impl Provider for Box<dyn Provider> {
-    fn next_image(&mut self) -> RahmenResult<DynamicImage> {
+impl<D> Provider<D> for Box<dyn Provider<D>> {
+    fn next_image(&mut self) -> RahmenResult<D> {
         (**self).next_image()
     }
 }
 
-pub struct RateLimitingProvider<P: Provider> {
+pub struct RateLimitingProvider<D, P: Provider<D>> {
     provider: P,
     interval: Duration,
     last_updated: Instant,
-    next_image: Option<DynamicImage>,
+    next_image: Option<D>,
 }
 
-impl<P: Provider> RateLimitingProvider<P> {
+impl<D, P: Provider<D>> RateLimitingProvider<D, P> {
     pub fn new(provider: P, interval: Duration) -> Self {
         Self {
             provider,
@@ -35,8 +36,8 @@ impl<P: Provider> RateLimitingProvider<P> {
     }
 }
 
-impl<P: Provider> Provider for RateLimitingProvider<P> {
-    fn next_image(&mut self) -> RahmenResult<DynamicImage> {
+impl<D, P: Provider<D>> Provider<D> for RateLimitingProvider<D, P> {
+    fn next_image(&mut self) -> RahmenResult<D> {
         if self.next_image.is_none() {
             self.next_image = Some(self.provider.next_image()?);
         }
@@ -50,11 +51,17 @@ impl<P: Provider> Provider for RateLimitingProvider<P> {
     }
 }
 
-pub struct ImageErrorToRetryProvider<P: Provider>(P);
+pub struct ImageErrorToRetryProvider<D, P: Provider<D>> {
+    provider: P,
+    _phantom_data: PhantomData<D>,
+}
 
-impl<P: Provider> ImageErrorToRetryProvider<P> {
+impl<D, P: Provider<D>> ImageErrorToRetryProvider<D, P> {
     pub fn new(provider: P) -> Self {
-        Self(provider)
+        Self {
+            provider,
+            _phantom_data: PhantomData,
+        }
     }
 }
 
@@ -63,9 +70,9 @@ fn report_and_raise<E: Error, R>(error: E, raise: RahmenError) -> RahmenResult<R
     Err(raise)
 }
 
-impl<P: Provider> Provider for ImageErrorToRetryProvider<P> {
-    fn next_image(&mut self) -> RahmenResult<DynamicImage> {
-        match self.0.next_image() {
+impl<D, P: Provider<D>> Provider<D> for ImageErrorToRetryProvider<D, P> {
+    fn next_image(&mut self) -> RahmenResult<D> {
+        match self.provider.next_image() {
             Err(RahmenError::ImageError(e)) => {
                 report_and_raise(e, RahmenError::Provider(ProviderError::Retry))
             }
@@ -77,18 +84,24 @@ impl<P: Provider> Provider for ImageErrorToRetryProvider<P> {
     }
 }
 
-pub struct RetryProvider<P: Provider>(P);
+pub struct RetryProvider<D, P: Provider<D>> {
+    provider: P,
+    _phantom_data: PhantomData<D>,
+}
 
-impl<P: Provider> RetryProvider<P> {
+impl<D, P: Provider<D>> RetryProvider<D, P> {
     pub fn new(provider: P) -> Self {
-        Self(provider)
+        Self {
+            provider,
+            _phantom_data: PhantomData,
+        }
     }
 }
 
-impl<P: Provider> Provider for RetryProvider<P> {
-    fn next_image(&mut self) -> RahmenResult<DynamicImage> {
+impl<D, P: Provider<D>> Provider<D> for RetryProvider<D, P> {
+    fn next_image(&mut self) -> RahmenResult<D> {
         loop {
-            match self.0.next_image() {
+            match self.provider.next_image() {
                 Err(RahmenError::Provider(ProviderError::Retry)) => {}
                 res => return res,
             }

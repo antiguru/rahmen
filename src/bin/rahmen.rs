@@ -59,8 +59,8 @@ fn main() -> RahmenResult<()> {
         )
         .get_matches();
 
-    let provider: Box<dyn Provider> = match matches.value_of("provider").expect("Provider missing")
-    {
+    let provider = matches.value_of("provider").expect("Provider missing");
+    let provider: Box<dyn Provider<_>> = match provider {
         "pattern" => Box::new(rahmen::provider_glob::create(
             matches.value_of("input").expect("Input mising"),
         )?),

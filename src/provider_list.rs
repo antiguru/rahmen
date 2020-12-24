@@ -17,7 +17,7 @@ impl<R: BufRead> ListProvider<R> {
         }
     }
 }
-impl<R: BufRead> Provider for ListProvider<R> {
+impl<R: BufRead> Provider<DynamicImage> for ListProvider<R> {
     fn next_image(&mut self) -> RahmenResult<DynamicImage> {
         self.buffer.clear();
         if self.reader.read_line(&mut self.buffer)? == 0 {
