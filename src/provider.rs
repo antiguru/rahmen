@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 use image::{DynamicImage, Pixel};
 
 use crate::errors::{ProviderError, RahmenError, RahmenResult};
+use std::error::Error;
 use std::io::BufReader;
 use std::path::Path;
 
@@ -57,10 +58,20 @@ impl<P: Provider> ImageErrorToRetryProvider<P> {
     }
 }
 
+fn report_and_raise<E: Error, R>(error: E, raise: RahmenError) -> RahmenResult<R> {
+    eprintln!("Suppressing error: {}", error);
+    Err(raise)
+}
+
 impl<P: Provider> Provider for ImageErrorToRetryProvider<P> {
     fn next_image(&mut self) -> RahmenResult<DynamicImage> {
         match self.0.next_image() {
-            Err(RahmenError::ImageError(_)) => Err(RahmenError::Provider(ProviderError::Retry)),
+            Err(RahmenError::ImageError(e)) => {
+                report_and_raise(e, RahmenError::Provider(ProviderError::Retry))
+            }
+            Err(RahmenError::IoError(e)) => {
+                report_and_raise(e, RahmenError::Provider(ProviderError::Retry))
+            }
             res => res,
         }
     }
