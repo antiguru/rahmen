@@ -97,8 +97,6 @@ impl<P: Provider> Provider for RetryProvider<P> {
 }
 
 fn load_jpeg<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
-    println!("Loading {:?}", path.as_ref());
-    let start = Instant::now();
     let d = mozjpeg::Decompress::with_markers(mozjpeg::ALL_MARKERS).from_path(&path)?;
     let mut img = DynamicImage::new_bgra8(d.width() as _, d.height() as _);
     let height = d.height();
@@ -112,7 +110,6 @@ fn load_jpeg<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
                 *rgba_img.get_pixel_mut(col as _, row as _) = *image::Bgra::from_slice(pixel);
             }
         }
-        println!("Loading took: {}ms", start.elapsed().as_millis());
         Ok(img)
     } else {
         eprintln!("Failed to decode image: {:?}", path.as_ref());
@@ -121,6 +118,7 @@ fn load_jpeg<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
 }
 
 pub fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
+    let _t = crate::Timer::new(|e| println!("Loading {}ms", e.as_millis()));
     println!("Loading {:?}", path.as_ref());
     let start = Instant::now();
     match image::ImageFormat::from_path(&path)? {

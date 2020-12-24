@@ -15,12 +15,6 @@ pub trait Display {
 }
 
 pub fn preprocess_image(img: DynamicImage, width: u32, height: u32) -> DynamicImage {
-    let start = Instant::now();
-    let img = img.resize(width, height, image::imageops::FilterType::Triangle);
-    println!(
-        "Resize {:?}, {}ms",
-        img.dimensions(),
-        start.elapsed().as_millis()
-    );
-    img
+    let _t = crate::Timer::new(|e| println!("Resize {}ms", e.as_millis()));
+    img.resize(width, height, image::imageops::FilterType::Triangle)
 }

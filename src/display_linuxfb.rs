@@ -41,7 +41,7 @@ impl<P: Provider> Display for LinuxFBDisplay<P> {
         &mut self,
         img: V,
     ) -> RahmenResult<()> {
-        let start = Instant::now();
+        let _t = crate::Timer::new(|e| println!("Rendering {}ms", e.as_millis()));
         self.buffer.clear();
         self.buffer
             .extend(std::iter::repeat(0).take(self.buffer.capacity()));
@@ -53,7 +53,6 @@ impl<P: Provider> Display for LinuxFBDisplay<P> {
             self.buffer[index..index + 3].copy_from_slice(pixel.to_bgr().channels());
         }
         self.map[..].copy_from_slice(&self.buffer[..]);
-        println!("Rendering: {}ms", start.elapsed().as_millis());
         Ok(())
     }
 
