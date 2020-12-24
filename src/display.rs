@@ -1,4 +1,5 @@
 use image::{DynamicImage, GenericImageView, Pixel};
+use std::time::Instant;
 
 pub trait Display {
     type Error;
@@ -13,7 +14,12 @@ pub trait Display {
 }
 
 pub fn preprocess_image(img: DynamicImage, width: u32, height: u32) -> DynamicImage {
+    let start = Instant::now();
     let img = img.resize(width, height, image::imageops::FilterType::Triangle);
-    println!("resized img {:?}", img.dimensions());
+    println!(
+        "Resize {:?}, {}ms",
+        img.dimensions(),
+        start.elapsed().as_millis()
+    );
     img
 }

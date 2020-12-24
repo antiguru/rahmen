@@ -2,12 +2,11 @@ use crate::display::{preprocess_image, Display};
 use crate::errors::{ProviderError, RahmenError};
 use crate::provider::Provider;
 use image::{GenericImageView, Pixel};
-use linuxfb::double::Buffer;
-use linuxfb::{BlankingLevel, Framebuffer};
+use linuxfb::Framebuffer;
 use memmap::MmapMut;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-pub fn setup_framebuffer(framebuffer: &mut Framebuffer) -> () {
+pub fn setup_framebuffer(framebuffer: &mut Framebuffer) {
     framebuffer.set_bytes_per_pixel(4).unwrap();
     framebuffer.set_offset(0, 0).unwrap();
 
@@ -44,18 +43,19 @@ impl<P: Provider> Display for LinuxFBDisplay<P> {
         &mut self,
         img: V,
     ) -> Result<(), Self::Error> {
+        let start = Instant::now();
         self.buffer.clear();
         self.buffer
             .extend(std::iter::repeat(0).take(self.buffer.capacity()));
         let dimensions = self.dimensions();
         let x_offset = (dimensions.0 - img.dimensions().0) / 2;
         let y_offset = (dimensions.1 - img.dimensions().1) / 2;
-        println!("x_offset: {}, y_offset: {}", x_offset, y_offset);
         for (x, y, pixel) in img.pixels() {
             let index = (x_offset + x + dimensions.0 * (y + y_offset)) as usize * 4;
             self.buffer[index..index + 3].copy_from_slice(pixel.to_bgr().channels());
         }
         self.map[..].copy_from_slice(&self.buffer[..]);
+        println!("Rendering: {}ms", start.elapsed().as_millis());
         Ok(())
     }
 
@@ -64,7 +64,6 @@ impl<P: Provider> Display for LinuxFBDisplay<P> {
     }
 
     fn main_loop(&mut self) {
-        println!("main_loop");
         loop {
             match self.provider.next_image() {
                 Ok(img) => self

@@ -3,10 +3,9 @@ use crate::errors::{ProviderError, RahmenError};
 use crate::provider::Provider;
 use framebuffer::Framebuffer;
 use image::{GenericImageView, Pixel};
-use memmap::MmapMut;
 use std::time::Duration;
 
-pub fn setup_framebuffer(framebuffer: &mut Framebuffer) -> () {
+pub fn setup_framebuffer(framebuffer: &mut Framebuffer) {
     assert_eq!(framebuffer.var_screen_info.bits_per_pixel, 32);
 }
 

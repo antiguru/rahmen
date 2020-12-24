@@ -34,7 +34,6 @@ impl<P: Provider> Display for MiniFBDisplay<P> {
         let mut buffer = vec![0; (self.dimensions().0 * self.dimensions().1) as _];
         let x_offset = (self.dimensions().0 - img.dimensions().0) / 2;
         let y_offset = (self.dimensions().1 - img.dimensions().1) / 2;
-        println!("x_offset: {}, y_offset: {}", x_offset, y_offset);
         for (x, y, pixel) in img.pixels() {
             buffer[(x_offset + x + self.dimensions().0 * (y + y_offset)) as usize] =
                 from_rgb(&pixel.to_rgb());

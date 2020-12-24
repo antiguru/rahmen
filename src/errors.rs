@@ -1,6 +1,5 @@
 use std::error::Error;
 use std::fmt;
-use std::fmt::Write;
 
 #[derive(Debug)]
 pub enum RahmenError {
@@ -24,7 +23,7 @@ impl fmt::Display for RahmenError {
             RahmenError::FramebufferError(err) => err.fmt(f),
             RahmenError::ImageError(err) => err.fmt(f),
             RahmenError::IoError(err) => err.fmt(f),
-            RahmenError::LinuxFBError(err) => f.write_str("linuxfb::Error"),
+            RahmenError::LinuxFBError(_err) => f.write_str("linuxfb::Error"),
             RahmenError::Provider(err) => err.fmt(f),
         }
     }
@@ -36,7 +35,7 @@ impl Error for RahmenError {
             RahmenError::FramebufferError(err) => err.source(),
             RahmenError::ImageError(err) => err.source(),
             RahmenError::IoError(err) => err.source(),
-            RahmenError::LinuxFBError(err) => None,
+            RahmenError::LinuxFBError(_err) => None,
             RahmenError::Provider(err) => err.source(),
         }
     }

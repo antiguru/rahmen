@@ -1,9 +1,8 @@
 use std::time::{Duration, Instant};
 
-use image::{DynamicImage, ImageFormat};
+use image::{DynamicImage, Pixel};
 
 use crate::errors::{ProviderError, RahmenError, RahmenResult};
-use std::io::BufReader;
 use std::path::Path;
 
 pub trait Provider {
@@ -80,9 +79,24 @@ impl<P: Provider> Provider for RetryProvider<P> {
 }
 
 pub fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
-    Ok(image::io::Reader::with_format(
-        BufReader::new(std::fs::File::open(&path)?),
-        ImageFormat::from_path(&path)?,
-    )
-    .decode()?)
+    println!("Loading {:?}", path.as_ref());
+    let start = Instant::now();
+    let d = mozjpeg::Decompress::with_markers(mozjpeg::ALL_MARKERS).from_path(&path)?;
+    let mut img = DynamicImage::new_bgra8(d.width() as _, d.height() as _);
+    let height = d.height();
+    let buffer: Option<Vec<[u8; 4]>> = d
+        .to_colorspace(mozjpeg::ColorSpace::JCS_EXT_BGRA)?
+        .read_scanlines();
+    let rgba_img = img.as_mut_bgra8().unwrap();
+    if let Some(buffer) = buffer {
+        for (row, row_buffer) in buffer.chunks(buffer.len() / height).enumerate() {
+            for (col, pixel) in row_buffer.iter().enumerate() {
+                *rgba_img.get_pixel_mut(col as _, row as _) = *image::Bgra::from_slice(pixel);
+            }
+        }
+        println!("Loading took: {}ms", start.elapsed().as_millis());
+        Ok(img)
+    } else {
+        panic!("Failed to decode image: {:?}", path.as_ref());
+    }
 }

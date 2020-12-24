@@ -19,9 +19,7 @@ use rahmen::display_minifb::MiniFBDisplay;
 use rahmen::errors::RahmenResult;
 use rahmen::provider::{ImageErrorToRetryProvider, Provider, RateLimitingProvider, RetryProvider};
 use rahmen::provider_list::ListProvider;
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::str::FromStr;
 
 fn main() -> RahmenResult<()> {
     let matches = App::new("Rahmen client")
@@ -51,6 +49,14 @@ fn main() -> RahmenResult<()> {
                 .long("output")
                 .takes_value(true),
         )
+        .arg(
+            Arg::new("time")
+                .short('t')
+                .long("time")
+                .takes_value(true)
+                .validator(|v| f64::from_str(v))
+                .default_value("90"),
+        )
         .get_matches();
 
     let provider: Box<dyn Provider> = match matches.value_of("provider").expect("Provider missing")
@@ -69,7 +75,9 @@ fn main() -> RahmenResult<()> {
 
     let provider = RateLimitingProvider::new(
         RetryProvider::new(ImageErrorToRetryProvider::new(provider)),
-        Duration::from_secs(0),
+        Duration::from_millis(
+            (f64::from_str(matches.value_of("time").unwrap()).unwrap() * 1000f64) as u64,
+        ),
     );
 
     match matches.value_of("display").expect("Display missing") {
@@ -90,29 +98,17 @@ fn main() -> RahmenResult<()> {
             MiniFBDisplay::new(window, provider).main_loop();
         }
         "linuxfb" => {
-            let mut framebuffer = linuxfb::Framebuffer::new(
+            let framebuffer = linuxfb::Framebuffer::new(
                 matches
                     .value_of("output")
                     .expect("Framebuffer output missing"),
             )?;
-            println!("Framebuffer size: {:?}", framebuffer.get_size());
             println!(
-                "Framebuffer virtual size: {:?}",
+                "Framebuffer size: {:?}, virtual: {:?}",
+                framebuffer.get_size(),
                 framebuffer.get_virtual_size()
             );
-            framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Graphics)
-                .map_err(|_e| println!("Failed to switch to graphics mode"));
-            rahmen::wrap_panic_and_restore(
-                || {
-                    LinuxFBDisplay::new(provider, framebuffer).main_loop();
-                },
-                || {
-                    framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Text)
-                        .map_err(|_e| eprintln!("Failed to restore text mode"))
-                        .unwrap();
-                },
-            );
-            framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Text)?;
+            LinuxFBDisplay::new(provider, framebuffer).main_loop();
         }
         "framebuffer" => {
             let path_to_device = matches

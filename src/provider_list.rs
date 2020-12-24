@@ -24,7 +24,6 @@ impl<R: BufRead> Provider for ListProvider<R> {
             Err(RahmenError::Provider(ProviderError::Eof))
         } else {
             let trimmed = &self.buffer.trim();
-            println!("Reading {}", trimmed);
             load_image_from_path(&PathBuf::from(trimmed))
         }
     }
