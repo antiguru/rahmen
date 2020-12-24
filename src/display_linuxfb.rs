@@ -4,7 +4,7 @@ use crate::provider::Provider;
 use image::{GenericImageView, Pixel};
 use linuxfb::Framebuffer;
 use memmap::MmapMut;
-use std::time::{Duration, Instant};
+use std::time::{Duration};
 
 pub fn setup_framebuffer(framebuffer: &mut Framebuffer) {
     framebuffer.set_bytes_per_pixel(4).unwrap();

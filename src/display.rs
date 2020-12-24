@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use image::{DynamicImage, GenericImageView, Pixel};
 
 use crate::errors::RahmenResult;
