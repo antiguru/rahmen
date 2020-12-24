@@ -6,7 +6,7 @@ use crate::errors::{ProviderError, RahmenError, RahmenResult};
 use std::error::Error;
 use std::io::BufReader;
 use std::marker::PhantomData;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub trait Provider<D> {
     fn next_image(&mut self) -> RahmenResult<D>;
@@ -130,7 +130,7 @@ fn load_jpeg<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
     }
 }
 
-pub fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
+fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
     let _t = crate::Timer::new(|e| println!("Loading {}ms", e.as_millis()));
     println!("Loading {:?}", path.as_ref());
     match image::ImageFormat::from_path(&path)? {
@@ -140,5 +140,24 @@ pub fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImag
             format,
         )
         .decode()?),
+    }
+}
+
+pub struct PathToImageProvider<P: Provider<PathBuf>> {
+    provider: P,
+}
+
+impl<P: Provider<PathBuf>> PathToImageProvider<P> {
+    pub fn new(provider: P) -> Self {
+        Self { provider }
+    }
+}
+
+impl<P: Provider<PathBuf>> Provider<DynamicImage> for PathToImageProvider<P> {
+    fn next_image(&mut self) -> RahmenResult<DynamicImage> {
+        match self.provider.next_image() {
+            Ok(path) => load_image_from_path(path),
+            Err(e) => Err(e),
+        }
     }
 }

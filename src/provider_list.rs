@@ -1,6 +1,5 @@
 use crate::errors::{ProviderError, RahmenError, RahmenResult};
-use crate::provider::{load_image_from_path, Provider};
-use image::DynamicImage;
+use crate::provider::Provider;
 use std::io::BufRead;
 use std::path::PathBuf;
 
@@ -17,14 +16,14 @@ impl<R: BufRead> ListProvider<R> {
         }
     }
 }
-impl<R: BufRead> Provider<DynamicImage> for ListProvider<R> {
-    fn next_image(&mut self) -> RahmenResult<DynamicImage> {
+impl<R: BufRead> Provider<PathBuf> for ListProvider<R> {
+    fn next_image(&mut self) -> RahmenResult<PathBuf> {
         self.buffer.clear();
         if self.reader.read_line(&mut self.buffer)? == 0 {
             Err(RahmenError::Provider(ProviderError::Eof))
         } else {
             let trimmed = &self.buffer.trim();
-            load_image_from_path(&PathBuf::from(trimmed))
+            Ok(PathBuf::from(trimmed))
         }
     }
 }

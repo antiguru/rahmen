@@ -1,7 +1,6 @@
 use crate::errors::{ProviderError, RahmenError, RahmenResult};
-use crate::provider::{load_image_from_path, Provider};
+use crate::provider::Provider;
 use glob::glob;
-use image::DynamicImage;
 use std::path::PathBuf;
 
 pub struct GlobProvider<I: Iterator<Item = PathBuf>> {
@@ -16,11 +15,10 @@ pub fn create(pattern: &str) -> RahmenResult<GlobProvider<impl Iterator<Item = P
     })
 }
 
-impl<I: Iterator<Item = PathBuf>> Provider<DynamicImage> for GlobProvider<I> {
-    fn next_image(&mut self) -> RahmenResult<DynamicImage> {
+impl<I: Iterator<Item = PathBuf>> Provider<PathBuf> for GlobProvider<I> {
+    fn next_image(&mut self) -> RahmenResult<PathBuf> {
         self.path_iter
             .next()
             .ok_or(RahmenError::Provider(ProviderError::Eof))
-            .and_then(load_image_from_path)
     }
 }

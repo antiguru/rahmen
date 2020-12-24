@@ -17,7 +17,9 @@ use rahmen::display_linuxfb::LinuxFBDisplay;
 #[cfg(feature = "minifb")]
 use rahmen::display_minifb::MiniFBDisplay;
 use rahmen::errors::RahmenResult;
-use rahmen::provider::{ImageErrorToRetryProvider, Provider, RateLimitingProvider, RetryProvider};
+use rahmen::provider::{
+    ImageErrorToRetryProvider, PathToImageProvider, Provider, RateLimitingProvider, RetryProvider,
+};
 use rahmen::provider_list::ListProvider;
 use std::str::FromStr;
 
@@ -73,6 +75,7 @@ fn main() -> RahmenResult<()> {
         other => panic!("Unknown provider: {}", other),
     };
 
+    let provider = PathToImageProvider::new(provider);
     let provider = RateLimitingProvider::new(
         RetryProvider::new(ImageErrorToRetryProvider::new(provider)),
         Duration::from_millis(
