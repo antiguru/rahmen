@@ -7,6 +7,7 @@ pub enum RahmenError {
     ImageError(image::error::ImageError),
     IoError(std::io::Error),
     LinuxFBError(linuxfb::Error),
+    #[cfg(feature = "minifb")]
     MiniFBError(minifb::Error),
     Provider(ProviderError),
 }
@@ -25,6 +26,7 @@ impl fmt::Display for RahmenError {
             RahmenError::ImageError(err) => err.fmt(f),
             RahmenError::IoError(err) => err.fmt(f),
             RahmenError::LinuxFBError(_err) => f.write_str("linuxfb::Error"),
+            #[cfg(feature = "minifb")]
             RahmenError::MiniFBError(err) => err.fmt(f),
             RahmenError::Provider(err) => err.fmt(f),
         }
@@ -38,6 +40,7 @@ impl Error for RahmenError {
             RahmenError::ImageError(err) => err.source(),
             RahmenError::IoError(err) => err.source(),
             RahmenError::LinuxFBError(_err) => None,
+            #[cfg(feature = "minifb")]
             RahmenError::MiniFBError(err) => err.source(),
             RahmenError::Provider(err) => err.source(),
         }
@@ -68,6 +71,7 @@ impl From<framebuffer::FramebufferError> for RahmenError {
     }
 }
 
+#[cfg(feature = "minifb")]
 impl From<minifb::Error> for RahmenError {
     fn from(e: minifb::Error) -> Self {
         RahmenError::MiniFBError(e)
