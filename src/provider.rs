@@ -22,7 +22,7 @@ pub struct RateLimitingProvider<D, P: Provider<D>> {
     provider: P,
     interval: Duration,
     last_updated: Instant,
-    next_image: Option<D>,
+    next_image: Option<RahmenResult<D>>,
 }
 
 impl<D, P: Provider<D>> RateLimitingProvider<D, P> {
@@ -39,12 +39,12 @@ impl<D, P: Provider<D>> RateLimitingProvider<D, P> {
 impl<D, P: Provider<D>> Provider<D> for RateLimitingProvider<D, P> {
     fn next_image(&mut self) -> RahmenResult<D> {
         if self.next_image.is_none() {
-            self.next_image = Some(self.provider.next_image()?);
+            self.next_image = Some(self.provider.next_image());
         }
 
         if self.last_updated + self.interval < Instant::now() {
             self.last_updated = Instant::now();
-            Ok(self.next_image.take().unwrap())
+            self.next_image.take().unwrap()
         } else {
             Err(RahmenError::Provider(ProviderError::Idle))
         }
