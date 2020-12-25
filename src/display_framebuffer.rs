@@ -36,21 +36,16 @@ impl<P: Provider<DynamicImage>> Display for FramebufferDisplay<P> {
         &mut self,
         img: V,
     ) -> RahmenResult<()> {
-        println!("Clearing buffer");
         self.buffer.clear();
-        println!("zeroing buffer");
         self.buffer
             .extend(std::iter::repeat(0).take(self.buffer.capacity()));
         let dimensions = self.dimensions();
         let x_offset = (dimensions.0 - img.dimensions().0) / 2;
         let y_offset = (dimensions.1 - img.dimensions().1) / 2;
-        println!("x_offset: {}, y_offset: {}", x_offset, y_offset);
-        println!("writing image to buffer");
         for (x, y, pixel) in img.pixels() {
             let index = (x_offset + x + dimensions.0 * (y + y_offset)) as usize * 4;
             self.buffer[index..index + 3].copy_from_slice(pixel.to_bgr().channels());
         }
-        println!("writing buffer to framebuffer");
         self.framebuffer.frame[..self.buffer.len()].copy_from_slice(&self.buffer[..]);
         Ok(())
     }
@@ -63,7 +58,6 @@ impl<P: Provider<DynamicImage>> Display for FramebufferDisplay<P> {
     }
 
     fn main_loop(&mut self) {
-        println!("main_loop, dimesions: {:?}", self.dimensions());
         loop {
             match self.provider.next_image() {
                 Ok(img) => self

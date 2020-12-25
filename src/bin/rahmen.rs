@@ -4,6 +4,7 @@ extern crate image;
 use std::fs::{File, OpenOptions};
 use std::io::BufReader;
 use std::panic;
+use std::str::FromStr;
 use std::time::Duration;
 
 use clap::{App, Arg};
@@ -18,7 +19,6 @@ use rahmen::display_minifb::MiniFBDisplay;
 use rahmen::errors::RahmenResult;
 use rahmen::provider::{PathToImageProvider, Provider, RateLimitingProvider, RetryProvider};
 use rahmen::provider_list::ListProvider;
-use std::str::FromStr;
 
 fn main() -> RahmenResult<()> {
     let matches = App::new("Rahmen client")
