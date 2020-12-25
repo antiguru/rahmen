@@ -4,7 +4,6 @@ extern crate image;
 use std::fs::{File, OpenOptions};
 use std::io::BufReader;
 use std::panic;
-use std::path::PathBuf;
 use std::time::Duration;
 
 use clap::{App, Arg};
@@ -40,16 +39,7 @@ fn main() -> RahmenResult<()> {
                 ])
                 .default_value("minifb"),
         )
-        .arg(
-            Arg::new("provider")
-                .short('p')
-                .long("provider")
-                .about("Image provider")
-                .takes_value(true)
-                .possible_values(&["pattern", "list"])
-                .default_value("list"),
-        )
-        .arg(Arg::new("input").short('i').long("input").takes_value(true))
+        .arg(Arg::new("input").takes_value(true).required(true).index(1))
         .arg(
             Arg::new("output")
                 .short('o')
@@ -66,18 +56,16 @@ fn main() -> RahmenResult<()> {
         )
         .get_matches();
 
-    let provider = matches.value_of("provider").expect("Provider missing");
-    let provider: Box<dyn Provider<_>> = match provider {
-        "pattern" => Box::new(rahmen::provider_glob::create(
-            matches.value_of("input").expect("Input mising"),
-        )?),
-        "list" => Box::new(ListProvider::new(BufReader::new(
-            File::open(&PathBuf::from(
-                matches.value_of("input").expect("Input mising"),
-            ))
-            .expect("Failed to open input"),
-        ))),
-        other => panic!("Unknown provider: {}", other),
+    let input = matches.value_of("input").expect("Input missing");
+    let provider: Box<dyn Provider<_>> = if input.eq("-") {
+        println!("Reading from stdin");
+        Box::new(ListProvider::new(BufReader::new(std::io::stdin())))
+    } else if let Ok(file) = File::open(input) {
+        println!("Reading from file");
+        Box::new(ListProvider::new(BufReader::new(file)))
+    } else {
+        println!("Reading from pattern {}", input);
+        Box::new(rahmen::provider_glob::create(input)?)
     };
 
     let provider = provider.path_to_image();
