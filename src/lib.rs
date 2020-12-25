@@ -1,6 +1,5 @@
 extern crate glob;
 extern crate image;
-extern crate linuxfb;
 extern crate memmap;
 #[cfg(feature = "minifb")]
 extern crate minifb;
@@ -10,7 +9,6 @@ use std::time::{Duration, Instant};
 
 pub mod display;
 pub mod display_framebuffer;
-pub mod display_linuxfb;
 #[cfg(feature = "minifb")]
 pub mod display_minifb;
 pub mod errors;

@@ -13,7 +13,6 @@ use minifb::{Window, WindowOptions};
 
 use rahmen::display::Display;
 use rahmen::display_framebuffer::FramebufferDisplay;
-use rahmen::display_linuxfb::LinuxFBDisplay;
 #[cfg(feature = "minifb")]
 use rahmen::display_minifb::MiniFBDisplay;
 use rahmen::errors::RahmenResult;
@@ -31,7 +30,6 @@ fn main() -> RahmenResult<()> {
                 .takes_value(true)
                 .possible_values(&[
                     "framebuffer",
-                    "linuxfb",
                     #[cfg(feature = "minifb")]
                     "minifb",
                 ])
@@ -89,19 +87,6 @@ fn main() -> RahmenResult<()> {
             // Limit to max ~60 fps update rate
             window.limit_update_rate(Some(std::time::Duration::from_secs(1) / 30));
             MiniFBDisplay::new(window, provider).main_loop();
-        }
-        "linuxfb" => {
-            let framebuffer = linuxfb::Framebuffer::new(
-                matches
-                    .value_of("output")
-                    .expect("Framebuffer output missing"),
-            )?;
-            println!(
-                "Framebuffer size: {:?}, virtual: {:?}",
-                framebuffer.get_size(),
-                framebuffer.get_virtual_size()
-            );
-            LinuxFBDisplay::new(provider, framebuffer).main_loop();
         }
         "framebuffer" => {
             let path_to_device = matches

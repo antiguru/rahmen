@@ -36,6 +36,7 @@ impl<P: Provider<DynamicImage>> Display for FramebufferDisplay<P> {
         &mut self,
         img: V,
     ) -> RahmenResult<()> {
+        let _t = crate::Timer::new(|e| println!("Rendering {}ms", e.as_millis()));
         self.buffer.clear();
         self.buffer
             .extend(std::iter::repeat(0).take(self.buffer.capacity()));
