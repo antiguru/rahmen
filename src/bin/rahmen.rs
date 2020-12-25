@@ -1,7 +1,6 @@
 extern crate clap;
-extern crate image;
 
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::BufReader;
 use std::panic;
 use std::str::FromStr;
@@ -92,18 +91,6 @@ fn main() -> RahmenResult<()> {
             let path_to_device = matches
                 .value_of("output")
                 .expect("Framebuffer output missing");
-            let device = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .open(&path_to_device)?;
-            println!(
-                "{:?}",
-                framebuffer::Framebuffer::get_fix_screeninfo(&device).unwrap()
-            );
-            println!(
-                "{:?}",
-                framebuffer::Framebuffer::get_var_screeninfo(&device).unwrap()
-            );
             let mut framebuffer = framebuffer::Framebuffer::new(path_to_device).unwrap();
             rahmen::display_framebuffer::setup_framebuffer(&mut framebuffer);
             // let _ = framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Graphics).unwrap();
