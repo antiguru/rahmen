@@ -1,4 +1,5 @@
 extern crate clap;
+extern crate ctrlc;
 
 use std::fs::File;
 use std::io::BufReader;
@@ -93,9 +94,17 @@ fn main() -> RahmenResult<()> {
                 .expect("Framebuffer output missing");
             let mut framebuffer = framebuffer::Framebuffer::new(path_to_device).unwrap();
             rahmen::display_framebuffer::setup_framebuffer(&mut framebuffer);
-            // let _ = framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Graphics).unwrap();
+            let _ = framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Graphics)
+                .map_err(|_e| println!("Failed to set graphics mode."));
+            ctrlc::set_handler(|| {
+                let _ = framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Text)
+                    .map_err(|_e| println!("Failed to set graphics mode."));
+                std::process::exit(0);
+            })
+            .unwrap();
             FramebufferDisplay::new(provider, framebuffer).main_loop();
-            // let _ = framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Text).unwrap();
+            let _ = framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Text)
+                .map_err(|_e| println!("Failed to set graphics mode."));
         }
         other => panic!("Unexpected display driver: {}", other),
     };
