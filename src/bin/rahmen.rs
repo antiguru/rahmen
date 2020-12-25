@@ -16,9 +16,7 @@ use rahmen::display_linuxfb::LinuxFBDisplay;
 #[cfg(feature = "minifb")]
 use rahmen::display_minifb::MiniFBDisplay;
 use rahmen::errors::RahmenResult;
-use rahmen::provider::{
-    ImageErrorToRetryProvider, PathToImageProvider, Provider, RateLimitingProvider, RetryProvider,
-};
+use rahmen::provider::{PathToImageProvider, Provider, RateLimitingProvider, RetryProvider};
 use rahmen::provider_list::ListProvider;
 use std::str::FromStr;
 
@@ -68,9 +66,8 @@ fn main() -> RahmenResult<()> {
         Box::new(rahmen::provider_glob::create(input)?)
     };
 
-    let provider = provider.path_to_image();
     let provider = RateLimitingProvider::new(
-        RetryProvider::new(ImageErrorToRetryProvider::new(provider)),
+        RetryProvider::new(provider.path_to_image()),
         Duration::from_millis(
             (f64::from_str(matches.value_of("time").unwrap()).unwrap() * 1000f64) as u64,
         ),

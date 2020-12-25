@@ -1,12 +1,11 @@
+use std::io::BufReader;
+use std::marker::PhantomData;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use image::{DynamicImage, Pixel};
 
 use crate::errors::{ProviderError, RahmenError, RahmenResult};
-use std::error::Error;
-use std::io::BufReader;
-use std::marker::PhantomData;
-use std::path::{Path, PathBuf};
 
 pub trait Provider<D> {
     fn next_image(&mut self) -> RahmenResult<D>;
@@ -47,39 +46,6 @@ impl<D, P: Provider<D>> Provider<D> for RateLimitingProvider<D, P> {
             self.next_image.take().unwrap()
         } else {
             Err(RahmenError::Provider(ProviderError::Idle))
-        }
-    }
-}
-
-pub struct ImageErrorToRetryProvider<D, P: Provider<D>> {
-    provider: P,
-    _phantom_data: PhantomData<D>,
-}
-
-impl<D, P: Provider<D>> ImageErrorToRetryProvider<D, P> {
-    pub fn new(provider: P) -> Self {
-        Self {
-            provider,
-            _phantom_data: PhantomData,
-        }
-    }
-}
-
-fn report_and_raise<E: Error, R>(error: E, raise: RahmenError) -> RahmenResult<R> {
-    eprintln!("Suppressing error: {}", error);
-    Err(raise)
-}
-
-impl<D, P: Provider<D>> Provider<D> for ImageErrorToRetryProvider<D, P> {
-    fn next_image(&mut self) -> RahmenResult<D> {
-        match self.provider.next_image() {
-            Err(RahmenError::ImageError(e)) => {
-                report_and_raise(e, RahmenError::Provider(ProviderError::Retry))
-            }
-            Err(RahmenError::IoError(e)) => {
-                report_and_raise(e, RahmenError::Provider(ProviderError::Retry))
-            }
-            res => res,
         }
     }
 }
@@ -160,7 +126,10 @@ impl<P: Provider<PathBuf>> PathToImageProvider<P> for P {
 impl<P: Provider<PathBuf>> Provider<DynamicImage> for PathToImageProviderImpl<P> {
     fn next_image(&mut self) -> RahmenResult<DynamicImage> {
         match self.provider.next_image() {
-            Ok(path) => load_image_from_path(path),
+            Ok(path) => load_image_from_path(&path).map_err(|e| {
+                eprintln!("Failed to read image {:?}: {}", path.as_os_str(), e);
+                RahmenError::Provider(ProviderError::Retry)
+            }),
             Err(e) => Err(e),
         }
     }
