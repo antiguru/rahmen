@@ -32,7 +32,12 @@ fn main() -> RahmenResult<()> {
                 .about("Select the display provider")
                 .value_name("display")
                 .takes_value(true)
-                .possible_values(&["framebuffer", "linuxfb", "minifb"])
+                .possible_values(&[
+                    "framebuffer",
+                    "linuxfb",
+                    #[cfg(feature = "minifb")]
+                    "minifb",
+                ])
                 .default_value("minifb"),
         )
         .arg(
