@@ -96,7 +96,7 @@ fn load_jpeg<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
     }
 }
 
-fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
+pub fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
     let _t = crate::Timer::new(|e| println!("Loading {}ms", e.as_millis()));
     println!("Loading {:?}", path.as_ref());
     match image::ImageFormat::from_path(&path)? {
