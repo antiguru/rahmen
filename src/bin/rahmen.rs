@@ -12,7 +12,7 @@ use clap::{App, Arg};
 #[cfg(feature = "minifb")]
 use minifb::{Window, WindowOptions};
 use timely::dataflow::operators::{
-    Branch, Capability, CapabilityRef, Concat, ConnectLoop, Enter, Inspect, Leave, LoopVariable,
+    Branch, Capability, CapabilityRef, Capture, Concat, ConnectLoop, Enter, Leave, LoopVariable,
     Map, Operator, Probe,
 };
 use timely::dataflow::{InputHandle, ProbeHandle, Scope};
@@ -21,10 +21,11 @@ use rahmen::display::{preprocess_image, Display};
 use rahmen::display_framebuffer::FramebufferDisplay;
 #[cfg(feature = "minifb")]
 use rahmen::display_minifb::MiniFBDisplay;
-use rahmen::errors::RahmenResult;
+use rahmen::errors::{RahmenError, RahmenResult};
 use rahmen::provider::{load_image_from_path, Provider};
 use rahmen::provider_list::ListProvider;
 
+use timely::dataflow::operators::capture::Event;
 use timely::order::Product;
 use timely::progress::Timestamp;
 
@@ -88,20 +89,21 @@ fn main() -> RahmenResult<()> {
 
     let dimensions = display.dimensions();
 
-    worker.dataflow(|scope| {
+    let output = worker.dataflow(|scope| {
         let _last_time: Option<Instant> = None;
         let time_str = matches.value_of("time").unwrap();
         let delay = Duration::from_millis((f64::from_str(time_str).unwrap() * 1000f64) as u64);
         println!("Delay: {:?}", delay);
-        let stream = input
-            .to_stream(scope)
-            .unary_frontier(
-                timely::dataflow::channels::pact::Pipeline,
-                "Ticker",
-                |cap: Capability<Duration>, _op| {
-                    let mut buffer = vec![];
-                    let mut retained_cap: Capability<Duration> = cap.delayed(cap.time());
-                    move |input_handle, output_handle| {
+        let stream = input.to_stream(scope).unary_frontier(
+            timely::dataflow::channels::pact::Pipeline,
+            "Ticker",
+            |cap: Capability<Duration>, _op| {
+                let mut buffer = vec![];
+                let mut retained_cap: Option<Capability<Duration>> = Some(cap.delayed(cap.time()));
+                move |input_handle, output_handle| {
+                    if input_handle.frontier.is_empty() {
+                        retained_cap.take();
+                    } else if let Some(retained_cap) = retained_cap.as_mut() {
                         if !input_handle
                             .frontier
                             .frontier()
@@ -110,14 +112,14 @@ fn main() -> RahmenResult<()> {
                             output_handle.session(&retained_cap).give(());
                             retained_cap.downgrade(&(*retained_cap.time() + delay))
                         }
-                        while let Some((cap, in_buffer)) = input_handle.next() {
-                            in_buffer.swap(&mut buffer);
-                            output_handle.session(&cap).give_vec(&mut buffer);
-                        }
                     }
-                },
-            )
-            .inspect_time(|x, t| println!("{:?} at {:?}", t, x));
+                    while let Some((cap, in_buffer)) = input_handle.next() {
+                        in_buffer.swap(&mut buffer);
+                        output_handle.session(&cap).give_vec(&mut buffer);
+                    }
+                }
+            },
+        );
         let dimensions_stream = input_dimensions.to_stream(scope);
         scope
             .scoped::<Product<_, u32>, _, _>("File loading", |inner| {
@@ -125,15 +127,11 @@ fn main() -> RahmenResult<()> {
                 let (ok, err) = stream
                     .enter(inner)
                     .concat(&cycle)
-                    .map(move |_| provider.next_image().unwrap())
-                    .map(|p| {
-                        load_image_from_path(p)
-                            .map_err(|e| eprintln!("Failed to load image: {}", e))
-                            .ok()
-                    })
-                    .branch(|_t, d| d.is_none());
+                    .map(move |_| provider.next_image())
+                    .map(|p| p.and_then(|p| load_image_from_path(p)))
+                    .branch(|_t, d| d.as_ref().err() == Some(&RahmenError::Retry));
                 err.map(|_| ()).connect_loop(handle);
-                ok.map(Option::unwrap).leave()
+                ok.leave()
             })
             .binary(
                 &dimensions_stream,
@@ -160,7 +158,6 @@ fn main() -> RahmenResult<()> {
                         }
                         in1.for_each(|time, data| {
                             if let Some(image) = data.last() {
-                                println!("Got image");
                                 current_image = Some(image.clone());
                                 did_work |= true;
                             }
@@ -168,32 +165,45 @@ fn main() -> RahmenResult<()> {
                         });
                         in2.for_each(|time, data| {
                             if let Some(dims) = data.last() {
-                                println!("Got dimension");
                                 dimensions = Some(dims.clone());
                                 did_work |= true;
                             }
                             track_time(&mut cap, time);
                         });
-                        if did_work && dimensions.is_some() && current_image.is_some() {
-                            println!("Dimensions: {:?}", dimensions);
-                            out.session(cap.as_ref().unwrap()).give(preprocess_image(
-                                current_image.as_ref().unwrap(),
-                                dimensions.unwrap().0,
-                                dimensions.unwrap().1,
-                            ));
+                        if did_work && dimensions.is_some() {
+                            if let Some(current_image) = current_image.as_ref() {
+                                if let Ok(current_image) = current_image {
+                                    out.session(cap.as_ref().unwrap()).give(Ok(preprocess_image(
+                                        &current_image,
+                                        dimensions.unwrap().0,
+                                        dimensions.unwrap().1,
+                                    )));
+                                } else if let Err(current_image_err) = current_image {
+                                    out.session(cap.as_ref().unwrap())
+                                        .give(Err(current_image_err.clone()));
+                                }
+                            }
                         }
                     }
                 },
             )
-            .map(move |img| display.render(img).unwrap())
-            .probe_with(&mut probe);
+            .map(move |img| img.map(|img| display.render(img)))
+            .probe_with(&mut probe)
+            .capture()
     });
 
     input_dimensions.send(dimensions);
     input_dimensions.close();
 
     let start_time = Instant::now();
-    loop {
+    while output
+        .try_iter()
+        .next()
+        .map_or(true, |result| match result {
+            Event::Progress(_) => true,
+            Event::Messages(_, ref r) => !r.contains(&Err(RahmenError::Terminate)),
+        })
+    {
         let now = start_time.elapsed();
         input.advance_to(now);
         while probe.less_than(input.time()) {
@@ -201,4 +211,8 @@ fn main() -> RahmenResult<()> {
         }
         std::thread::sleep(Duration::from_millis(50));
     }
+
+    input.close();
+    while worker.step() {}
+    Ok(())
 }

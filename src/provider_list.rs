@@ -1,5 +1,5 @@
-use crate::errors::{ProviderError, RahmenError, RahmenResult};
-use crate::provider::Provider;
+use crate::errors::{RahmenError, RahmenResult};
+use crate::provider::{Provider, ToRahmenError};
 use std::io::BufRead;
 use std::path::PathBuf;
 
@@ -19,8 +19,13 @@ impl<R: BufRead> ListProvider<R> {
 impl<R: BufRead> Provider<PathBuf> for ListProvider<R> {
     fn next_image(&mut self) -> RahmenResult<PathBuf> {
         self.buffer.clear();
-        if self.reader.read_line(&mut self.buffer)? == 0 {
-            Err(RahmenError::Provider(ProviderError::Eof))
+        if self
+            .reader
+            .read_line(&mut self.buffer)
+            .map_to_rahmen_error(RahmenError::Retry)?
+            == 0
+        {
+            Err(RahmenError::Terminate)
         } else {
             let trimmed = &self.buffer.trim();
             Ok(PathBuf::from(trimmed))
