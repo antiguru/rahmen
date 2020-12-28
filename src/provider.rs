@@ -66,3 +66,18 @@ pub fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImag
         .map_to_rahmen_error(RahmenError::Retry)?),
     }
 }
+pub fn read_exif_from_path<P: AsRef<Path>>(path: P) -> Vec<exif::Field> {
+    let file = std::fs::File::open(path).unwrap();
+    let mut bufreader = std::io::BufReader::new(&file);
+    let exifreader = exif::Reader::new();
+    let exif = exifreader.read_from_container(&mut bufreader).unwrap();
+    exif.fields().cloned().collect()
+    // for f in exif.fields() {
+    //     println!(
+    //         "{} {} {}",
+    //         f.tag,
+    //         f.ifd_num,
+    //         f.display_value().with_unit(&exif)
+    //     );
+    // }
+}

@@ -1,34 +1,33 @@
 extern crate clap;
 extern crate ctrlc;
+extern crate exif;
 extern crate timely;
 
 use std::fs::File;
 use std::io::BufReader;
-
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 use clap::{App, Arg};
-#[cfg(feature = "minifb")]
-use minifb::{Window, WindowOptions};
+use timely::dataflow::operators::capture::Event;
 use timely::dataflow::operators::{
     Branch, Capability, CapabilityRef, Capture, Concat, ConnectLoop, Enter, Leave, LoopVariable,
     Map, Operator, Probe,
 };
 use timely::dataflow::{InputHandle, ProbeHandle, Scope};
+use timely::order::Product;
+use timely::progress::Timestamp;
 
 use rahmen::display::{preprocess_image, Display};
+#[cfg(feature = "fltk")]
+use rahmen::display_fltk::FltkDisplay;
 use rahmen::display_framebuffer::FramebufferDisplay;
 #[cfg(feature = "minifb")]
 use rahmen::display_minifb::MiniFBDisplay;
 use rahmen::errors::{RahmenError, RahmenResult};
 use rahmen::provider::{load_image_from_path, Provider};
 use rahmen::provider_list::ListProvider;
-
-use rahmen::display_fltk::FltkDisplay;
-use timely::dataflow::operators::capture::Event;
-use timely::order::Product;
-use timely::progress::Timestamp;
+use rahmen::timely_result::ResultStream;
 
 fn main() -> RahmenResult<()> {
     let matches = App::new("Rahmen client")
@@ -40,12 +39,11 @@ fn main() -> RahmenResult<()> {
                 .value_name("display")
                 .takes_value(true)
                 .possible_values(&[
+                    #[cfg(feature = "fltk")]
                     "fltk",
                     "framebuffer",
-                    #[cfg(feature = "minifb")]
-                    "minifb",
                 ])
-                .default_value("minifb"),
+                .default_value("framebuffer"),
         )
         .arg(Arg::new("input").takes_value(true).required(true).index(1))
         .arg(
@@ -115,18 +113,26 @@ fn main() -> RahmenResult<()> {
             },
         );
         let dimensions_stream = input_dimensions.to_stream(scope);
-        scope
-            .scoped::<Product<_, u32>, _, _>("File loading", |inner| {
-                let (handle, cycle) = inner.loop_variable(1);
-                let (ok, err) = stream
-                    .enter(inner)
-                    .concat(&cycle)
-                    .map(move |_| provider.next_image())
-                    .map(|p| p.and_then(|p| load_image_from_path(p)))
-                    .branch(|_t, d| d.as_ref().err() == Some(&RahmenError::Retry));
-                err.map(|_| ()).connect_loop(handle);
-                ok.leave()
-            })
+        let img_path_stream = scope.scoped::<Product<_, u32>, _, _>("File loading", |inner| {
+            let (handle, cycle) = inner.loop_variable(1);
+            let (ok, err) = stream
+                .enter(inner)
+                .concat(&cycle)
+                .map(move |_| provider.next_image())
+                .and_then(|p| load_image_from_path(&p).map(|img| (p, img)))
+                .branch(|_t, d| d.as_ref().err() == Some(&RahmenError::Retry));
+            err.map(|_| ()).connect_loop(handle);
+            ok.leave()
+        });
+
+        // img_path_stream
+        //     .ok()
+        //     .flat_map(|(p, _img)| read_exif_from_path(&p))
+        //     .inspect(|x| println!("exif: {:?}", x))
+        //     .probe_with(&mut probe);
+
+        img_path_stream
+            .map(|res| res.map(|(_, img)| img))
             .binary(
                 &dimensions_stream,
                 timely::dataflow::channels::pact::Pipeline,
@@ -221,8 +227,19 @@ fn main() -> RahmenResult<()> {
                 .value_of("output")
                 .expect("Framebuffer output missing");
             let framebuffer = framebuffer::Framebuffer::new(path_to_device).unwrap();
-            FramebufferDisplay::new(framebuffer).main_loop(display_fn)
+            let _ = framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Graphics)
+                .map_err(|_e| println!("Failed to set graphics mode."));
+            ctrlc::set_handler(|| {
+                let _ = framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Text)
+                    .map_err(|_e| println!("Failed to set graphics mode."));
+                std::process::exit(0);
+            })
+            .unwrap();
+            FramebufferDisplay::new(framebuffer).main_loop(display_fn);
+            let _ = framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Text)
+                .map_err(|_e| println!("Failed to set graphics mode."));
         }
+        #[cfg(feature = "fltk")]
         "fltk" => FltkDisplay::new().main_loop(display_fn),
         _ => panic!("Unknown display"),
     };

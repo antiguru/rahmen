@@ -5,6 +5,7 @@ authors = ["Moritz Hoffmann <antiguru@gmail.com>"]
 edition = "2018"
 
 [features]
+default = ["fltk"]
 
 [[bin]]
 name = "rahmen"
@@ -15,8 +16,9 @@ debug = true
 [dependencies]
 clap = "3.0.0-beta.2"
 ctrlc = "3.1.7"
-fltk = {version = "0.12.2", features = ["system-libjpeg"]}
+fltk = {version = "0.12.2", optional = true, features = ["fltk-shared"]}
 glob = "0.3.0"
+kamadak-exif = "0.5.2"
 memmap = "0.7.0"
 mozjpeg = "0.8.21"
 framebuffer = "0.2.2"

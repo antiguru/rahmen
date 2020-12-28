@@ -20,10 +20,12 @@ The first-generation Raspberry Pi had a BCM2835, supporting the ARMv6 instructio
 only support armv7. For this reason, we need to use a different toolchain, for example the one provided specifically for
 the Raspberry Pi on [github.com/raspberrypi/tools](https://github.com/raspberrypi/tools).
 
-`cargo build --target arm-unknown-linux-gnueabihf --bin rahmen --release`
+`cargo build --target arm-unknown-linux-gnueabihf --bin rahmen --release --no-default-features`
 
-## Minifb support
+We pass `--no-default-features` to disable the FLTK display support.
 
-The minifb renders a window on X, which can be used for development.
+## FLTK support
 
-Enable the optional feature `minifb`
+The FLTK renders a window on various platforms, which can be used for development.
+
+The feature `fltk` is enabled by default. Pass `--no-default-features` to disable.
