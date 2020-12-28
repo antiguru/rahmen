@@ -25,6 +25,7 @@ use rahmen::errors::{RahmenError, RahmenResult};
 use rahmen::provider::{load_image_from_path, Provider};
 use rahmen::provider_list::ListProvider;
 
+use rahmen::display_fltk::FltkDisplay;
 use timely::dataflow::operators::capture::Event;
 use timely::order::Product;
 use timely::progress::Timestamp;
@@ -39,6 +40,7 @@ fn main() -> RahmenResult<()> {
                 .value_name("display")
                 .takes_value(true)
                 .possible_values(&[
+                    "fltk",
                     "framebuffer",
                     #[cfg(feature = "minifb")]
                     "minifb",
@@ -80,14 +82,6 @@ fn main() -> RahmenResult<()> {
     let mut input: InputHandle<_, ()> = InputHandle::new();
     let mut input_dimensions: InputHandle<_, (u32, u32)> = InputHandle::new();
     let mut probe = ProbeHandle::new();
-
-    let path_to_device = matches
-        .value_of("output")
-        .expect("Framebuffer output missing");
-    let framebuffer = framebuffer::Framebuffer::new(path_to_device).unwrap();
-    let mut display = FramebufferDisplay::new(framebuffer);
-
-    let dimensions = display.dimensions();
 
     let output = worker.dataflow(|scope| {
         let _last_time: Option<Instant> = None;
@@ -187,32 +181,54 @@ fn main() -> RahmenResult<()> {
                     }
                 },
             )
-            .map(move |img| img.map(|img| display.render(img)))
             .probe_with(&mut probe)
             .capture()
     });
 
-    input_dimensions.send(dimensions);
-    input_dimensions.close();
-
     let start_time = Instant::now();
-    while output
-        .try_iter()
-        .next()
-        .map_or(true, |result| match result {
-            Event::Progress(_) => true,
-            Event::Messages(_, ref r) => !r.contains(&Err(RahmenError::Terminate)),
-        })
-    {
+    let mut dimensions = None;
+
+    let display_fn = |display: Box<&mut dyn Display>| {
         let now = start_time.elapsed();
         input.advance_to(now);
+        if Some(display.dimensions()) != dimensions {
+            dimensions = Some(display.dimensions());
+            input_dimensions.send(display.dimensions());
+        }
+        input_dimensions.advance_to(now);
         while probe.less_than(input.time()) {
             worker.step();
         }
-        std::thread::sleep(Duration::from_millis(50));
-    }
+        match output.try_iter().all(|result| match result {
+            Event::Progress(_) => true,
+            Event::Messages(_, ref r) => {
+                r.iter()
+                    .filter(|r| r.is_ok())
+                    .last()
+                    .map(|img| img.as_ref().map(|img| display.render(img)));
+                !r.iter()
+                    .any(|r| r.as_ref().err() == Some(&RahmenError::Terminate))
+            }
+        }) {
+            true => Ok(()),
+            false => Err(RahmenError::Terminate),
+        }
+    };
+
+    match matches.value_of("display").expect("Display missing") {
+        "framebuffer" => {
+            let path_to_device = matches
+                .value_of("output")
+                .expect("Framebuffer output missing");
+            let framebuffer = framebuffer::Framebuffer::new(path_to_device).unwrap();
+            FramebufferDisplay::new(framebuffer).main_loop(display_fn)
+        }
+        "fltk" => FltkDisplay::new().main_loop(display_fn),
+        _ => panic!("Unknown display"),
+    };
 
     input.close();
+    input_dimensions.close();
     while worker.step() {}
     Ok(())
 }

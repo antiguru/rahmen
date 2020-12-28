@@ -1,16 +1,14 @@
+extern crate fltk;
 extern crate glob;
 extern crate image;
 extern crate memmap;
-#[cfg(feature = "minifb")]
-extern crate minifb;
 extern crate mozjpeg;
 
 use std::time::{Duration, Instant};
 
 pub mod display;
+pub mod display_fltk;
 pub mod display_framebuffer;
-#[cfg(feature = "minifb")]
-pub mod display_minifb;
 pub mod errors;
 pub mod provider;
 pub mod provider_glob;

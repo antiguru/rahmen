@@ -1,9 +1,9 @@
-use crate::display::{Display};
-use crate::errors::{RahmenResult};
+use crate::display::Display;
+use crate::errors::RahmenResult;
 
 use framebuffer::Framebuffer;
-use image::{GenericImageView, Pixel};
-
+use image::{DynamicImage, GenericImageView, Pixel};
+use std::time::Duration;
 
 pub fn setup_framebuffer(framebuffer: &mut Framebuffer) {
     assert_eq!(framebuffer.var_screen_info.bits_per_pixel, 32);
@@ -27,13 +27,19 @@ impl FramebufferDisplay {
             framebuffer,
         }
     }
+
+    pub fn main_loop<F: FnMut(Box<&mut dyn Display>) -> RahmenResult<()>>(
+        &mut self,
+        mut callback: F,
+    ) {
+        while callback(Box::new(self)).is_ok() {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    }
 }
 
 impl Display for FramebufferDisplay {
-    fn render<V: GenericImageView<Pixel = Pi>, Pi: Pixel<Subpixel = u8>>(
-        &mut self,
-        img: V,
-    ) -> RahmenResult<()> {
+    fn render(&mut self, img: &DynamicImage) -> RahmenResult<()> {
         let _t = crate::Timer::new(|e| println!("Rendering {}ms", e.as_millis()));
         println!("Image dimensions: {:?}", img.dimensions());
         self.buffer.clear();

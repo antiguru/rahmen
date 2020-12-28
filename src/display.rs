@@ -1,12 +1,9 @@
-use image::{DynamicImage, GenericImageView, Pixel};
+use image::DynamicImage;
 
 use crate::errors::RahmenResult;
 
 pub trait Display {
-    fn render<V: GenericImageView<Pixel = P>, P: Pixel<Subpixel = u8>>(
-        &mut self,
-        img: V,
-    ) -> RahmenResult<()>;
+    fn render(&mut self, img: &DynamicImage) -> RahmenResult<()>;
 
     fn dimensions(&self) -> (u32, u32);
 }
