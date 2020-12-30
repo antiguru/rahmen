@@ -1,4 +1,4 @@
-use crate::errors::{RahmenError, RahmenResult};
+use crate::errors::RahmenResult;
 use crate::provider::Provider;
 use glob::glob;
 use std::path::PathBuf;

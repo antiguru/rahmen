@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::io::BufReader;
 use std::path::Path;
 
@@ -18,19 +17,6 @@ pub trait Provider<D> {
 impl<D> Provider<D> for Box<dyn Provider<D>> {
     fn next_image(&mut self) -> RahmenResult<Option<D>> {
         (**self).next_image()
-    }
-}
-
-pub trait ToRahmenError<T> {
-    fn map_to_rahmen_error(self, err: RahmenError) -> RahmenResult<T>;
-}
-
-impl<T, E: Display> ToRahmenError<T> for Result<T, E> {
-    fn map_to_rahmen_error(self, err: RahmenError) -> RahmenResult<T> {
-        self.map_err(|e| {
-            eprintln!("Coercing {} to {:?}", e, err);
-            err.into()
-        })
     }
 }
 
@@ -58,14 +44,13 @@ fn load_jpeg<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
 pub fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
     let _t = crate::Timer::new(|e| println!("Loading {}ms", e.as_millis()));
     println!("Loading {:?}", path.as_ref());
-    match image::ImageFormat::from_path(&path).map_to_rahmen_error(RahmenError::Retry)? {
+    match image::ImageFormat::from_path(&path)? {
         image::ImageFormat::Jpeg => load_jpeg(path),
-        format => image::io::Reader::with_format(
-            BufReader::new(std::fs::File::open(&path).map_to_rahmen_error(RahmenError::Retry)?),
-            format,
-        )
-        .decode()
-        .map_err(Into::into),
+        format => {
+            image::io::Reader::with_format(BufReader::new(std::fs::File::open(&path)?), format)
+                .decode()
+                .map_err(Into::into)
+        }
     }
 }
 
