@@ -44,13 +44,10 @@ fn fatal_err<T>(result: RahmenResult<Option<T>>) -> RunResult<T> {
 }
 
 fn suppress_err<T>(result: RahmenResult<T>) -> RunResult<T> {
-    match result {
-        Ok(t) => Ok(t),
-        Err(e) => {
-            eprintln!("Encountered error, suppressing: {}", e);
-            Err(RunControl::Suppressed)
-        }
-    }
+    result.map_err(|e| {
+        eprintln!("Encountered error, suppressing: {}", e);
+        RunControl::Suppressed
+    })
 }
 
 type RunResult<T> = Result<T, RunControl>;
