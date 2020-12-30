@@ -155,12 +155,22 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-channel"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b153fe7cbef478c567df0f972e02e6d736db11affe43dfc9c56a9374d1adfb87"
+dependencies = [
+ "crossbeam-utils 0.7.2",
+ "maybe-uninit",
+]
+
+[[package]]
+name = "crossbeam-channel"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dca26ee1f8d361640700bde38b2c37d8c22b3ce2d360e1fc1c74ea4b0aa7d775"
 dependencies = [
  "cfg-if 1.0.0",
- "crossbeam-utils",
+ "crossbeam-utils 0.8.1",
 ]
 
 [[package]]
@@ -171,7 +181,7 @@ checksum = "94af6efb46fef72616855b036a624cf27ba656ffc9be1b9a3c931cfc7749a9a9"
 dependencies = [
  "cfg-if 1.0.0",
  "crossbeam-epoch",
- "crossbeam-utils",
+ "crossbeam-utils 0.8.1",
 ]
 
 [[package]]
@@ -182,10 +192,21 @@ checksum = "a1aaa739f95311c2c7887a76863f500026092fb1dce0161dab577e559ef3569d"
 dependencies = [
  "cfg-if 1.0.0",
  "const_fn",
- "crossbeam-utils",
+ "crossbeam-utils 0.8.1",
  "lazy_static",
  "memoffset",
  "scopeguard",
+]
+
+[[package]]
+name = "crossbeam-utils"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3c7c73a2d1e9fc0886a08b93e98eb643461230d5f1925e4036204d5f2e261a8"
+dependencies = [
+ "autocfg",
+ "cfg-if 0.1.10",
+ "lazy_static",
 ]
 
 [[package]]
@@ -407,6 +428,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "kdtree"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80ee359328fc9087e9e3fc0a4567c4dd27ec69a127d6a70e8d9dd22845b8b1a2"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -417,6 +447,12 @@ name = "libc"
 version = "0.2.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1482821306169ec4d07f6aca392a4681f66c75c9918aa49641a2595db64053cb"
+
+[[package]]
+name = "maybe-uninit"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 
 [[package]]
 name = "memmap"
@@ -611,6 +647,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "quick-csv"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "edf4b7701db7d2e4c9c010f21eebd8676a50f79223a0cf858162d24bff47338c"
+dependencies = [
+ "rustc-serialize",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -630,8 +675,10 @@ dependencies = [
  "glob",
  "image",
  "kamadak-exif",
+ "lazy_static",
  "memmap",
  "mozjpeg",
+ "reverse_geocoder",
  "timely",
 ]
 
@@ -653,11 +700,24 @@ version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ab346ac5921dc62ffa9f89b7a773907511cdfa5490c572ae9be1be33e8afa4a"
 dependencies = [
- "crossbeam-channel",
+ "crossbeam-channel 0.5.0",
  "crossbeam-deque",
- "crossbeam-utils",
+ "crossbeam-utils 0.8.1",
  "lazy_static",
  "num_cpus",
+]
+
+[[package]]
+name = "reverse_geocoder"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "983955dc2b36116d0bf6ad274825be1dbcc5c0278df19f992ef1618b99ab24b2"
+dependencies = [
+ "kdtree",
+ "quick-csv",
+ "rustc-serialize",
+ "serde",
+ "serde_derive",
 ]
 
 [[package]]
@@ -668,6 +728,12 @@ checksum = "287f3c3f8236abb92d8b7e36797f19159df4b58f0a658cc3fb6dd3004b1f3bd3"
 dependencies = [
  "bytemuck",
 ]
+
+[[package]]
+name = "rustc-serialize"
+version = "0.3.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
 
 [[package]]
 name = "scoped_threadpool"
@@ -759,11 +825,11 @@ dependencies = [
 [[package]]
 name = "timely"
 version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfe8827dd1a7fd3360e0aed3e93d5706c75c402b46f81d634b3a9ab73fca71cf"
+source = "git+https://github.com/TimelyDataflow/timely-dataflow.git#f0206b9316ab872ee5aa5079c137c489c42081e5"
 dependencies = [
  "abomonation",
  "abomonation_derive",
+ "crossbeam-channel 0.4.4",
  "serde",
  "serde_derive",
  "timely_bytes",
@@ -774,17 +840,16 @@ dependencies = [
 [[package]]
 name = "timely_bytes"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3aa590d9f1532c3e265ffea178f757cb0fb2f617a5123326526cb6c8287c5c4"
+source = "git+https://github.com/TimelyDataflow/timely-dataflow.git#f0206b9316ab872ee5aa5079c137c489c42081e5"
 
 [[package]]
 name = "timely_communication"
 version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcc4b4cb3a970337237e3e00807d54904ac9693106dcb45e395ab01b9093a30c"
+source = "git+https://github.com/TimelyDataflow/timely-dataflow.git#f0206b9316ab872ee5aa5079c137c489c42081e5"
 dependencies = [
  "abomonation",
  "abomonation_derive",
+ "crossbeam-channel 0.4.4",
  "getopts",
  "serde",
  "serde_derive",
@@ -795,8 +860,7 @@ dependencies = [
 [[package]]
 name = "timely_logging"
 version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0ddcf773c75363ce1a25ad4cb7eb1b9e8c2f3a90332395630332f67423bee44"
+source = "git+https://github.com/TimelyDataflow/timely-dataflow.git#f0206b9316ab872ee5aa5079c137c489c42081e5"
 
 [[package]]
 name = "unicode-segmentation"

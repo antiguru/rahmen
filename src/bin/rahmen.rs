@@ -11,8 +11,8 @@ use std::time::{Duration, Instant};
 use clap::{App, Arg};
 use timely::dataflow::operators::capture::Event;
 use timely::dataflow::operators::{
-    Branch, Capability, CapabilityRef, Capture, Concat, ConnectLoop, Enter, Leave, LoopVariable,
-    Map, Operator, Probe,
+    Branch, Capability, CapabilityRef, Capture, Concat, ConnectLoop, Enter, Inspect, Leave,
+    LoopVariable, Map, Operator, Probe, ResultStream,
 };
 use timely::dataflow::{InputHandle, ProbeHandle, Scope};
 use timely::order::Product;
@@ -25,9 +25,8 @@ use rahmen::display_framebuffer::FramebufferDisplay;
 #[cfg(feature = "minifb")]
 use rahmen::display_minifb::MiniFBDisplay;
 use rahmen::errors::{RahmenError, RahmenResult};
-use rahmen::provider::{load_image_from_path, Provider};
+use rahmen::provider::{load_image_from_path, read_exif_from_path, Provider};
 use rahmen::provider_list::ListProvider;
-use rahmen::timely_result::ResultStream;
 
 fn main() -> RahmenResult<()> {
     let matches = App::new("Rahmen client")
@@ -125,11 +124,11 @@ fn main() -> RahmenResult<()> {
             ok.leave()
         });
 
-        // img_path_stream
-        //     .ok()
-        //     .flat_map(|(p, _img)| read_exif_from_path(&p))
-        //     .inspect(|x| println!("exif: {:?}", x))
-        //     .probe_with(&mut probe);
+        let exif_stream = img_path_stream
+            .ok()
+            .map(|(p, _img)| read_exif_from_path(&p))
+            // .inspect(|x| println!("exif: {:?}", x))
+            .probe_with(&mut probe);
 
         img_path_stream
             .map(|res| res.map(|(_, img)| img))
