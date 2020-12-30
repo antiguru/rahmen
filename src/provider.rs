@@ -8,11 +8,15 @@ use image::{DynamicImage, Pixel};
 use crate::errors::{RahmenError, RahmenResult};
 
 pub trait Provider<D> {
-    fn next_image(&mut self) -> RahmenResult<D>;
+    /// Obtain the next element.
+    /// Error -> Terminate
+    /// Ok(Some(T)) -> Process T
+    /// Ok(None) -> Exhausted
+    fn next_image(&mut self) -> RahmenResult<Option<D>>;
 }
 
 impl<D> Provider<D> for Box<dyn Provider<D>> {
-    fn next_image(&mut self) -> RahmenResult<D> {
+    fn next_image(&mut self) -> RahmenResult<Option<D>> {
         (**self).next_image()
     }
 }
@@ -24,21 +28,18 @@ pub trait ToRahmenError<T> {
 impl<T, E: Display> ToRahmenError<T> for Result<T, E> {
     fn map_to_rahmen_error(self, err: RahmenError) -> RahmenResult<T> {
         self.map_err(|e| {
-            eprintln!("Coercing {} to {}", e, err);
-            err
+            eprintln!("Coercing {} to {:?}", e, err);
+            err.into()
         })
     }
 }
 
 fn load_jpeg<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
-    let d = mozjpeg::Decompress::with_markers(mozjpeg::ALL_MARKERS)
-        .from_path(&path)
-        .map_to_rahmen_error(RahmenError::Retry)?;
+    let d = mozjpeg::Decompress::with_markers(mozjpeg::ALL_MARKERS).from_path(&path)?;
     let mut img = DynamicImage::new_bgra8(d.width() as _, d.height() as _);
     let height = d.height();
     let buffer: Option<Vec<[u8; 4]>> = d
-        .to_colorspace(mozjpeg::ColorSpace::JCS_EXT_BGRA)
-        .map_to_rahmen_error(RahmenError::Retry)?
+        .to_colorspace(mozjpeg::ColorSpace::JCS_EXT_BGRA)?
         .read_scanlines();
     let rgba_img = img.as_mut_bgra8().unwrap();
     if let Some(buffer) = buffer {
@@ -50,7 +51,7 @@ fn load_jpeg<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
         Ok(img)
     } else {
         eprintln!("Failed to decode image: {:?}", path.as_ref());
-        Err(RahmenError::Retry)
+        Err(RahmenError::Retry.into())
     }
 }
 
@@ -59,12 +60,12 @@ pub fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImag
     println!("Loading {:?}", path.as_ref());
     match image::ImageFormat::from_path(&path).map_to_rahmen_error(RahmenError::Retry)? {
         image::ImageFormat::Jpeg => load_jpeg(path),
-        format => Ok(image::io::Reader::with_format(
+        format => image::io::Reader::with_format(
             BufReader::new(std::fs::File::open(&path).map_to_rahmen_error(RahmenError::Retry)?),
             format,
         )
         .decode()
-        .map_to_rahmen_error(RahmenError::Retry)?),
+        .map_err(Into::into),
     }
 }
 
@@ -130,26 +131,29 @@ mod location_lookup {
 }
 
 pub fn coordinates_to_location(coordinate: Coordinate) -> Option<String> {
-    let search_result = location_lookup::GEOCODER.search(coordinate);
-    if let Some(search_result) = search_result {
-        println!(
-            "Location: {:?} {:?}",
-            search_result.distance, search_result.record
-        );
-        Some(search_result.record.name.clone())
-    } else {
-        None
-    }
+    location_lookup::GEOCODER
+        .search(coordinate)
+        .map(|result| result.record.name.clone())
+
+    // if let Some(search_result) = search_result {
+    //     println!(
+    //         "Location: {:?} {:?}",
+    //         search_result.distance, search_result.record
+    //     );
+    //     Some(search_result.record.name.clone())
+    // } else {
+    //     None
+    // }
 }
 
-pub fn read_exif_from_path<P: AsRef<Path>>(path: P) /*-> RahmenResult<Vec<exif::Field>> */
-{
-    let file = std::fs::File::open(path).unwrap();
+pub fn read_exif_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<Vec<exif::Field>> {
+    let file = std::fs::File::open(path)?;
     let mut bufreader = std::io::BufReader::new(&file);
     let exifreader = exif::Reader::new();
     exifreader
         .read_from_container(&mut bufreader)
-        .map(|exif| exif.fields().cloned().collect::<Vec<_>>());
+        .map(|exif| exif.fields().cloned().collect::<Vec<_>>())
+        .map_err(Into::into)
 
     // if let Some(coordinate) = coordinates_from_exif(exif.fields()) {
     //     coordinates_to_location(coordinate);

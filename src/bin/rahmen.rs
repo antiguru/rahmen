@@ -22,11 +22,38 @@ use rahmen::display::{preprocess_image, Display};
 #[cfg(feature = "fltk")]
 use rahmen::display_fltk::FltkDisplay;
 use rahmen::display_framebuffer::FramebufferDisplay;
-#[cfg(feature = "minifb")]
-use rahmen::display_minifb::MiniFBDisplay;
 use rahmen::errors::{RahmenError, RahmenResult};
 use rahmen::provider::{load_image_from_path, read_exif_from_path, Provider};
 use rahmen::provider_list::ListProvider;
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum RunControl {
+    Terminate,
+    Suppressed,
+}
+
+fn fatal_err<T>(result: RahmenResult<Option<T>>) -> RunResult<T> {
+    match result {
+        Ok(None) => Err(RunControl::Terminate),
+        Ok(Some(t)) => Ok(t),
+        Err(e) => {
+            eprintln!("Encountered error, terminating: {}", e);
+            Err(RunControl::Terminate)
+        }
+    }
+}
+
+fn suppress_err<T>(result: RahmenResult<T>) -> RunResult<T> {
+    match result {
+        Ok(t) => Ok(t),
+        Err(e) => {
+            eprintln!("Encountered error, suppressing: {}", e);
+            Err(RunControl::Suppressed)
+        }
+    }
+}
+
+type RunResult<T> = Result<T, RunControl>;
 
 fn main() -> RahmenResult<()> {
     let matches = App::new("Rahmen client")
@@ -117,75 +144,78 @@ fn main() -> RahmenResult<()> {
             let (ok, err) = stream
                 .enter(inner)
                 .concat(&cycle)
-                .map(move |_| provider.next_image())
-                .and_then(|p| load_image_from_path(&p).map(|img| (p, img)))
-                .branch(|_t, d| d.as_ref().err() == Some(&RahmenError::Retry));
+                // obtain next path
+                .map(move |_| fatal_err(provider.next_image()))
+                // Load image
+                .and_then(|ref path| {
+                    suppress_err(load_image_from_path(path).map(|img| (path.clone(), img)))
+                })
+                .branch(|_t, d| d.as_ref().err() == Some(&RunControl::Suppressed));
             err.map(|_| ()).connect_loop(handle);
             ok.leave()
         });
 
         let exif_stream = img_path_stream
             .ok()
-            .map(|(p, _img)| read_exif_from_path(&p))
+            .flat_map(|(p, _img)| read_exif_from_path(&p).ok())
             // .inspect(|x| println!("exif: {:?}", x))
             .probe_with(&mut probe);
 
-        img_path_stream
-            .map(|res| res.map(|(_, img)| img))
-            .binary(
-                &dimensions_stream,
-                timely::dataflow::channels::pact::Pipeline,
-                timely::dataflow::channels::pact::Pipeline,
-                "Resize",
-                |_cap, _op| {
-                    let mut dimensions = None;
-                    let mut current_image = None;
-                    move |in1, in2, out| {
-                        let mut did_work = false;
-                        let mut cap: Option<Capability<_>> = None;
-                        fn track_time<T: Timestamp>(
-                            cap: &mut Option<Capability<T>>,
-                            time: CapabilityRef<T>,
-                        ) {
-                            if let Some(cap) = cap.as_mut() {
-                                if cap.time() < time.time() {
-                                    cap.downgrade(time.time());
-                                }
-                            } else {
-                                cap.replace(time.retain());
+        let err_stream = img_path_stream.err();
+
+        let img_stream = img_path_stream.ok().map(|(_, img)| img).binary(
+            &dimensions_stream,
+            timely::dataflow::channels::pact::Pipeline,
+            timely::dataflow::channels::pact::Pipeline,
+            "Resize",
+            |_cap, _op| {
+                let mut dimensions = None;
+                let mut current_image = None;
+                move |in1, in2, out| {
+                    let mut did_work = false;
+                    let mut cap: Option<Capability<_>> = None;
+                    fn track_time<T: Timestamp>(
+                        cap: &mut Option<Capability<T>>,
+                        time: CapabilityRef<T>,
+                    ) {
+                        if let Some(cap) = cap.as_mut() {
+                            if cap.time() < time.time() {
+                                cap.downgrade(time.time());
                             }
-                        }
-                        in1.for_each(|time, data| {
-                            if let Some(image) = data.last() {
-                                current_image = Some(image.clone());
-                                did_work |= true;
-                            }
-                            track_time(&mut cap, time);
-                        });
-                        in2.for_each(|time, data| {
-                            if let Some(dims) = data.last() {
-                                dimensions = Some(dims.clone());
-                                did_work |= true;
-                            }
-                            track_time(&mut cap, time);
-                        });
-                        if did_work && dimensions.is_some() {
-                            if let Some(current_image) = current_image.as_ref() {
-                                if let Ok(current_image) = current_image {
-                                    out.session(cap.as_ref().unwrap()).give(Ok(preprocess_image(
-                                        &current_image,
-                                        dimensions.unwrap().0,
-                                        dimensions.unwrap().1,
-                                    )));
-                                } else if let Err(current_image_err) = current_image {
-                                    out.session(cap.as_ref().unwrap())
-                                        .give(Err(current_image_err.clone()));
-                                }
-                            }
+                        } else {
+                            cap.replace(time.retain());
                         }
                     }
-                },
-            )
+                    in1.for_each(|time, data| {
+                        if let Some(image) = data.last() {
+                            current_image = Some(image.clone());
+                            did_work |= true;
+                        }
+                        track_time(&mut cap, time);
+                    });
+                    in2.for_each(|time, data| {
+                        if let Some(dims) = data.last() {
+                            dimensions = Some(dims.clone());
+                            did_work |= true;
+                        }
+                        track_time(&mut cap, time);
+                    });
+                    if did_work && dimensions.is_some() {
+                        if let Some(current_image) = current_image.as_ref() {
+                            out.session(cap.as_ref().unwrap()).give(preprocess_image(
+                                &current_image,
+                                dimensions.unwrap().0,
+                                dimensions.unwrap().1,
+                            ));
+                        }
+                    }
+                }
+            },
+        );
+
+        err_stream
+            .map(Err)
+            .concat(&img_stream.map(Ok))
             .probe_with(&mut probe)
             .capture()
     });
@@ -212,7 +242,7 @@ fn main() -> RahmenResult<()> {
                     .last()
                     .map(|img| img.as_ref().map(|img| display.render(img)));
                 !r.iter()
-                    .any(|r| r.as_ref().err() == Some(&RahmenError::Terminate))
+                    .any(|r| r.as_ref().err() == Some(&RunControl::Terminate))
             }
         }) {
             true => Ok(()),

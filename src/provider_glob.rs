@@ -16,7 +16,7 @@ pub fn create(pattern: &str) -> RahmenResult<GlobProvider<impl Iterator<Item = P
 }
 
 impl<I: Iterator<Item = PathBuf>> Provider<PathBuf> for GlobProvider<I> {
-    fn next_image(&mut self) -> RahmenResult<PathBuf> {
-        self.path_iter.next().ok_or(RahmenError::Terminate)
+    fn next_image(&mut self) -> RahmenResult<Option<PathBuf>> {
+        Ok(self.path_iter.next())
     }
 }
