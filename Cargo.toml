@@ -22,7 +22,7 @@ kamadak-exif = "0.5.2"
 memmap = "0.7.0"
 mozjpeg = "0.8.21"
 framebuffer = "0.2.2"
-timely = "0.11.1"
+timely = {git = "https://github.com/TimelyDataflow/timely-dataflow"}
 
 [dependencies.image]
 version  = "0.23.12"
