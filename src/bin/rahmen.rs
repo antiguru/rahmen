@@ -266,10 +266,10 @@ fn main() -> RahmenResult<()> {
             timely::dataflow::channels::pact::Pipeline,
             "Resize",
             |_cap, _op| {
-                let _t = Timer::new(|e| println!("Resize op {}ms", e.as_millis()));
                 let mut dimensions = None;
                 let mut current_image = None;
                 move |in1, in2, out| {
+                    let _t = Timer::new(|e| println!("Resize op {}ms", e.as_millis()));
                     let mut did_work = false;
                     let mut cap: Option<Capability<_>> = None;
                     fn track_time<T: Timestamp>(
