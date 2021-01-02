@@ -32,15 +32,15 @@ fn load_jpeg<P: AsRef<Path>>(path: P, max_size: Option<usize>) -> RahmenResult<D
         d.scale(scale);
         println!("Scaling jpeg by {}/8", scale);
     }
-    let mut decompress_started = d.to_colorspace(mozjpeg::ColorSpace::JCS_EXT_BGRA)?;
+    let mut decompress_started = d.to_colorspace(mozjpeg::ColorSpace::JCS_EXT_BGR)?;
     let height = decompress_started.height();
-    let mut img = DynamicImage::new_bgra8(decompress_started.width() as _, height as _);
-    let buffer: Option<Vec<[u8; 4]>> = decompress_started.read_scanlines();
-    let rgba_img = img.as_mut_bgra8().unwrap();
+    let mut img = DynamicImage::new_bgr8(decompress_started.width() as _, height as _);
+    let buffer: Option<Vec<[u8; 3]>> = decompress_started.read_scanlines();
+    let rgb_img = img.as_mut_bgr8().unwrap();
     if let Some(buffer) = buffer {
         for (row, row_buffer) in buffer.chunks(buffer.len() / height).enumerate() {
             for (col, pixel) in row_buffer.iter().enumerate() {
-                *rgba_img.get_pixel_mut(col as _, row as _) = *image::Bgra::from_slice(pixel);
+                *rgb_img.get_pixel_mut(col as _, row as _) = *image::Bgr::from_slice(pixel);
             }
         }
         Ok(img)
@@ -50,6 +50,7 @@ fn load_jpeg<P: AsRef<Path>>(path: P, max_size: Option<usize>) -> RahmenResult<D
     }
 }
 
+/// Load an image from a path
 pub fn load_image_from_path<P: AsRef<Path>>(
     path: P,
     max_size: Option<usize>,
@@ -66,8 +67,10 @@ pub fn load_image_from_path<P: AsRef<Path>>(
     }
 }
 
+/// A coordinate of latitude/longitude.
 pub type Coordinate = (f64, f64);
 
+/// Extract the GPS coordinates from an iterator over EXIF fields
 pub fn coordinates_from_exif<'a, I: Iterator<Item = &'a Field>>(mut iter: I) -> Option<Coordinate> {
     fn parse_coordinates(value: &Value) -> Option<f64> {
         match value {
@@ -127,22 +130,15 @@ mod location_lookup {
     }
 }
 
+/// Convert a coordinate to a descriptive string
 pub fn coordinates_to_location(coordinate: Coordinate) -> Option<String> {
     location_lookup::GEOCODER
         .search(coordinate)
         .map(|result| result.record.name.clone())
-
-    // if let Some(search_result) = search_result {
-    //     println!(
-    //         "Location: {:?} {:?}",
-    //         search_result.distance, search_result.record
-    //     );
-    //     Some(search_result.record.name.clone())
-    // } else {
-    //     None
-    // }
 }
 
+/// Read the exif info from a file.
+/// TODO: This reads the same image again, and ideally it would re-use the original buffer
 pub fn read_exif_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<Vec<exif::Field>> {
     let file = std::fs::File::open(path)?;
     let mut bufreader = std::io::BufReader::new(&file);
@@ -151,16 +147,4 @@ pub fn read_exif_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<Vec<exif::Fi
         .read_from_container(&mut bufreader)
         .map(|exif| exif.fields().cloned().collect::<Vec<_>>())
         .map_err(Into::into)
-
-    // if let Some(coordinate) = coordinates_from_exif(exif.fields()) {
-    //     coordinates_to_location(coordinate);
-    // }
-    // for f in exif.fields() {
-    //     println!(
-    //         "{} {} {}",
-    //         f.tag,
-    //         f.ifd_num,
-    //         f.display_value().with_unit(&exif)
-    //     );
-    // }
 }

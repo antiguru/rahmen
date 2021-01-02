@@ -246,7 +246,7 @@ fn main() -> RahmenResult<()> {
                             let dimension = current_dimension.as_ref().unwrap();
                             // println!("Dimension: {:?}", dimension);
                             // println!("Text: {}", current_text.as_ref().unwrap());
-                            let mut img = DynamicImage::new_bgra8(dimension.0, font_size as _);
+                            let mut img = DynamicImage::new_luma8(dimension.0, font_size as _);
                             font_renderer.render(
                                 current_text.as_ref().unwrap(),
                                 font_size,
@@ -352,7 +352,7 @@ fn main() -> RahmenResult<()> {
                         if current_text.is_some() && current_img.is_some() {
                             let (dimension, text_img) = current_text.as_ref().unwrap();
                             let current_img = current_img.as_ref().unwrap();
-                            let mut img = DynamicImage::new_bgra8(dimension.0, dimension.1);
+                            let mut img = DynamicImage::new_bgr8(dimension.0, dimension.1);
                             let x_offset = (dimension.0 - current_img.dimensions().0) / 2;
                             let y_offset = (dimension.1 - current_img.dimensions().1) / 2;
                             // println!(
