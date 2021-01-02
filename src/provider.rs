@@ -20,13 +20,22 @@ impl<D> Provider<D> for Box<dyn Provider<D>> {
     }
 }
 
-fn load_jpeg<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
-    let d = mozjpeg::Decompress::with_markers(mozjpeg::ALL_MARKERS).from_path(&path)?;
-    let mut img = DynamicImage::new_bgra8(d.width() as _, d.height() as _);
-    let height = d.height();
-    let buffer: Option<Vec<[u8; 4]>> = d
-        .to_colorspace(mozjpeg::ColorSpace::JCS_EXT_BGRA)?
-        .read_scanlines();
+fn load_jpeg<P: AsRef<Path>>(path: P, max_size: Option<usize>) -> RahmenResult<DynamicImage> {
+    let mut d = mozjpeg::Decompress::with_markers(mozjpeg::ALL_MARKERS).from_path(&path)?;
+
+    if let Some(max_size) = max_size {
+        let mut scale = 8;
+        let ratio_to_max_size = max_size as f32 / (d.width() * d.height()) as f32;
+        if ratio_to_max_size < 1. {
+            scale = (ratio_to_max_size * 8.) as u8 + 1;
+        }
+        d.scale(scale);
+        println!("Scaling jpeg by {}/8", scale);
+    }
+    let mut decompress_started = d.to_colorspace(mozjpeg::ColorSpace::JCS_EXT_BGRA)?;
+    let height = decompress_started.height();
+    let mut img = DynamicImage::new_bgra8(decompress_started.width() as _, height as _);
+    let buffer: Option<Vec<[u8; 4]>> = decompress_started.read_scanlines();
     let rgba_img = img.as_mut_bgra8().unwrap();
     if let Some(buffer) = buffer {
         for (row, row_buffer) in buffer.chunks(buffer.len() / height).enumerate() {
@@ -41,11 +50,14 @@ fn load_jpeg<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
     }
 }
 
-pub fn load_image_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<DynamicImage> {
+pub fn load_image_from_path<P: AsRef<Path>>(
+    path: P,
+    max_size: Option<usize>,
+) -> RahmenResult<DynamicImage> {
     let _t = crate::Timer::new(|e| println!("Loading {}ms", e.as_millis()));
     println!("Loading {:?}", path.as_ref());
     match image::ImageFormat::from_path(&path)? {
-        image::ImageFormat::Jpeg => load_jpeg(path),
+        image::ImageFormat::Jpeg => load_jpeg(path, max_size),
         format => {
             image::io::Reader::with_format(BufReader::new(std::fs::File::open(&path)?), format)
                 .decode()

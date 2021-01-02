@@ -90,6 +90,13 @@ fn main() -> RahmenResult<()> {
                 .validator(|v| f64::from_str(v))
                 .default_value("90"),
         )
+        .arg(
+            Arg::new("buffer_max_size")
+                .long("buffer_max_size")
+                .takes_value(true)
+                .validator(|v| f64::from_str(v))
+                .default_value(format!("{}", 4000 * 4000).as_str()),
+        )
         .get_matches();
 
     let input = matches.value_of("input").expect("Input missing");
@@ -110,6 +117,12 @@ fn main() -> RahmenResult<()> {
     let mut input: InputHandle<_, ()> = InputHandle::new();
     let mut input_dimensions: InputHandle<_, (u32, u32)> = InputHandle::new();
     let mut probe = ProbeHandle::new();
+
+    let buffer_max_size: usize = matches
+        .value_of("buffer_max_size")
+        .expect("Missing buffer_max_size")
+        .parse()
+        .unwrap();
 
     let output = worker.dataflow(|scope| {
         let font_size = 30.;
@@ -162,8 +175,11 @@ fn main() -> RahmenResult<()> {
                 // obtain next path
                 .map(move |_| fatal_err(provider.next_image()))
                 // Load image
-                .and_then(|ref path| {
-                    suppress_err(load_image_from_path(path).map(|img| (path.clone(), img)))
+                .and_then(move |ref path| {
+                    suppress_err(
+                        load_image_from_path(path, Some(buffer_max_size))
+                            .map(|img| (path.clone(), img)),
+                    )
                 })
                 .branch(|_t, d| d.as_ref().err() == Some(&RunControl::Suppressed));
             err.map(|_| ()).connect_loop(handle);
