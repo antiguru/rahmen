@@ -32,6 +32,7 @@ use rahmen::provider::{
 use rahmen::provider_list::ListProvider;
 use rahmen::Timer;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum RunControl {
@@ -178,7 +179,7 @@ fn main() -> RahmenResult<()> {
                 .and_then(move |ref path| {
                     suppress_err(
                         load_image_from_path(path, Some(buffer_max_size))
-                            .map(|img| (path.clone(), img)),
+                            .map(|img| (path.clone(), Arc::new(img))),
                     )
                 })
                 .branch(|_t, d| d.as_ref().err() == Some(&RunControl::Suppressed));
@@ -252,7 +253,7 @@ fn main() -> RahmenResult<()> {
                                 (dimension.0, font_size as _),
                                 |x, y, pixel| Ok(img.put_pixel(x as _, y as _, pixel.to_rgba())),
                             );
-                            out.session(&time).give((*dimension, img));
+                            out.session(&time).give((*dimension, Arc::new(img)));
                         }
                     });
                 },
@@ -299,11 +300,12 @@ fn main() -> RahmenResult<()> {
                     });
                     if did_work && dimensions.is_some() {
                         if let Some(current_image) = current_image.as_ref() {
-                            out.session(cap.as_ref().unwrap()).give(preprocess_image(
-                                &current_image,
-                                dimensions.unwrap().0,
-                                dimensions.unwrap().1,
-                            ));
+                            out.session(cap.as_ref().unwrap())
+                                .give(Arc::new(preprocess_image(
+                                    &current_image,
+                                    dimensions.unwrap().0,
+                                    dimensions.unwrap().1,
+                                )));
                         }
                     }
                 }
@@ -357,9 +359,9 @@ fn main() -> RahmenResult<()> {
                             //     "Dimension: {:?} offset: ({}, {})",
                             //     dimension, x_offset, y_offset
                             // );
-                            img.copy_from(current_img, x_offset, y_offset);
-                            img.copy_from(text_img, 0, dimension.1 - font_size as u32);
-                            out.session(&time).give(img);
+                            img.copy_from(current_img.as_ref(), x_offset, y_offset);
+                            img.copy_from(text_img.as_ref(), 0, dimension.1 - font_size as u32);
+                            out.session(&time).give(Arc::new(img));
                         }
                     });
                 },
