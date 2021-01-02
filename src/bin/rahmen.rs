@@ -18,6 +18,7 @@ use timely::dataflow::{InputHandle, ProbeHandle, Scope};
 use timely::order::Product;
 use timely::progress::Timestamp;
 
+use font_kit::loaders::freetype::Font;
 use image::{DynamicImage, GenericImage, GenericImageView, Pixel};
 use rahmen::display::{preprocess_image, Display};
 #[cfg(feature = "fltk")]
@@ -98,6 +99,13 @@ fn main() -> RahmenResult<()> {
                 .validator(|v| f64::from_str(v))
                 .default_value(format!("{}", 4000 * 4000).as_str()),
         )
+        .arg(
+            Arg::new("font")
+                .long("font")
+                .takes_value(true)
+                .validator(|f| File::open(f))
+                .default_value("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"),
+        )
         .get_matches();
 
     let input = matches.value_of("input").expect("Input missing");
@@ -124,6 +132,9 @@ fn main() -> RahmenResult<()> {
         .expect("Missing buffer_max_size")
         .parse()
         .unwrap();
+
+    let font = Font::from_path(matches.value_of("font").unwrap(), 0).unwrap();
+    let font_renderer = FontRenderer::with_font(font);
 
     let output = worker.dataflow(|scope| {
         let font_size = 30.;
@@ -202,8 +213,6 @@ fn main() -> RahmenResult<()> {
             })
             .inspect(|loc| println!("Location: {}", loc))
             .probe_with(&mut probe);
-
-        let font_renderer = FontRenderer::new();
 
         let text_img_stream = {
             let mut dimensions = HashMap::new();

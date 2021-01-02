@@ -3,6 +3,7 @@ use font_kit::canvas::{Canvas, Format, RasterizationOptions};
 use font_kit::hinting::HintingOptions;
 use font_kit::loaders::freetype::Font;
 use font_kit::source::SystemSource;
+use font_kit::sources::fontconfig::FontconfigSource;
 use image::{Pixel, Rgb, Rgba};
 use pathfinder_geometry::transform2d::Transform2F;
 use pathfinder_geometry::vector::{Vector2F, Vector2I};
@@ -20,6 +21,10 @@ impl FontRenderer {
             .load()
             .expect("Failed to load font");
         println!("Font: {} ({})", font.full_name(), font.family_name());
+        Self { font }
+    }
+
+    pub fn with_font(font: Font) -> Self {
         Self { font }
     }
 
