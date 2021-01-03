@@ -359,9 +359,9 @@ checksum = "7bad48618fdb549078c333a7a8528acb57af271d0433bdecd523eb620628364e"
 
 [[package]]
 name = "fltk"
-version = "0.12.2"
+version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffd87548cdd20a4d8db129c01657d7b758875bb0882e3f85c576b29d2c5cc97b"
+checksum = "432661971f065a30d6f6c6c7a34a9f8861c20dcfc714fcc1f1e65233e89a6237"
 dependencies = [
  "bitflags",
  "fltk-derive",
@@ -371,9 +371,9 @@ dependencies = [
 
 [[package]]
 name = "fltk-derive"
-version = "0.12.2"
+version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c7f211ec3038d4b3320d3c808d59b9eb0cf90982c47579480056cd88c66d0da"
+checksum = "8f05032feb0ace16f4d2e47d0e937d3ef3406edf88cc5ffb33cd2ad1b30deaea"
 dependencies = [
  "quote",
  "syn",
@@ -381,9 +381,9 @@ dependencies = [
 
 [[package]]
 name = "fltk-sys"
-version = "0.12.0"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "986b05d04928df95d39a8c4983185b48421e08f274f615ed815248f4c28d8527"
+checksum = "508622b5a94b9f0a1033f56854b52f881e45fe6f2f82f75658a3e21f75db8590"
 dependencies = [
  "cmake",
  "libc",
@@ -478,11 +478,11 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.1.15"
+version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc587bc0ec293155d5bfa6b9891ec18a1e330c234f896ea47fbada4cadbe47e6"
+checksum = "8fc3cb4d91f53b50155bdcfd23f6a4c39ae1969c2ae85982b135750cccaf5fce"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "libc",
  "wasi",
 ]
@@ -957,9 +957,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.56"
+version = "1.0.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9802ddde94170d186eeee5005b798d9c159fa970403f1be19976d0cfb939b72"
+checksum = "4211ce9909eb971f111059df92c45640aad50a619cf55cd76476be803c4c68e6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -999,7 +999,7 @@ dependencies = [
 [[package]]
 name = "timely"
 version = "0.11.1"
-source = "git+https://github.com/TimelyDataflow/timely-dataflow.git#f0206b9316ab872ee5aa5079c137c489c42081e5"
+source = "git+https://github.com/TimelyDataflow/timely-dataflow#f0206b9316ab872ee5aa5079c137c489c42081e5"
 dependencies = [
  "abomonation",
  "abomonation_derive",
@@ -1014,12 +1014,12 @@ dependencies = [
 [[package]]
 name = "timely_bytes"
 version = "0.11.0"
-source = "git+https://github.com/TimelyDataflow/timely-dataflow.git#f0206b9316ab872ee5aa5079c137c489c42081e5"
+source = "git+https://github.com/TimelyDataflow/timely-dataflow#f0206b9316ab872ee5aa5079c137c489c42081e5"
 
 [[package]]
 name = "timely_communication"
 version = "0.11.1"
-source = "git+https://github.com/TimelyDataflow/timely-dataflow.git#f0206b9316ab872ee5aa5079c137c489c42081e5"
+source = "git+https://github.com/TimelyDataflow/timely-dataflow#f0206b9316ab872ee5aa5079c137c489c42081e5"
 dependencies = [
  "abomonation",
  "abomonation_derive",
@@ -1034,7 +1034,7 @@ dependencies = [
 [[package]]
 name = "timely_logging"
 version = "0.11.1"
-source = "git+https://github.com/TimelyDataflow/timely-dataflow.git#f0206b9316ab872ee5aa5079c137c489c42081e5"
+source = "git+https://github.com/TimelyDataflow/timely-dataflow#f0206b9316ab872ee5aa5079c137c489c42081e5"
 
 [[package]]
 name = "unicode-width"
