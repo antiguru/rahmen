@@ -1,3 +1,5 @@
+//! Functionality to render images on a Linux framebuffer
+
 use crate::display::Display;
 use crate::errors::RahmenResult;
 
@@ -5,19 +7,21 @@ use framebuffer::Framebuffer;
 use image::{DynamicImage, GenericImageView, Pixel};
 use std::time::Duration;
 
-pub fn setup_framebuffer(framebuffer: &mut Framebuffer) {
-    assert_eq!(framebuffer.var_screen_info.bits_per_pixel, 32);
-}
-
+/// A display driver for Linux framebuffers
+#[derive(Debug)]
 pub struct FramebufferDisplay {
     framebuffer: Framebuffer,
 }
 
 impl FramebufferDisplay {
+    /// Crate a new framebuffer
     pub fn new(framebuffer: Framebuffer) -> Self {
+        assert_eq!(framebuffer.var_screen_info.bits_per_pixel, 32);
         Self { framebuffer }
     }
 
+    /// Enter the control loop. This will periodically trigger the callback, until it returns an
+    /// `Err` result.
     pub fn main_loop<F: FnMut(Box<&mut dyn Display>) -> RahmenResult<()>>(
         &mut self,
         mut callback: F,

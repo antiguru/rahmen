@@ -1,18 +1,23 @@
+//! Utilities to rasterize fonts to images
+
 use crate::errors::RahmenResult;
 use font_kit::canvas::{Canvas, Format, RasterizationOptions};
 use font_kit::hinting::HintingOptions;
 use font_kit::loaders::freetype::Font;
 use font_kit::source::SystemSource;
-use font_kit::sources::fontconfig::FontconfigSource;
-use image::{Pixel, Rgb, Rgba};
+
+use image::{Pixel, Rgb};
 use pathfinder_geometry::transform2d::Transform2F;
 use pathfinder_geometry::vector::{Vector2F, Vector2I};
 
+/// A font renderer to rasterize text to images
+#[derive(Debug)]
 pub struct FontRenderer {
     font: Font,
 }
 
 impl FontRenderer {
+    /// Create a new font renderer, selecting a sans-serif font.
     pub fn new() -> Self {
         let font = SystemSource::new()
             .select_family_by_name("sans-serif")
@@ -24,10 +29,12 @@ impl FontRenderer {
         Self { font }
     }
 
+    /// Create a new font renderer from an given font.
     pub fn with_font(font: Font) -> Self {
         Self { font }
     }
 
+    /// Render a text and draw pixels via a callback
     pub fn render<F: FnMut(i32, i32, &Rgb<u8>) -> RahmenResult<()>>(
         &self,
         text: &str,
@@ -41,7 +48,7 @@ impl FontRenderer {
 
         let metrics = self.font.metrics();
 
-        let em = (size / 1.24) as f32;
+        let em = size / 1.24;
         let mut base_x = 0.;
         let mut canvas = Canvas::new(Vector2I::new(dimensions.0 as _, dimensions.1 as _), format);
 
@@ -65,7 +72,7 @@ impl FontRenderer {
                         &mut canvas,
                         glyph_id,
                         size,
-                        Transform2F::from_translation(Vector2F::new(base_x as _, em)),
+                        Transform2F::from_translation(Vector2F::new(base_x, em)),
                         hinting,
                         rasterization,
                     )

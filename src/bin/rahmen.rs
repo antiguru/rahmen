@@ -3,12 +3,16 @@ extern crate ctrlc;
 extern crate exif;
 extern crate timely;
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use clap::{App, Arg};
+use font_kit::loaders::freetype::Font;
+use image::{DynamicImage, GenericImage, GenericImageView, Pixel};
 use timely::dataflow::operators::capture::Event;
 use timely::dataflow::operators::{
     Branch, Capability, CapabilityRef, Capture, Concat, ConnectLoop, Enter, Inspect, Leave,
@@ -18,9 +22,7 @@ use timely::dataflow::{InputHandle, ProbeHandle, Scope};
 use timely::order::Product;
 use timely::progress::Timestamp;
 
-use font_kit::loaders::freetype::Font;
-use image::{DynamicImage, GenericImage, GenericImageView, Pixel};
-use rahmen::display::{preprocess_image, Display};
+use rahmen::display::Display;
 #[cfg(feature = "fltk")]
 use rahmen::display_fltk::FltkDisplay;
 use rahmen::display_framebuffer::FramebufferDisplay;
@@ -32,8 +34,6 @@ use rahmen::provider::{
 };
 use rahmen::provider_list::ListProvider;
 use rahmen::Timer;
-use std::collections::HashMap;
-use std::sync::Arc;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum RunControl {
@@ -168,7 +168,6 @@ fn main() -> RahmenResult<()> {
                                 retained_cap
                                     .downgrade(&(*retained_cap.time() + Duration::from_secs(1)));
                             }
-                            println!("retained time: {:?}", retained_cap.time());
                         }
                     }
                     while let Some((cap, in_buffer)) = input_handle.next() {
@@ -221,7 +220,6 @@ fn main() -> RahmenResult<()> {
             let mut current_text = None;
             let mut in_buffer1 = vec![];
             let mut in_buffer2 = vec![];
-            let font_size1 = font_size;
             location_stream.binary_notify(
                 &dimensions_stream,
                 timely::dataflow::channels::pact::Pipeline,
@@ -256,12 +254,16 @@ fn main() -> RahmenResult<()> {
                             // println!("Dimension: {:?}", dimension);
                             // println!("Text: {}", current_text.as_ref().unwrap());
                             let mut img = DynamicImage::new_luma8(dimension.0, font_size as _);
-                            font_renderer.render(
-                                current_text.as_ref().unwrap(),
-                                font_size,
-                                (dimension.0, font_size as _),
-                                |x, y, pixel| Ok(img.put_pixel(x as _, y as _, pixel.to_rgba())),
-                            );
+                            font_renderer
+                                .render(
+                                    current_text.as_ref().unwrap(),
+                                    font_size,
+                                    (dimension.0, font_size as _),
+                                    |x, y, pixel| {
+                                        Ok(img.put_pixel(x as _, y as _, pixel.to_rgba()))
+                                    },
+                                )
+                                .unwrap();
                             out.session(&time).give((*dimension, Arc::new(img)));
                         }
                     });
@@ -309,12 +311,13 @@ fn main() -> RahmenResult<()> {
                     });
                     if did_work && dimensions.is_some() {
                         if let Some(current_image) = current_image.as_ref() {
-                            out.session(cap.as_ref().unwrap())
-                                .give(Arc::new(preprocess_image(
-                                    &current_image,
+                            out.session(cap.as_ref().unwrap()).give(Arc::new(
+                                current_image.resize(
                                     dimensions.unwrap().0,
                                     dimensions.unwrap().1,
-                                )));
+                                    image::imageops::FilterType::Triangle,
+                                ),
+                            ));
                         }
                     }
                 }
@@ -328,7 +331,6 @@ fn main() -> RahmenResult<()> {
             let mut current_text = None;
             let mut in_buffer1 = vec![];
             let mut in_buffer2 = vec![];
-            let font_size1 = font_size;
             img_stream.binary_notify(
                 &text_img_stream,
                 timely::dataflow::channels::pact::Pipeline,
@@ -364,12 +366,10 @@ fn main() -> RahmenResult<()> {
                             let mut img = DynamicImage::new_bgr8(dimension.0, dimension.1);
                             let x_offset = (dimension.0 - current_img.dimensions().0) / 2;
                             let y_offset = (dimension.1 - current_img.dimensions().1) / 2;
-                            // println!(
-                            //     "Dimension: {:?} offset: ({}, {})",
-                            //     dimension, x_offset, y_offset
-                            // );
-                            img.copy_from(current_img.as_ref(), x_offset, y_offset);
-                            img.copy_from(text_img.as_ref(), 0, dimension.1 - font_size as u32);
+                            img.copy_from(current_img.as_ref(), x_offset, y_offset)
+                                .unwrap();
+                            img.copy_from(text_img.as_ref(), 0, dimension.1 - font_size as u32)
+                                .unwrap();
                             out.session(&time).give(Arc::new(img));
                         }
                     });
@@ -399,7 +399,9 @@ fn main() -> RahmenResult<()> {
             worker.step();
         }
         match output.try_iter().all(|result| match result {
+            // Continue processing on progress messages
             Event::Progress(_) => true,
+            // Handle data messages by rending an image and determining whether to terminate
             Event::Messages(_, ref r) => {
                 r.iter()
                     .filter(|r| r.is_ok())

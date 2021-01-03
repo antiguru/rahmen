@@ -1,15 +1,25 @@
+//! Rahmen error handling
+
 use std::error::Error;
 use std::fmt;
+use std::sync::Arc;
 
+/// Error types within Rahmen
 #[derive(std::fmt::Debug)]
 pub enum RahmenError {
+    /// Errors from handling EXIF data
     ExifError(exif::Error),
+    /// Errors interacting with I/O
     IoError(std::io::Error),
-    ImageError(image::error::ImageError),
+    /// Errors from the image library
+    ImageError(Arc<image::error::ImageError>),
+    /// Pseudo-error to indicate a retry condition
     Retry,
+    /// Pseudo-error to indocate program termination
     Terminate,
 }
 
+/// Result type for `RahmenError`
 pub type RahmenResult<T> = Result<T, RahmenError>;
 
 impl fmt::Display for RahmenError {
@@ -50,6 +60,6 @@ impl From<std::io::Error> for RahmenError {
 
 impl From<image::error::ImageError> for RahmenError {
     fn from(err: image::error::ImageError) -> Self {
-        RahmenError::ImageError(err)
+        RahmenError::ImageError(Arc::new(err))
     }
 }

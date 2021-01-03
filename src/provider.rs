@@ -1,3 +1,5 @@
+//! Utilities to provide images, and other abstractions
+
 use std::io::BufReader;
 use std::path::Path;
 
@@ -6,6 +8,7 @@ use image::{DynamicImage, Pixel};
 
 use crate::errors::{RahmenError, RahmenResult};
 
+/// Provider trait to produce images, or other types
 pub trait Provider<D> {
     /// Obtain the next element.
     /// Error -> Terminate
@@ -30,7 +33,6 @@ fn load_jpeg<P: AsRef<Path>>(path: P, max_size: Option<usize>) -> RahmenResult<D
             scale = (ratio_to_max_size * 8.) as u8 + 1;
         }
         d.scale(scale);
-        println!("Scaling jpeg by {}/8", scale);
     }
     let mut decompress_started = d.to_colorspace(mozjpeg::ColorSpace::JCS_EXT_BGR)?;
     let height = decompress_started.height();
@@ -139,7 +141,7 @@ pub fn coordinates_to_location(coordinate: Coordinate) -> Option<String> {
 
 /// Read the exif info from a file.
 /// TODO: This reads the same image again, and ideally it would re-use the original buffer
-pub fn read_exif_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<Vec<exif::Field>> {
+pub fn read_exif_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<Vec<Field>> {
     let file = std::fs::File::open(path)?;
     let mut bufreader = std::io::BufReader::new(&file);
     let exifreader = exif::Reader::new();

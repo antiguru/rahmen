@@ -1,3 +1,5 @@
+//! Functionality to render images on a FLTK window
+
 use crate::display::Display;
 use crate::errors::RahmenResult;
 
@@ -12,12 +14,15 @@ use fltk::{
 use image::{DynamicImage, GenericImageView};
 use std::time::Duration;
 
+/// A display driver rendering to a FLTK window
+#[derive(Debug)]
 pub struct FltkDisplay {
     window: Window,
     frame: Frame,
 }
 
 impl FltkDisplay {
+    /// Create a new FLTK display
     pub fn new() -> Self {
         let _app = App::default().with_scheme(Scheme::Gleam);
         let mut window = Window::new(100, 100, 400, 300, "Rahmen");
@@ -42,6 +47,7 @@ impl FltkDisplay {
         Self { window, frame }
     }
 
+    /// Main loop to handle FLTK events and call back into Rahmen's logic
     pub fn main_loop<F: FnMut(Box<&mut dyn Display>) -> RahmenResult<()>>(
         &mut self,
         mut callback: F,

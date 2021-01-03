@@ -1,3 +1,5 @@
+//! Rahmen library
+
 #![forbid(unsafe_code)]
 #![warn(
     anonymous_parameters,
@@ -6,7 +8,6 @@
     missing_docs,
     nonstandard_style,
     rust_2018_idioms,
-    single_use_lifetimes,
     trivial_casts,
     trivial_numeric_casts,
     unreachable_pub,
@@ -15,18 +16,8 @@
     variant_size_differences
 )]
 
-extern crate exif;
-#[cfg(feature = "fltk")]
-extern crate fltk;
-extern crate font_kit;
-extern crate glob;
-extern crate image;
 #[macro_use]
 extern crate lazy_static;
-extern crate memmap;
-extern crate mozjpeg;
-extern crate pathfinder_geometry;
-extern crate reverse_geocoder;
 
 use std::time::{Duration, Instant};
 
@@ -40,12 +31,15 @@ pub mod provider;
 pub mod provider_glob;
 pub mod provider_list;
 
+/// A timer to track the duration of a code span until it is dropped
+#[derive(Debug)]
 pub struct Timer<F: Fn(Duration)> {
     start: Instant,
     f: F,
 }
 
 impl<F: Fn(Duration)> Timer<F> {
+    /// Construct a new timer with a callback. The callback will receive the duration since creation
     pub fn new(f: F) -> Self {
         Self {
             start: Instant::now(),
