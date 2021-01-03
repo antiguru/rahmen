@@ -132,4 +132,4 @@ the debug symbols from the binary:
 
 The FLTK renders a window on various platforms, which can be used for development.
 
-The feature `fltk` is enabled by default. Pass `--no-default-features` to disable.
+The feature `fltk` is enabled by default. Pass `--no-default-features` to `cargo build` to disable.
