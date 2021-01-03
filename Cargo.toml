@@ -3,9 +3,12 @@ name = "rahmen"
 version = "0.1.0"
 authors = ["Moritz Hoffmann <antiguru@gmail.com>"]
 edition = "2018"
+license = "MIT"
+description = "Rahmen is a lightweight image presenter"
+readme = "README.md"
 
 [features]
-default = ["fltk"]
+default = []
 
 [[bin]]
 name = "rahmen"
@@ -14,9 +17,9 @@ name = "rahmen"
 debug = true
 
 [dependencies]
-clap = {version = "3.0.0-beta.2", default-features = false, features = ["color", "std"] }
+clap = { version = "3.0.0-beta.2", default-features = false, features = ["color", "std"] }
 ctrlc = "3.1.7"
-fltk = {version = "0.12.2", optional = true, features = ["fltk-shared"]}
+fltk = { version = "0.12.2", optional = true, features = ["fltk-shared"] }
 font-kit = "0.10.0"
 framebuffer = "0.2.2"
 glob = "0.3.0"
@@ -26,10 +29,10 @@ memmap = "0.7.0"
 mozjpeg = "0.8.21"
 pathfinder_geometry = "0.5.1"
 reverse_geocoder = "2.0.0"
-timely = {git = "https://github.com/TimelyDataflow/timely-dataflow"}
+timely = { git = "https://github.com/TimelyDataflow/timely-dataflow" }
 
 [dependencies.image]
-version  = "0.23.12"
+version = "0.23.12"
 default-features = false
 # Disable jpeg_rayon
 features = ["jpeg"]
