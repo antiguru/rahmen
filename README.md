@@ -36,7 +36,7 @@ The buffer size (in Bytes) determines the downscaling of images. All images that
 Bytes will be scaled down to the buffer size. This should be larger than your monitor to avoid scaling
 artefacts/jaggies.
 
-Rule of thumb: long side of the monitor ^ 2 * 2, e.g. for a 1600 * 1200 monitor: 1600 * 1600 * 2 = 5120000.
+Rule of thumb: `long side of the monitor ^ 2 * 2`, e.g. for a 1600 * 1200 monitor: `1600 * 1600 * 2 = 5120000`.
 
 (Images smaller than your monitor will be scaled up to the monitor size and will possibly appear blurred. Avoid them if
 you don't like this.)
@@ -62,7 +62,7 @@ just point this option to a TrueType font file.
     -t, --time <time>                          [default: 90]
 ```
 
-The output points to the frame buffer to be used. Usually /dev/fb0
+The output points to the frame buffer to be used. Usually `/dev/fb0`.
 
 The time (in seconds) defines the interval to change to the next slide. On the Raspberry Pi version 1, it takes several
 seconds to scale larger images. If the time given is shorter than what it takes to display the image, no images will be
