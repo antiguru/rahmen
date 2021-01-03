@@ -46,7 +46,7 @@ you don't like this.)
 Select the display provider [default: framebuffer] [possible values: framebuffer]
 ```
 
-(If compiled with the FLTK option, the FLTK display provider will also be available, use fltk as value.)
+(If compiled with the FLTK option, the FLTK display provider will also be available, use `fltk` as value.)
 
 ```shell
         --font <font>
