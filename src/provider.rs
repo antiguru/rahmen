@@ -3,8 +3,8 @@
 use std::io::BufReader;
 use std::path::Path;
 
-use exif::{Field, Value};
 use image::{DynamicImage, Pixel};
+use rexiv2::Metadata;
 
 use crate::errors::{RahmenError, RahmenResult};
 
@@ -69,84 +69,32 @@ pub fn load_image_from_path<P: AsRef<Path>>(
     }
 }
 
-/// A coordinate of latitude/longitude.
-pub type Coordinate = (f64, f64);
+const FIELD_LOOKUP_TABLE: &[&[&str]] = &[
+    &[
+        "Iptc.Application2.Sublocation",
+        "Iptc.Application2.City",
+        "Iptc.Application2.ProvinceState",
+        "Iptc.Application2.CountryName",
+        "Iptc.Application2.CountryCode",
+    ],
+    &["Iptc.Application2.DigitizationDate"],
+    &["Xmp.dc.creator"],
+];
 
-/// Extract the GPS coordinates from an iterator over EXIF fields
-pub fn coordinates_from_exif<'a, I: Iterator<Item = &'a Field>>(mut iter: I) -> Option<Coordinate> {
-    fn parse_coordinates(value: &Value) -> Option<f64> {
-        match value {
-            Value::Rational(rationals) => {
-                if rationals.len() != 3 {
-                    None
-                } else {
-                    Some(
-                        rationals[0].to_f64()
-                            + rationals[1].to_f64() / 60f64
-                            + rationals[2].to_f64() / (60f64 * 6f64),
-                    )
-                }
-            }
-            _ => None,
+/// Format the metadata tags from an image to show a status line
+pub fn format_exif<P: AsRef<std::ffi::OsStr>>(path: P) -> RahmenResult<String> {
+    let metadata = Metadata::new_from_path(path)?;
+
+    let mut result = vec![];
+    for lookup in FIELD_LOOKUP_TABLE {
+        if let Some(Some(text)) = lookup
+            .iter()
+            .map(|f| metadata.get_tag_interpreted_string(*f).ok())
+            .filter(Option::is_some)
+            .next()
+        {
+            result.push(text)
         }
     }
-    fn parse_direction_modifier(value: &Value) -> Option<f64> {
-        if let Value::Ascii(c) = value {
-            match c.get(0).and_then(|c| c.get(0)) {
-                Some(b'N') => Some(1f64),
-                Some(b'S') => Some(-1f64),
-                Some(b'E') => Some(1f64),
-                Some(b'W') => Some(-1f64),
-                _ => None,
-            }
-        } else {
-            None
-        }
-    }
-    let mut gps_latitude_ref = None;
-    let mut gps_latitude = None;
-    let mut gps_longitude_ref = None;
-    let mut gps_longitude = None;
-    while let Some(field) = iter.next() {
-        match field.tag {
-            exif::Tag::GPSLatitudeRef => gps_latitude_ref = parse_direction_modifier(&field.value),
-            exif::Tag::GPSLatitude => gps_latitude = parse_coordinates(&field.value),
-            exif::Tag::GPSLongitudeRef => {
-                gps_longitude_ref = parse_direction_modifier(&field.value)
-            }
-            exif::Tag::GPSLongitude => gps_longitude = parse_coordinates(&field.value),
-            _ => {}
-        }
-    }
-    let latitude = gps_latitude.and_then(|l| gps_latitude_ref.and_then(|r| Some(r * l)));
-    let longitude = gps_longitude.and_then(|l| gps_longitude_ref.and_then(|r| Some(r * l)));
-    latitude.and_then(|latitude| longitude.and_then(|longitude| Some((latitude, longitude))))
-}
-
-mod location_lookup {
-    lazy_static! {
-        pub(crate) static ref LOCATIONS: reverse_geocoder::Locations =
-            reverse_geocoder::Locations::from_memory();
-        pub(crate) static ref GEOCODER: reverse_geocoder::ReverseGeocoder<'static> =
-            reverse_geocoder::ReverseGeocoder::new(&LOCATIONS);
-    }
-}
-
-/// Convert a coordinate to a descriptive string
-pub fn coordinates_to_location(coordinate: Coordinate) -> Option<String> {
-    location_lookup::GEOCODER
-        .search(coordinate)
-        .map(|result| result.record.name.clone())
-}
-
-/// Read the exif info from a file.
-/// TODO: This reads the same image again, and ideally it would re-use the original buffer
-pub fn read_exif_from_path<P: AsRef<Path>>(path: P) -> RahmenResult<Vec<Field>> {
-    let file = std::fs::File::open(path)?;
-    let mut bufreader = std::io::BufReader::new(&file);
-    let exifreader = exif::Reader::new();
-    exifreader
-        .read_from_container(&mut bufreader)
-        .map(|exif| exif.fields().cloned().collect::<Vec<_>>())
-        .map_err(Into::into)
+    Ok(result.join(" "))
 }

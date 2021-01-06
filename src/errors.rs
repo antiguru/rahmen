@@ -7,15 +7,15 @@ use std::sync::Arc;
 /// Error types within Rahmen
 #[derive(std::fmt::Debug)]
 pub enum RahmenError {
-    /// Errors from handling EXIF data
-    ExifError(exif::Error),
     /// Errors interacting with I/O
     IoError(std::io::Error),
     /// Errors from the image library
     ImageError(Arc<image::error::ImageError>),
     /// Pseudo-error to indicate a retry condition
     Retry,
-    /// Pseudo-error to indocate program termination
+    /// Errors from rexiv2
+    Rexiv2Error(rexiv2::Rexiv2Error),
+    /// Pseudo-error to indicate program termination
     Terminate,
 }
 
@@ -25,10 +25,10 @@ pub type RahmenResult<T> = Result<T, RahmenError>;
 impl fmt::Display for RahmenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            RahmenError::ExifError(err) => err.fmt(f),
             RahmenError::IoError(err) => err.fmt(f),
             RahmenError::ImageError(err) => err.fmt(f),
             RahmenError::Retry => write!(f, "Retry"),
+            RahmenError::Rexiv2Error(err) => err.fmt(f),
             RahmenError::Terminate => write!(f, "Terminate"),
         }
     }
@@ -37,21 +37,14 @@ impl fmt::Display for RahmenError {
 impl Error for RahmenError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            RahmenError::ExifError(err) => err.source(),
             RahmenError::IoError(err) => err.source(),
             RahmenError::ImageError(err) => err.source(),
             RahmenError::Retry => None,
+            RahmenError::Rexiv2Error(err) => err.source(),
             RahmenError::Terminate => None,
         }
     }
 }
-
-impl From<exif::Error> for RahmenError {
-    fn from(err: exif::Error) -> Self {
-        RahmenError::ExifError(err)
-    }
-}
-
 impl From<std::io::Error> for RahmenError {
     fn from(err: std::io::Error) -> Self {
         RahmenError::IoError(err)
@@ -61,5 +54,10 @@ impl From<std::io::Error> for RahmenError {
 impl From<image::error::ImageError> for RahmenError {
     fn from(err: image::error::ImageError) -> Self {
         RahmenError::ImageError(Arc::new(err))
+    }
+}
+impl From<rexiv2::Rexiv2Error> for RahmenError {
+    fn from(err: rexiv2::Rexiv2Error) -> Self {
+        RahmenError::Rexiv2Error(err)
     }
 }

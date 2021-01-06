@@ -1,6 +1,5 @@
 extern crate clap;
 extern crate ctrlc;
-extern crate exif;
 extern crate timely;
 
 use std::collections::HashMap;
@@ -28,10 +27,7 @@ use rahmen::display_fltk::FltkDisplay;
 use rahmen::display_framebuffer::FramebufferDisplay;
 use rahmen::errors::{RahmenError, RahmenResult};
 use rahmen::font::FontRenderer;
-use rahmen::provider::{
-    coordinates_from_exif, coordinates_to_location, load_image_from_path, read_exif_from_path,
-    Provider,
-};
+use rahmen::provider::{format_exif, load_image_from_path, Provider};
 use rahmen::provider_list::ListProvider;
 use rahmen::Timer;
 
@@ -198,20 +194,10 @@ fn main() -> RahmenResult<()> {
         });
         let err_stream = img_path_stream.err();
 
-        let exif_stream = img_path_stream
+        let status_line_stream = img_path_stream
             .ok()
-            .flat_map(|(p, _img)| read_exif_from_path(&p).ok())
-            // .inspect(|x| println!("exif: {:?}", x))
-            .probe_with(&mut probe);
-
-        let location_stream = exif_stream
-            .map(|exif| coordinates_from_exif(exif.iter()))
-            .map(|c| {
-                c.map(|c| coordinates_to_location(c).unwrap_or(String::from("")))
-                    .unwrap_or(String::from(""))
-            })
-            .inspect(|loc| println!("Location: {}", loc))
-            .probe_with(&mut probe);
+            .flat_map(|(p, _img)| format_exif(&p).ok())
+            .inspect(|loc| println!("Status line: {}", loc));
 
         let text_img_stream = {
             let mut dimensions = HashMap::new();
@@ -220,7 +206,7 @@ fn main() -> RahmenResult<()> {
             let mut current_text = None;
             let mut in_buffer1 = vec![];
             let mut in_buffer2 = vec![];
-            location_stream.binary_notify(
+            status_line_stream.binary_notify(
                 &dimensions_stream,
                 timely::dataflow::channels::pact::Pipeline,
                 timely::dataflow::channels::pact::Pipeline,

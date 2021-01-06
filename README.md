@@ -8,6 +8,12 @@ and periodically shows the next image.
 Rahmen is designed to run on low-power devices, such as the Raspberry Pi 1. While it is not heavily optimized to consume
 little resources, some effort has been put into loading, pre-processing and rendering images.
 
+## Dependencies
+
+Rahmen depends on various libraries, which should be available on most Linux distributions. Specifically, it needs:
+
+* `libgexiv2-dev`
+
 ## Building
 
 `cargo build --bin rahmen`
@@ -41,6 +47,13 @@ Preparation:
    ```shell
    git clone https://github.com/raspberrypi/tools
    export PATH="$PATH:$(pwd)/tools/arm-bcm2708/arm-linux-gnueabihf/bin/"
+   ```
+
+3. Add the `armhf` target to Debian and install a dependency:
+
+   ```shell
+   dpkg --add-architecture armhf
+   apt install libgexiv2-dev:armhf libfontconfig1-dev:armhf
    ```
 
 Now, issue the following command to cross-compile the binary.

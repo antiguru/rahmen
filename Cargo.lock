@@ -488,6 +488,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gexiv2-sys"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3e66ac4aab8b401ca63838116d080b98e12fb5056e1c2a44e35c93da3526d13"
+dependencies = [
+ "libc",
+ "pkg-config",
+]
+
+[[package]]
 name = "glob"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -519,7 +529,7 @@ dependencies = [
  "color_quant",
  "jpeg-decoder",
  "num-iter",
- "num-rational",
+ "num-rational 0.3.2",
  "num-traits",
 ]
 
@@ -549,24 +559,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cc797adac5f083b8ff0ca6f6294a999393d76e197c36488e2ef732c4715f6fa3"
 dependencies = [
  "byteorder",
-]
-
-[[package]]
-name = "kamadak-exif"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "524f22a6373f7d4f4e7caa44d54efbaf1e92c09d41f38647db2784ebce610aa8"
-dependencies = [
- "mutate_once",
-]
-
-[[package]]
-name = "kdtree"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80ee359328fc9087e9e3fc0a4567c4dd27ec69a127d6a70e8d9dd22845b8b1a2"
-dependencies = [
- "num-traits",
 ]
 
 [[package]]
@@ -640,12 +632,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mutate_once"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16cf681a23b4d0a43fc35024c176437f9dcd818db34e0f42ab456a0ee5ad497b"
-
-[[package]]
 name = "nasm-rs"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -682,6 +668,17 @@ name = "num-iter"
 version = "0.1.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2021c8337a54d21aca0d59a92577a029af9431cb59b909b03252b9c164fad59"
+dependencies = [
+ "autocfg",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-rational"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c000134b5dbf44adc5cb772486d335293351644b801551abe8f75c84cfa4aef"
 dependencies = [
  "autocfg",
  "num-integer",
@@ -759,15 +756,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "quick-csv"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edf4b7701db7d2e4c9c010f21eebd8676a50f79223a0cf858162d24bff47338c"
-dependencies = [
- "rustc-serialize",
-]
-
-[[package]]
 name = "quote"
 version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -787,12 +775,10 @@ dependencies = [
  "framebuffer",
  "glob",
  "image",
- "kamadak-exif",
- "lazy_static",
  "memmap",
  "mozjpeg",
  "pathfinder_geometry",
- "reverse_geocoder",
+ "rexiv2",
  "timely",
 ]
 
@@ -839,16 +825,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "reverse_geocoder"
-version = "2.0.0"
+name = "rexiv2"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "983955dc2b36116d0bf6ad274825be1dbcc5c0278df19f992ef1618b99ab24b2"
+checksum = "ab34307334dcf90c2f9afeda08e0c52310f4d9f282cf6e8ec6a6ffb0b09826a5"
 dependencies = [
- "kdtree",
- "quick-csv",
- "rustc-serialize",
- "serde",
- "serde_derive",
+ "gexiv2-sys",
+ "libc",
+ "num-rational 0.2.4",
 ]
 
 [[package]]
@@ -871,12 +855,6 @@ dependencies = [
  "constant_time_eq",
  "crossbeam-utils 0.8.1",
 ]
-
-[[package]]
-name = "rustc-serialize"
-version = "0.3.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
 
 [[package]]
 name = "rustc_version"

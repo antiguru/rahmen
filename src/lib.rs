@@ -16,9 +16,6 @@
     variant_size_differences
 )]
 
-#[macro_use]
-extern crate lazy_static;
-
 use std::time::{Duration, Instant};
 
 pub mod display;
