@@ -89,6 +89,7 @@ pub fn format_exif<P: AsRef<std::ffi::OsStr>>(path: P) -> RahmenResult<String> {
     for lookup in FIELD_LOOKUP_TABLE {
         if let Some(Some(text)) = lookup
             .iter()
+            .filter(|f| metadata.has_tag(f))
             .map(|f| metadata.get_tag_interpreted_string(*f).ok())
             .filter(Option::is_some)
             .next()
