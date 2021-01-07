@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::str::FromStr;
@@ -8,8 +9,8 @@ use clap::{App, Arg};
 use font_kit::loaders::freetype::Font;
 use timely::dataflow::operators::capture::Event;
 use timely::dataflow::operators::{
-    Branch, Capability, Capture, Concat, ConnectLoop, Enter, Inspect, Leave, LoopVariable, Map,
-    Operator, Probe, ResultStream,
+    Branch, Capture, Concat, ConnectLoop, Enter, Inspect, Leave, LoopVariable, Map, Operator,
+    Probe, ResultStream,
 };
 use timely::dataflow::{InputHandle, ProbeHandle, Scope};
 use timely::order::Product;
@@ -131,40 +132,45 @@ fn main() -> RahmenResult<()> {
 
     let output = worker.dataflow(|scope| {
         let configuration_stream = input_configuration.to_stream(scope);
-        let stream = input.to_stream(scope).unary_frontier(
-            timely::dataflow::channels::pact::Pipeline,
-            "Ticker",
-            |cap: Capability<Duration>, _op| {
-                let mut buffer = vec![];
-                let mut retained_cap: Option<Capability<Duration>> = Some(cap);
-                move |input_handle, output_handle| {
-                    if input_handle.frontier.is_empty() {
-                        retained_cap.take();
-                    } else if let Some(retained_cap) = retained_cap.as_mut() {
-                        if !input_handle
-                            .frontier
-                            .frontier()
-                            .less_equal(retained_cap.time())
-                        {
-                            output_handle.session(&retained_cap).give(());
-                            retained_cap.downgrade(&(*retained_cap.time() + delay));
-                            while !input_handle
-                                .frontier
-                                .frontier()
-                                .less_equal(retained_cap.time())
-                            {
-                                retained_cap
-                                    .downgrade(&(*retained_cap.time() + Duration::from_secs(1)));
+
+        let stream = {
+            let mut config_stash = HashMap::new();
+            let mut buffer = vec![];
+            let mut current_delay = None;
+            let mut last_timeout = None;
+            input_configuration.to_stream(scope).unary_notify(
+                timely::dataflow::channels::pact::Pipeline,
+                "Ticker",
+                Some(Duration::default()),
+                move |input, output, not| {
+                    input.for_each(|time, data| {
+                        data.swap(&mut buffer);
+                        config_stash
+                            .entry(*time.time())
+                            .or_insert_with(Vec::new)
+                            .extend(buffer.drain(..));
+                        not.notify_at(time.retain());
+                    });
+                    not.for_each(|time, _cnt, not| {
+                        if let Some(configs) = config_stash.remove(time.time()) {
+                            for cfg in configs {
+                                if let Configuration::Delay(duration) = cfg {
+                                    current_delay = Some(duration)
+                                }
                             }
                         }
-                    }
-                    while let Some((cap, in_buffer)) = input_handle.next() {
-                        in_buffer.swap(&mut buffer);
-                        output_handle.session(&cap).give_vec(&mut buffer);
-                    }
-                }
-            },
-        );
+                        if let Some(current_delay) = current_delay {
+                            if last_timeout.is_none() || last_timeout.unwrap() <= *time.time() {
+                                output.session(&time).give(());
+                                let next_timeout = *time.time() + current_delay;
+                                last_timeout = Some(next_timeout);
+                                not.notify_at(time.delayed(&next_timeout));
+                            }
+                        }
+                    });
+                },
+            )
+        };
         let img_path_stream = scope.scoped::<Product<_, u32>, _, _>("File loading", |inner| {
             let (handle, cycle) = inner.loop_variable(1);
             let (ok, err) = stream
@@ -205,6 +211,7 @@ fn main() -> RahmenResult<()> {
                     width,
                     height - current_font_size.unwrap_or(0.) as u32,
                 ),
+                configuration => configuration,
             })
         };
 
@@ -227,6 +234,7 @@ fn main() -> RahmenResult<()> {
     let start_time = Instant::now();
     let mut dimensions = None;
     input_configuration.send(Configuration::FontSize(30.));
+    input_configuration.send(Configuration::Delay(delay));
 
     let display_fn = |display: Box<&mut dyn Display>| {
         let now = start_time.elapsed();

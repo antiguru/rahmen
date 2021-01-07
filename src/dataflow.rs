@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::font::FontRenderer;
 use crate::Timer;
@@ -26,6 +27,8 @@ pub enum Configuration {
     FontSize(f32),
     /// Update the screen dimensions
     ScreenDimensions(u32, u32),
+    /// Delay between images
+    Delay(Duration),
 }
 
 /// Format text for the status line trait
@@ -88,6 +91,7 @@ impl<S: Scope> FormatText<S> for Stream<S, String> {
                                 Configuration::ScreenDimensions(width, height) => {
                                     current_screen_dimension = Some((width, height))
                                 }
+                                _ => {}
                             }
                         }
                     }
