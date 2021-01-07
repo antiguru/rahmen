@@ -4,7 +4,6 @@ use crate::errors::RahmenResult;
 use font_kit::canvas::{Canvas, Format, RasterizationOptions};
 use font_kit::hinting::HintingOptions;
 use font_kit::loaders::freetype::Font;
-use font_kit::source::SystemSource;
 
 use image::{Pixel, Rgb};
 use pathfinder_geometry::transform2d::Transform2F;
@@ -17,18 +16,6 @@ pub struct FontRenderer {
 }
 
 impl FontRenderer {
-    /// Create a new font renderer, selecting a sans-serif font.
-    pub fn new() -> Self {
-        let font = SystemSource::new()
-            .select_family_by_name("sans-serif")
-            .expect("Failed to look up font")
-            .fonts()[0]
-            .load()
-            .expect("Failed to load font");
-        println!("Font: {} ({})", font.full_name(), font.family_name());
-        Self { font }
-    }
-
     /// Create a new font renderer from an given font.
     pub fn with_font(font: Font) -> Self {
         Self { font }
