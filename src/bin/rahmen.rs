@@ -131,10 +131,10 @@ fn main() -> RahmenResult<()> {
     let output = worker.dataflow(|scope| {
         let configuration_stream = input_configuration.to_stream(scope);
 
-        let stream = configuration_stream.ticker();
         let img_path_stream = scope.scoped::<Product<_, u32>, _, _>("File loading", |inner| {
             let (handle, cycle) = inner.loop_variable(1);
-            let (ok, err) = stream
+            let (ok, err) = configuration_stream
+                .ticker()
                 .enter(inner)
                 .concat(&cycle)
                 // obtain next path
@@ -197,7 +197,7 @@ fn main() -> RahmenResult<()> {
     input_configuration.send(Configuration::FontSize(30.));
     input_configuration.send(Configuration::Delay(delay));
 
-    let display_fn = |display: Box<&mut dyn Display>| {
+    let display_fn = |display: &mut dyn Display| {
         let now = start_time.elapsed();
         if Some(display.dimensions()) != dimensions {
             dimensions = Some(display.dimensions());

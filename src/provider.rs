@@ -48,7 +48,7 @@ fn load_jpeg<P: AsRef<Path>>(path: P, max_size: Option<usize>) -> RahmenResult<D
         Ok(img)
     } else {
         eprintln!("Failed to decode image: {:?}", path.as_ref());
-        Err(RahmenError::Retry.into())
+        Err(RahmenError::Retry)
     }
 }
 

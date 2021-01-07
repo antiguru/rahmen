@@ -22,11 +22,8 @@ impl FramebufferDisplay {
 
     /// Enter the control loop. This will periodically trigger the callback, until it returns an
     /// `Err` result.
-    pub fn main_loop<F: FnMut(Box<&mut dyn Display>) -> RahmenResult<()>>(
-        &mut self,
-        mut callback: F,
-    ) {
-        while callback(Box::new(self)).is_ok() {
+    pub fn main_loop<F: FnMut(&mut dyn Display) -> RahmenResult<()>>(&mut self, mut callback: F) {
+        while callback(self).is_ok() {
             std::thread::sleep(Duration::from_millis(50));
         }
     }

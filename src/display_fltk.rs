@@ -48,11 +48,8 @@ impl FltkDisplay {
     }
 
     /// Main loop to handle FLTK events and call back into Rahmen's logic
-    pub fn main_loop<F: FnMut(Box<&mut dyn Display>) -> RahmenResult<()>>(
-        &mut self,
-        mut callback: F,
-    ) {
-        while callback(Box::new(self)).is_ok() && self.window.shown() {
+    pub fn main_loop<F: FnMut(&mut dyn Display) -> RahmenResult<()>>(&mut self, mut callback: F) {
+        while callback(self).is_ok() && self.window.shown() {
             match fltk::app::wait_for(Duration::from_millis(50).as_secs_f64()) {
                 Err(e) => {
                     eprintln!("FLTK error: {}", e);

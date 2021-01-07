@@ -111,7 +111,10 @@ impl<S: Scope> FormatText<S> for Stream<S, String> {
                                 current_text.as_ref().unwrap(),
                                 font_size,
                                 (dimension.0, font_size as _),
-                                |x, y, pixel| Ok(img.put_pixel(x as _, y as _, pixel.to_rgba())),
+                                |x, y, pixel| {
+                                    img.put_pixel(x as _, y as _, pixel.to_rgba());
+                                    Ok(())
+                                },
                             )
                             .unwrap();
                         out.session(&time).give((
@@ -171,11 +174,8 @@ impl<S: Scope> ComposeImage<S> for ImagePosStream<S> {
                 not.for_each(|time, _cnt, _not| {
                     if let Some(configurations) = configuration_stash.remove(time.time()) {
                         for configuration in configurations {
-                            match configuration {
-                                Configuration::ScreenDimensions(width, height) => {
-                                    current_screen_size = Some((width, height))
-                                }
-                                _ => {}
+                            if let Configuration::ScreenDimensions(width, height) = configuration {
+                                current_screen_size = Some((width, height))
                             }
                         }
                     }
@@ -184,8 +184,7 @@ impl<S: Scope> ComposeImage<S> for ImagePosStream<S> {
                             current_image.insert(img.0, img);
                         }
                     }
-                    if current_screen_size.is_some() {
-                        let current_screen_size = current_screen_size.unwrap();
+                    if let Some(current_screen_size) = current_screen_size {
                         let mut output_image =
                             DynamicImage::new_bgr8(current_screen_size.0, current_screen_size.1);
                         println!("current screen size: {:?}", current_screen_size);
@@ -259,11 +258,8 @@ impl<S: Scope> ResizeImage<S> for ImageStream<S> {
                 not.for_each(|time, _cnt, _not| {
                     if let Some(configurations) = configuration_stash.remove(time.time()) {
                         for configuration in configurations {
-                            match configuration {
-                                Configuration::ScreenDimensions(width, height) => {
-                                    current_screen_size = Some((width, height))
-                                }
-                                _ => {}
+                            if let Configuration::ScreenDimensions(width, height) = configuration {
+                                current_screen_size = Some((width, height))
                             }
                         }
                     }
