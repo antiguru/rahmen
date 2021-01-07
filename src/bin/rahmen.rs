@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::str::FromStr;
@@ -9,13 +8,13 @@ use clap::{App, Arg};
 use font_kit::loaders::freetype::Font;
 use timely::dataflow::operators::capture::Event;
 use timely::dataflow::operators::{
-    Branch, Capture, Concat, ConnectLoop, Enter, Inspect, Leave, LoopVariable, Map, Operator,
-    Probe, ResultStream,
+    Branch, Capture, Concat, ConnectLoop, Enter, Inspect, Leave, LoopVariable, Map, Probe,
+    ResultStream,
 };
 use timely::dataflow::{InputHandle, ProbeHandle, Scope};
 use timely::order::Product;
 
-use rahmen::dataflow::{ComposeImage, Configuration, FormatText, ResizeImage};
+use rahmen::dataflow::{ComposeImage, Configuration, FormatText, ResizeImage, Ticker};
 use rahmen::display::Display;
 #[cfg(feature = "fltk")]
 use rahmen::display_fltk::FltkDisplay;
@@ -113,7 +112,6 @@ fn main() -> RahmenResult<()> {
     let allocator = timely::communication::allocator::Thread::new();
     let mut worker = timely::worker::Worker::new(allocator);
 
-    let mut input: InputHandle<_, ()> = InputHandle::new();
     let mut input_configuration: InputHandle<_, Configuration> = InputHandle::new();
     let mut probe = ProbeHandle::new();
 
@@ -133,44 +131,7 @@ fn main() -> RahmenResult<()> {
     let output = worker.dataflow(|scope| {
         let configuration_stream = input_configuration.to_stream(scope);
 
-        let stream = {
-            let mut config_stash = HashMap::new();
-            let mut buffer = vec![];
-            let mut current_delay = None;
-            let mut last_timeout = None;
-            input_configuration.to_stream(scope).unary_notify(
-                timely::dataflow::channels::pact::Pipeline,
-                "Ticker",
-                Some(Duration::default()),
-                move |input, output, not| {
-                    input.for_each(|time, data| {
-                        data.swap(&mut buffer);
-                        config_stash
-                            .entry(*time.time())
-                            .or_insert_with(Vec::new)
-                            .extend(buffer.drain(..));
-                        not.notify_at(time.retain());
-                    });
-                    not.for_each(|time, _cnt, not| {
-                        if let Some(configs) = config_stash.remove(time.time()) {
-                            for cfg in configs {
-                                if let Configuration::Delay(duration) = cfg {
-                                    current_delay = Some(duration)
-                                }
-                            }
-                        }
-                        if let Some(current_delay) = current_delay {
-                            if last_timeout.is_none() || last_timeout.unwrap() <= *time.time() {
-                                output.session(&time).give(());
-                                let next_timeout = *time.time() + current_delay;
-                                last_timeout = Some(next_timeout);
-                                not.notify_at(time.delayed(&next_timeout));
-                            }
-                        }
-                    });
-                },
-            )
-        };
+        let stream = configuration_stream.ticker();
         let img_path_stream = scope.scoped::<Product<_, u32>, _, _>("File loading", |inner| {
             let (handle, cycle) = inner.loop_variable(1);
             let (ok, err) = stream
@@ -238,7 +199,6 @@ fn main() -> RahmenResult<()> {
 
     let display_fn = |display: Box<&mut dyn Display>| {
         let now = start_time.elapsed();
-        input.advance_to(now);
         if Some(display.dimensions()) != dimensions {
             dimensions = Some(display.dimensions());
             input_configuration.send(Configuration::ScreenDimensions(
@@ -247,7 +207,7 @@ fn main() -> RahmenResult<()> {
             ));
         }
         input_configuration.advance_to(now);
-        while probe.less_than(input.time()) {
+        while probe.less_than(input_configuration.time()) {
             worker.step();
         }
         match output.try_iter().all(|result| match result {
@@ -291,7 +251,6 @@ fn main() -> RahmenResult<()> {
         _ => panic!("Unknown display"),
     };
 
-    input.close();
     input_configuration.close();
     while worker.step() {}
     Ok(())
