@@ -1,8 +1,3 @@
-extern crate clap;
-extern crate ctrlc;
-extern crate timely;
-
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::str::FromStr;
@@ -11,16 +6,15 @@ use std::time::{Duration, Instant};
 
 use clap::{App, Arg};
 use font_kit::loaders::freetype::Font;
-use image::{DynamicImage, GenericImage, GenericImageView, Pixel};
 use timely::dataflow::operators::capture::Event;
 use timely::dataflow::operators::{
-    Branch, Capability, CapabilityRef, Capture, Concat, ConnectLoop, Enter, Inspect, Leave,
-    LoopVariable, Map, Operator, Probe, ResultStream,
+    Branch, Capability, Capture, Concat, ConnectLoop, Enter, Inspect, Leave, LoopVariable, Map,
+    Operator, Probe, ResultStream,
 };
 use timely::dataflow::{InputHandle, ProbeHandle, Scope};
 use timely::order::Product;
-use timely::progress::Timestamp;
 
+use rahmen::dataflow::{ComposeImage, Configuration, FormatText, ResizeImage};
 use rahmen::display::Display;
 #[cfg(feature = "fltk")]
 use rahmen::display_fltk::FltkDisplay;
@@ -29,7 +23,6 @@ use rahmen::errors::{RahmenError, RahmenResult};
 use rahmen::font::FontRenderer;
 use rahmen::provider::{format_exif, load_image_from_path, Provider};
 use rahmen::provider_list::ListProvider;
-use rahmen::Timer;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum RunControl {
@@ -120,7 +113,7 @@ fn main() -> RahmenResult<()> {
     let mut worker = timely::worker::Worker::new(allocator);
 
     let mut input: InputHandle<_, ()> = InputHandle::new();
-    let mut input_dimensions: InputHandle<_, (u32, u32)> = InputHandle::new();
+    let mut input_configuration: InputHandle<_, Configuration> = InputHandle::new();
     let mut probe = ProbeHandle::new();
 
     let buffer_max_size: usize = matches
@@ -132,13 +125,12 @@ fn main() -> RahmenResult<()> {
     let font = Font::from_path(matches.value_of("font").unwrap(), 0).unwrap();
     let font_renderer = FontRenderer::with_font(font);
 
-    let output = worker.dataflow(|scope| {
-        let font_size = 30.;
+    let time_str = matches.value_of("time").unwrap();
+    let delay = Duration::from_millis((f64::from_str(time_str).unwrap() * 1000f64) as u64);
+    println!("Delay: {:?}", delay);
 
-        let _last_time: Option<Instant> = None;
-        let time_str = matches.value_of("time").unwrap();
-        let delay = Duration::from_millis((f64::from_str(time_str).unwrap() * 1000f64) as u64);
-        println!("Delay: {:?}", delay);
+    let output = worker.dataflow(|scope| {
+        let configuration_stream = input_configuration.to_stream(scope);
         let stream = input.to_stream(scope).unary_frontier(
             timely::dataflow::channels::pact::Pipeline,
             "Ticker",
@@ -173,7 +165,6 @@ fn main() -> RahmenResult<()> {
                 }
             },
         );
-        let dimensions_stream = input_dimensions.to_stream(scope);
         let img_path_stream = scope.scoped::<Product<_, u32>, _, _>("File loading", |inner| {
             let (handle, cycle) = inner.loop_variable(1);
             let (ok, err) = stream
@@ -199,169 +190,32 @@ fn main() -> RahmenResult<()> {
             .flat_map(|(p, _img)| format_exif(&p).ok())
             .inspect(|loc| println!("Status line: {}", loc));
 
-        let text_img_stream = {
-            let mut dimensions = HashMap::new();
-            let mut texts = HashMap::new();
-            let mut current_dimension = None;
-            let mut current_text = None;
-            let mut in_buffer1 = vec![];
-            let mut in_buffer2 = vec![];
-            status_line_stream.binary_notify(
-                &dimensions_stream,
-                timely::dataflow::channels::pact::Pipeline,
-                timely::dataflow::channels::pact::Pipeline,
-                "Render font",
-                None,
-                move |in1, in2, out, not| {
-                    let _t = Timer::new(|e| println!("Render font op {}ms", e.as_millis()));
-                    in1.for_each(|time, data| {
-                        data.swap(&mut in_buffer1);
-                        for text in in_buffer1.drain(..) {
-                            texts.insert(*time.time(), text);
-                        }
-                        not.notify_at(time.retain());
-                    });
-                    in2.for_each(|time, data| {
-                        data.swap(&mut in_buffer2);
-                        for dimension in in_buffer2.drain(..) {
-                            dimensions.insert(*time.time(), dimension);
-                        }
-                        not.notify_at(time.retain());
-                    });
-                    not.for_each(|time, _cnt, _not| {
-                        if let Some(dimension) = dimensions.remove(time.time()) {
-                            current_dimension = Some(dimension);
-                        }
-                        if let Some(text) = texts.remove(time.time()) {
-                            current_text = Some(text);
-                        }
-                        if current_text.is_some() && current_dimension.is_some() {
-                            let dimension = current_dimension.as_ref().unwrap();
-                            // println!("Dimension: {:?}", dimension);
-                            // println!("Text: {}", current_text.as_ref().unwrap());
-                            let mut img = DynamicImage::new_luma8(dimension.0, font_size as _);
-                            font_renderer
-                                .render(
-                                    current_text.as_ref().unwrap(),
-                                    font_size,
-                                    (dimension.0, font_size as _),
-                                    |x, y, pixel| {
-                                        Ok(img.put_pixel(x as _, y as _, pixel.to_rgba()))
-                                    },
-                                )
-                                .unwrap();
-                            out.session(&time).give((*dimension, Arc::new(img)));
-                        }
-                    });
-                },
-            )
-        };
+        let text_img_stream =
+            status_line_stream.format_text(&configuration_stream, font_renderer, 2);
 
-        let img_stream = img_path_stream.ok().map(|(_, img)| img).binary(
-            &dimensions_stream.map(move |(x, y)| (x, y - font_size as u32)),
-            timely::dataflow::channels::pact::Pipeline,
-            timely::dataflow::channels::pact::Pipeline,
-            "Resize",
-            |_cap, _op| {
-                let mut dimensions = None;
-                let mut current_image = None;
-                move |in1, in2, out| {
-                    let _t = Timer::new(|e| println!("Resize op {}ms", e.as_millis()));
-                    let mut did_work = false;
-                    let mut cap: Option<Capability<_>> = None;
-                    fn track_time<T: Timestamp>(
-                        cap: &mut Option<Capability<T>>,
-                        time: CapabilityRef<T>,
-                    ) {
-                        if let Some(cap) = cap.as_mut() {
-                            if cap.time() < time.time() {
-                                cap.downgrade(time.time());
-                            }
-                        } else {
-                            cap.replace(time.retain());
-                        }
-                    }
-                    in1.for_each(|time, data| {
-                        if let Some(image) = data.last() {
-                            current_image = Some(image.clone());
-                            did_work |= true;
-                        }
-                        track_time(&mut cap, time);
-                    });
-                    in2.for_each(|time, data| {
-                        if let Some(dims) = data.last() {
-                            dimensions = Some(dims.clone());
-                            did_work |= true;
-                        }
-                        track_time(&mut cap, time);
-                    });
-                    if did_work && dimensions.is_some() {
-                        if let Some(current_image) = current_image.as_ref() {
-                            out.session(cap.as_ref().unwrap()).give(Arc::new(
-                                current_image.resize(
-                                    dimensions.unwrap().0,
-                                    dimensions.unwrap().1,
-                                    image::imageops::FilterType::Triangle,
-                                ),
-                            ));
-                        }
-                    }
+        let adjusted_configuration_stream = {
+            // Hack: adjust screen size for the resize operator to reserve space for the status line
+            let mut current_font_size = None;
+            configuration_stream.map(move |configuration| match configuration {
+                Configuration::FontSize(font_size) => {
+                    current_font_size = Some(font_size);
+                    Configuration::FontSize(font_size)
                 }
-            },
-        );
-
-        let composed_img_stream = {
-            let mut imgs = HashMap::new();
-            let mut texts = HashMap::new();
-            let mut current_img = None;
-            let mut current_text = None;
-            let mut in_buffer1 = vec![];
-            let mut in_buffer2 = vec![];
-            img_stream.binary_notify(
-                &text_img_stream,
-                timely::dataflow::channels::pact::Pipeline,
-                timely::dataflow::channels::pact::Pipeline,
-                "Compose",
-                None,
-                move |in1, in2, out, not| {
-                    let _t = Timer::new(|e| println!("Compose op {}ms", e.as_millis()));
-                    in1.for_each(|time, data| {
-                        data.swap(&mut in_buffer1);
-                        for img in in_buffer1.drain(..) {
-                            imgs.insert(*time.time(), img);
-                        }
-                        not.notify_at(time.retain());
-                    });
-                    in2.for_each(|time, data| {
-                        data.swap(&mut in_buffer2);
-                        for text_dim in in_buffer2.drain(..) {
-                            texts.insert(*time.time(), text_dim);
-                        }
-                        not.notify_at(time.retain());
-                    });
-                    not.for_each(|time, _cnt, _not| {
-                        if let Some(img) = imgs.remove(time.time()) {
-                            current_img = Some(img);
-                        }
-                        if let Some(text) = texts.remove(time.time()) {
-                            current_text = Some(text);
-                        }
-                        if current_text.is_some() && current_img.is_some() {
-                            let (dimension, text_img) = current_text.as_ref().unwrap();
-                            let current_img = current_img.as_ref().unwrap();
-                            let mut img = DynamicImage::new_bgr8(dimension.0, dimension.1);
-                            let x_offset = (dimension.0 - current_img.dimensions().0) / 2;
-                            let y_offset = (dimension.1 - current_img.dimensions().1) / 2;
-                            img.copy_from(current_img.as_ref(), x_offset, y_offset)
-                                .unwrap();
-                            img.copy_from(text_img.as_ref(), 0, dimension.1 - font_size as u32)
-                                .unwrap();
-                            out.session(&time).give(Arc::new(img));
-                        }
-                    });
-                },
-            )
+                Configuration::ScreenDimensions(width, height) => Configuration::ScreenDimensions(
+                    width,
+                    height - current_font_size.unwrap_or(0.) as u32,
+                ),
+            })
         };
+
+        let img_stream = img_path_stream
+            .ok()
+            .map(|(_, img)| img)
+            .resize_image(&adjusted_configuration_stream, 1);
+
+        let composed_img_stream = img_stream
+            .concat(&text_img_stream)
+            .compose_image(&configuration_stream);
 
         err_stream
             .map(Err)
@@ -372,15 +226,19 @@ fn main() -> RahmenResult<()> {
 
     let start_time = Instant::now();
     let mut dimensions = None;
+    input_configuration.send(Configuration::FontSize(30.));
 
     let display_fn = |display: Box<&mut dyn Display>| {
         let now = start_time.elapsed();
         input.advance_to(now);
         if Some(display.dimensions()) != dimensions {
             dimensions = Some(display.dimensions());
-            input_dimensions.send(display.dimensions());
+            input_configuration.send(Configuration::ScreenDimensions(
+                display.dimensions().0,
+                display.dimensions().1,
+            ));
         }
-        input_dimensions.advance_to(now);
+        input_configuration.advance_to(now);
         while probe.less_than(input.time()) {
             worker.step();
         }
@@ -426,7 +284,7 @@ fn main() -> RahmenResult<()> {
     };
 
     input.close();
-    input_dimensions.close();
+    input_configuration.close();
     while worker.step() {}
     Ok(())
 }

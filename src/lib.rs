@@ -18,6 +18,7 @@
 
 use std::time::{Duration, Instant};
 
+pub mod dataflow;
 pub mod display;
 #[cfg(feature = "fltk")]
 pub mod display_fltk;
