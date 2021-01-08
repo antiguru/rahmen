@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
 
 use crate::font::FontRenderer;
 use crate::Timer;
@@ -10,7 +9,6 @@ use image::{DynamicImage, GenericImage, GenericImageView, Pixel};
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::Operator;
 use timely::dataflow::{Scope, Stream};
-use timely::Data;
 
 /// A stream of images
 pub type ImageStream<S> = Stream<S, Arc<DynamicImage>>;
@@ -28,8 +26,8 @@ pub enum Configuration {
     FontSize(f32),
     /// Update the screen dimensions
     ScreenDimensions(u32, u32),
-    /// Delay between images
-    Delay(Duration),
+    /// Show a new image
+    Tick,
 }
 
 /// Format text for the status line trait
@@ -280,53 +278,6 @@ impl<S: Scope> ResizeImage<S> for ImageStream<S> {
                             .give((key, (x_offset, y_offset), Arc::new(resized)));
                     }
                 })
-            },
-        )
-    }
-}
-
-/// A ticker ticks with a configurable delay
-pub trait Ticker<S: Scope, D: Data> {
-    /// Create a ticking stream
-    fn ticker(&self) -> Stream<S, D>;
-}
-
-impl<S: Scope<Timestamp = Duration>> Ticker<S, ()> for ConfigurationStream<S> {
-    fn ticker(&self) -> Stream<S, ()> {
-        let mut config_stash = HashMap::new();
-        let mut buffer = vec![];
-        let mut current_delay = None;
-        let mut last_timeout = None;
-        self.unary_notify(
-            Pipeline,
-            "Ticker",
-            Some(Duration::default()),
-            move |input, output, not| {
-                input.for_each(|time, data| {
-                    data.swap(&mut buffer);
-                    config_stash
-                        .entry(*time.time())
-                        .or_insert_with(Vec::new)
-                        .extend(buffer.drain(..));
-                    not.notify_at(time.retain());
-                });
-                not.for_each(|time, _cnt, not| {
-                    if let Some(configs) = config_stash.remove(time.time()) {
-                        for cfg in &configs {
-                            if let Configuration::Delay(duration) = cfg {
-                                current_delay = Some(*duration)
-                            }
-                        }
-                    }
-                    if let Some(current_delay) = current_delay.as_ref() {
-                        if last_timeout.is_none() || last_timeout.unwrap() <= *time.time() {
-                            output.session(&time).give(());
-                            let next_timeout = *time.time() + *current_delay;
-                            last_timeout = Some(next_timeout);
-                            not.notify_at(time.delayed(&next_timeout));
-                        }
-                    }
-                });
             },
         )
     }

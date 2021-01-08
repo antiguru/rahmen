@@ -8,13 +8,13 @@ use clap::{App, Arg};
 use font_kit::loaders::freetype::Font;
 use timely::dataflow::operators::capture::Event;
 use timely::dataflow::operators::{
-    Branch, Capture, Concat, ConnectLoop, Enter, Inspect, Leave, LoopVariable, Map, Probe,
+    Branch, Capture, Concat, ConnectLoop, Enter, Filter, Inspect, Leave, LoopVariable, Map, Probe,
     ResultStream,
 };
 use timely::dataflow::{InputHandle, ProbeHandle, Scope};
 use timely::order::Product;
 
-use rahmen::dataflow::{ComposeImage, Configuration, FormatText, ResizeImage, Ticker};
+use rahmen::dataflow::{ComposeImage, Configuration, FormatText, ResizeImage};
 use rahmen::display::Display;
 #[cfg(feature = "fltk")]
 use rahmen::display_fltk::FltkDisplay;
@@ -134,7 +134,7 @@ fn main() -> RahmenResult<()> {
         let img_path_stream = scope.scoped::<Product<_, u32>, _, _>("File loading", |inner| {
             let (handle, cycle) = inner.loop_variable(1);
             let (ok, err) = configuration_stream
-                .ticker()
+                .filter(|c| matches!(c, Configuration::Tick))
                 .enter(inner)
                 .concat(&cycle)
                 // obtain next path
@@ -147,7 +147,7 @@ fn main() -> RahmenResult<()> {
                     )
                 })
                 .branch(|_t, d| d.as_ref().err() == Some(&RunControl::Suppressed));
-            err.map(|_| ()).connect_loop(handle);
+            err.map(|_| Configuration::Tick).connect_loop(handle);
             ok.leave()
         });
         let err_stream = img_path_stream.err();
@@ -195,10 +195,17 @@ fn main() -> RahmenResult<()> {
     let start_time = Instant::now();
     let mut dimensions = None;
     input_configuration.send(Configuration::FontSize(30.));
-    input_configuration.send(Configuration::Delay(delay));
+
+    let mut next_image_at = start_time.elapsed();
 
     let display_fn = |display: &mut dyn Display| {
         let now = start_time.elapsed();
+
+        if next_image_at < now {
+            input_configuration.send(Configuration::Tick);
+            next_image_at = now + delay;
+        }
+
         if Some(display.dimensions()) != dimensions {
             dimensions = Some(display.dimensions());
             input_configuration.send(Configuration::ScreenDimensions(
