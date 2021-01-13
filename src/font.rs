@@ -35,9 +35,10 @@ impl FontRenderer {
 
         let metrics = self.font.metrics();
 
-        let em = size / 1.24;
-        let mut base_x = 0.;
+        let em = size; // width of character, larger values of optional factor (eg size * 1.1) increase spacing
+        let mut base_x = 0.; // horizontal offset from the start of the text
         let mut canvas = Canvas::new(Vector2I::new(dimensions.0 as _, dimensions.1 as _), format);
+        // dimensions are set in dataflow.rs
 
         for char in text.chars() {
             if let Some(glyph_id) = self.font.glyph_for_char(char) {
@@ -59,7 +60,7 @@ impl FontRenderer {
                         &mut canvas,
                         glyph_id,
                         size,
-                        Transform2F::from_translation(Vector2F::new(base_x, em)),
+                        Transform2F::from_translation(Vector2F::new(base_x, size)),
                         hinting,
                         rasterization,
                     )

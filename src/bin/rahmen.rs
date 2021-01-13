@@ -170,7 +170,7 @@ fn main() -> RahmenResult<()> {
                 }
                 Configuration::ScreenDimensions(width, height) => Configuration::ScreenDimensions(
                     width,
-                    height - current_font_size.unwrap_or(0.) as u32,
+                    height - ( current_font_size.unwrap_or(0.) * 1.5) as u32, // this factor is the same as in dataflow.rs
                 ),
                 configuration => configuration,
             })
@@ -194,7 +194,8 @@ fn main() -> RahmenResult<()> {
 
     let start_time = Instant::now();
     let mut dimensions = None;
-    input_configuration.send(Configuration::FontSize(30.));
+    input_configuration.send(Configuration::FontSize(30.)); /// font size to use (px?)
+    input_configuration.send(Configuration::FontCanvasVStretch(1.5)); /// enlarge font canvas vertically by this factor (default: 1.5)
 
     let mut next_image_at = start_time.elapsed();
 

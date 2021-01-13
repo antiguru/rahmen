@@ -24,9 +24,11 @@ pub struct FltkDisplay {
 impl FltkDisplay {
     /// Create a new FLTK display
     pub fn new() -> Self {
+        let dim_x = 400;
+        let dim_y = 300;
         let _app = App::default().with_scheme(Scheme::Gleam);
-        let mut window = Window::new(100, 100, 400, 300, "Rahmen");
-        let frame = Frame::new(0, 0, 400, 300, "");
+        let mut window = Window::new(100, 100, dim_x, dim_y, "Rahmen");
+        let frame = Frame::new(0, 0, dim_x, dim_y, "");
         window.make_resizable(true);
         window.end();
         window.show_with_env_args();

@@ -70,13 +70,11 @@ pub fn load_image_from_path<P: AsRef<Path>>(
 }
 
 const FIELD_LOOKUP_TABLE: &[&[&str]] = &[
-    &[
-        "Iptc.Application2.Sublocation",
-        "Iptc.Application2.City",
-        "Iptc.Application2.ProvinceState",
-        "Iptc.Application2.CountryName",
-        "Iptc.Application2.CountryCode",
-    ],
+    //&[  "Iptc.Application2.Sublocation" ],
+    &["Iptc.Application2.ObjectName"],
+    &["Iptc.Application2.City" ],
+    &["Iptc.Application2.ProvinceState"],
+    &["Iptc.Application2.CountryName"],
     &["Iptc.Application2.DigitizationDate"],
     &["Xmp.dc.creator"],
 ];
@@ -97,5 +95,5 @@ pub fn format_exif<P: AsRef<std::ffi::OsStr>>(path: P) -> RahmenResult<String> {
             result.push(text)
         }
     }
-    Ok(result.join(" "))
+    Ok(result.join(", "))
 }

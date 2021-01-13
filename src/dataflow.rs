@@ -24,6 +24,8 @@ pub type ConfigurationStream<S> = Stream<S, Configuration>;
 pub enum Configuration {
     /// Update the font size for the status line
     FontSize(f32),
+    /// factor by which font canvas is higher than font
+    FontCanvasVStretch(f32),
     /// Update the screen dimensions
     ScreenDimensions(u32, u32),
     /// Show a new image
@@ -52,6 +54,7 @@ impl<S: Scope> FormatText<S> for Stream<S, String> {
         let mut text_stash = HashMap::new();
         let mut current_screen_dimension = None;
         let mut current_font_size = None;
+        let mut current_font_canvas_vstretch = None;
         let mut current_text = None;
         let mut in_buffer1 = vec![];
         let mut in_buffer2 = vec![];
@@ -87,6 +90,9 @@ impl<S: Scope> FormatText<S> for Stream<S, String> {
                                 Configuration::FontSize(font_size) => {
                                     current_font_size = Some(font_size)
                                 }
+                                Configuration::FontCanvasVStretch(font_canvas_vstretch) => {
+                                    current_font_canvas_vstretch = Some(font_canvas_vstretch)
+                                }
                                 Configuration::ScreenDimensions(width, height) => {
                                     current_screen_dimension = Some((width, height))
                                 }
@@ -101,14 +107,15 @@ impl<S: Scope> FormatText<S> for Stream<S, String> {
                         && current_screen_dimension.is_some()
                         && current_font_size.is_some()
                     {
-                        let font_size = current_font_size.unwrap();
+                        let font_size = current_font_size.unwrap(); // font size
+                        let canvas_height = font_size * current_font_canvas_vstretch.unwrap_or(1.5); // font canvas height, factor controls vertical padding
                         let dimension = current_screen_dimension.as_ref().unwrap();
-                        let mut img = DynamicImage::new_luma8(dimension.0, font_size as _);
+                        let mut img = DynamicImage::new_luma8(dimension.0,  canvas_height as _);
                         font_renderer
                             .render(
                                 current_text.as_ref().unwrap(),
                                 font_size,
-                                (dimension.0, font_size as _),
+                                (dimension.0, canvas_height as _),
                                 |x, y, pixel| {
                                     img.put_pixel(x as _, y as _, pixel.to_rgba());
                                     Ok(())
@@ -117,7 +124,7 @@ impl<S: Scope> FormatText<S> for Stream<S, String> {
                             .unwrap();
                         out.session(&time).give((
                             key,
-                            (0, dimension.1 - font_size as u32),
+                            (0, dimension.1 - canvas_height as u32),
                             Arc::new(img),
                         ));
                     }
@@ -188,7 +195,7 @@ impl<S: Scope> ComposeImage<S> for ImagePosStream<S> {
                         println!("current screen size: {:?}", current_screen_size);
                         for (_key, (x_offset, y_offset), img) in current_image.values() {
                             println!(
-                                " {} -> ({}, {}) + {:?}",
+                                " Key:{} -> xy:({}, {}) + img:{:?}",
                                 _key,
                                 x_offset,
                                 y_offset,
