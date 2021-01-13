@@ -24,16 +24,23 @@ use rahmen::font::FontRenderer;
 use rahmen::provider::{format_exif, load_image_from_path, Provider};
 use rahmen::provider_list::ListProvider;
 
+/// dataflow control, this is used as result R part
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum RunControl {
+    /// terminate stream processing (by external command)
     Terminate,
+    /// stream processing encountered an error, but will continue
     Suppressed,
 }
 
+/// error handler for display stuff
 fn fatal_err<T>(result: RahmenResult<Option<T>>) -> RunResult<T> {
     match result {
+        // empty result means we terminate as planned (e.g. end of list)
         Ok(None) => Err(RunControl::Terminate),
+        // we process the result
         Ok(Some(t)) => Ok(t),
+        // display error and terminate
         Err(e) => {
             eprintln!("Encountered error, terminating: {}", e);
             Err(RunControl::Terminate)
@@ -41,8 +48,10 @@ fn fatal_err<T>(result: RahmenResult<Option<T>>) -> RunResult<T> {
     }
 }
 
+/// to keep running the dataflow when there's a stream error
 fn suppress_err<T>(result: RahmenResult<T>) -> RunResult<T> {
     result.map_err(|e| {
+        // just notify about error but keep processing
         eprintln!("Encountered error, suppressing: {}", e);
         RunControl::Suppressed
     })
@@ -98,6 +107,7 @@ fn main() -> RahmenResult<()> {
         .get_matches();
 
     let input = matches.value_of("input").expect("Input missing");
+    // box is used bec of dynamic typing for provider
     let mut provider: Box<dyn Provider<_>> = if input.eq("-") {
         println!("Reading from stdin");
         Box::new(ListProvider::new(BufReader::new(std::io::stdin())))
@@ -108,12 +118,6 @@ fn main() -> RahmenResult<()> {
         println!("Reading from pattern {}", input);
         Box::new(rahmen::provider_glob::create(input)?)
     };
-
-    let allocator = timely::communication::allocator::Thread::new();
-    let mut worker = timely::worker::Worker::new(allocator);
-
-    let mut input_configuration: InputHandle<_, Configuration> = InputHandle::new();
-    let mut probe = ProbeHandle::new();
 
     let buffer_max_size: usize = matches
         .value_of("buffer_max_size")
@@ -127,6 +131,15 @@ fn main() -> RahmenResult<()> {
     let time_str = matches.value_of("time").unwrap();
     let delay = Duration::from_millis((f64::from_str(time_str).unwrap() * 1000f64) as u64);
     println!("Delay: {:?}", delay);
+
+    // initialization for timely dataflow
+    let allocator = timely::communication::allocator::Thread::new();
+    let mut worker = timely::worker::Worker::new(allocator);
+
+    // input: #1 timeline #2 screen resolution
+    let mut input_configuration: InputHandle<_, Configuration> = InputHandle::new();
+    // to gather information about progress
+    let mut probe = ProbeHandle::new();
 
     let output = worker.dataflow(|scope| {
         let configuration_stream = input_configuration.to_stream(scope);
@@ -225,7 +238,7 @@ fn main() -> RahmenResult<()> {
             ));
         }
         input_configuration.advance_to(now);
-        while probe.less_than(input_configuration.time()) {
+        while probe.less_than(&now) {
             worker.step();
         }
         match output.try_iter().all(|result| match result {

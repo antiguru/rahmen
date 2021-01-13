@@ -2,8 +2,8 @@
 
 Rah·men [[ˈʁaːmən]](https://de.wiktionary.org/wiki/Rahmen) German: frame
 
-Rahmen is a lightweight tool to present images while consuming little resources. It takes a list of files or a pattern,
-and periodically shows the next image.
+Rahmen is a lightweight tool to present an image slideshow while consuming little resources. It takes a list of files or
+a pattern, and periodically shows the next image.
 
 Rahmen is designed to run on low-power devices, such as the Raspberry Pi 1. While it is not heavily optimized to consume
 little resources, some effort has been put into loading, pre-processing and rendering images.
@@ -18,6 +18,64 @@ Rahmen depends on various libraries, which should be available on most Linux dis
 
 `cargo build --bin rahmen`
 
+## Running
+
+```shell
+./rahmen --help`
+Rahmen client
+
+USAGE:
+rahmen [OPTIONS] <input>
+
+ARGS:
+<input>
+
+FLAGS:
+-h, --help       Prints help information
+-V, --version    Prints version information
+
+OPTIONS:
+--buffer_max_size <buffer_max_size>    [default: 16000000]
+```
+
+The buffer size (in Bytes) determines the downscaling of images. All images that are larger than the buffer size in
+Bytes will be scaled down to the buffer size. This should be larger than your monitor to avoid scaling
+artefacts/jaggies.
+
+Rule of thumb: `long side of the monitor ^ 2 * 2`, e.g. for a 1600 * 1200 monitor: `1600 * 1600 * 2 = 5120000`.
+
+(Images smaller than your monitor will be scaled up to the monitor size and will possibly appear blurred. Avoid them if
+you don't like this.)
+
+```shell
+-d, --display <display>
+Select the display provider [default: framebuffer] [possible values: framebuffer]
+```
+
+(If compiled with the FLTK option, the FLTK display provider will also be available, use `fltk` as value.)
+
+```shell
+        --font <font>
+            [default: /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf]
+```
+
+Rahmen tries to guess the location of the image by looking up the GPS coordinates (if any), and will display it below
+the image in the given font. If the font is not found, the program exits. If you don't want to install lots of fonts,
+just point this option to a TrueType font file.
+
+```shell
+    -o, --output <output>                      
+    -t, --time <time>                          [default: 90]
+```
+
+The output points to the frame buffer to be used. Usually `/dev/fb0`.
+
+The time (in seconds) defines the interval to change to the next slide. On the Raspberry Pi version 1, it takes several
+seconds to scale larger images. If the time given is shorter than what it takes to display the image, no images will be
+skipped, the image will be displayed to the next full second after it is fully loaded plus the time it takes to load the
+next image. So on low-resource systems this should not be set too short, otherwise if the next image is very small, it
+could lead to the image displaying for less than 1 second.
+
 ## Cross-compiling for the Raspberry Pi 1
 
 Preparation:
@@ -27,7 +85,7 @@ Preparation:
    rustup target add arm-unknown-linux-gnueabihf
    ```
 
-2. Setup the GCC toolchanin. The first-generation Raspberry Pi had a BCM2835, supporting the ARMv6 instruction set.
+2. Setup the GCC toolchain. The first-generation Raspberry Pi had a BCM2835, supporting the ARMv6 instruction set.
    Current ARM compilers on Debian only support armv7. For this reason, we need to use a different toolchain, for
    example the one provided specifically for the Raspberry Pi
    on [github.com/raspberrypi/tools](https://github.com/raspberrypi/tools). Export its `bin` directory to the local
@@ -87,4 +145,4 @@ the debug symbols from the binary:
 
 The FLTK renders a window on various platforms, which can be used for development.
 
-The feature `fltk` is enabled by default. Pass `--no-default-features` to disable.
+The feature `fltk` is enabled by default. Pass `--no-default-features` to `cargo build` to disable.
