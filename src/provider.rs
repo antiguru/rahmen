@@ -70,9 +70,8 @@ pub fn load_image_from_path<P: AsRef<Path>>(
 }
 
 const FIELD_LOOKUP_TABLE: &[&[&str]] = &[
-    //&[  "Iptc.Application2.Sublocation" ],
     &["Iptc.Application2.ObjectName"],
-    &["Iptc.Application2.City" ],
+    &["Iptc.Application2.City"],
     &["Iptc.Application2.ProvinceState"],
     &["Iptc.Application2.CountryName"],
     &["Iptc.Application2.DigitizationDate"],

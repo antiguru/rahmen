@@ -106,11 +106,13 @@ impl<S: Scope> FormatText<S> for Stream<S, String> {
                     if current_text.is_some()
                         && current_screen_dimension.is_some()
                         && current_font_size.is_some()
+                        && current_font_canvas_vstretch.is_some()
                     {
-                        let font_size = current_font_size.unwrap(); // font size
-                        let canvas_height = font_size * current_font_canvas_vstretch.unwrap_or(1.5); // font canvas height, factor controls vertical padding
+                        let font_size = current_font_size.unwrap();
+                        // font canvas height, factor controls vertical padding
+                        let canvas_height = font_size * current_font_canvas_vstretch.unwrap();
                         let dimension = current_screen_dimension.as_ref().unwrap();
-                        let mut img = DynamicImage::new_luma8(dimension.0,  canvas_height as _);
+                        let mut img = DynamicImage::new_luma8(dimension.0, canvas_height as _);
                         font_renderer
                             .render(
                                 current_text.as_ref().unwrap(),

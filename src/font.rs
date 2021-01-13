@@ -34,11 +34,12 @@ impl FontRenderer {
         let format = Format::Rgb24;
 
         let metrics = self.font.metrics();
-
-        let em = size; // width of character, larger values of optional factor (eg size * 1.1) increase spacing
-        let mut base_x = 0.; // horizontal offset from the start of the text
-        let mut canvas = Canvas::new(Vector2I::new(dimensions.0 as _, dimensions.1 as _), format);
+        // width of character, larger values of optional factor (eg size * 1.1) increase spacing
+        let em = size;
+        // horizontal offset from the start of the text
+        let mut base_x = 0.;
         // dimensions are set in dataflow.rs
+        let mut canvas = Canvas::new(Vector2I::new(dimensions.0 as _, dimensions.1 as _), format);
 
         for char in text.chars() {
             if let Some(glyph_id) = self.font.glyph_for_char(char) {
