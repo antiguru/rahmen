@@ -2,6 +2,7 @@
 
 use std::io::BufReader;
 use std::path::Path;
+use itertools::Itertools;
 
 use image::{DynamicImage, Pixel};
 use rexiv2::Metadata;
@@ -81,18 +82,20 @@ const FIELD_LOOKUP_TABLE: &[&[&str]] = &[
 /// Format the metadata tags from an image to show a status line
 pub fn format_exif<P: AsRef<std::ffi::OsStr>>(path: P) -> RahmenResult<String> {
     let metadata = Metadata::new_from_path(path)?;
-
-    let mut result = vec![];
-    for lookup in FIELD_LOOKUP_TABLE {
-        if let Some(Some(text)) = lookup
-            .iter()
-            .filter(|f| metadata.has_tag(f))
-            .map(|f| metadata.get_tag_interpreted_string(*f).ok())
-            .filter(Option::is_some)
-            .next()
-        {
-            result.push(text)
-        }
-    }
+    // iterate over the tag table
+    let result = FIELD_LOOKUP_TABLE
+        .iter()
+        .flat_map(move |lookup| {
+            lookup
+                //iterate over each exif result, check if the tag is available  and return value if one exists
+                .iter()
+                .filter(|f| metadata.has_tag(f))
+                .map(|f| metadata.get_tag_interpreted_string(*f).ok())
+                .find(Option::is_some)
+                .map(Option::unwrap)
+        })
+        // remove multiples (e.g. if City and  ProvinceState are the same)
+        .unique()
+        .collect::<Vec<String>>();
     Ok(result.join(", "))
 }
