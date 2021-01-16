@@ -95,17 +95,17 @@ pub fn process_tag(tag: &String) -> String {
     // convert date to German format
     let re = Regex::new(r"(?P<y>\d{4})[-:](?P<m>\d{2})[-:](?P<d>\d{2})").unwrap();
     // TODO find better way to insert comma after year, might lead to a surplus comma if no time is found in metadata? (but Exif.Photo.DateTimeOriginal _should_ contain a time)
-    let s = re.replace_all(tag, "$d.$m.$y,").to_string();
+    let s = re.replace_all(tag, "$d.$m.$y,").into_owned();
     // remove leading zeros after dot (date)
     let re = Regex::new(r"\.0").unwrap();
-    let s = re.replace_all(&s, ".").to_string();
+    let s = re.replace_all(&s, ".").into_owned();
     // remove www stuff
     let re = Regex::new(r"\b<?www.").unwrap();
-    let s = re.replace_all(&s, "").to_string();
+    let s = re.replace_all(&s, "").into_owned();
     // remove numeric strings starting with plus sign after whitespace (phone numbers)
     let re = Regex::new(r"\s\+\d+").unwrap();
     // and convert from UPPER CASE to Title Case
-    re.replace_all(&s, "").to_string().from_case(Case::Upper).to_case(Case::Title)
+    re.replace_all(&s, "").into_owned().from_case(Case::Upper).to_case(Case::Title)
 }
 
 /// Format the metadata tags from an image to show a status line
@@ -126,8 +126,9 @@ pub fn format_exif<P: AsRef<std::ffi::OsStr>>(path: P) -> RahmenResult<String> {
         // remove multiples (e.g. if City and  ProvinceState are the same)
         .unique()
         // insert date and text conversion logic here?
+        .map(|tag|process_tag(&tag))
         .collect::<Vec<String>>();
     println!("{:?}", tag_values);
-    let processed_tag_values = tag_values.iter().map(|tag| process_tag(tag)).collect::<Vec<String>>();
-    Ok(processed_tag_values.join(", "))
+    //let processed_tag_values = tag_values.iter().map(|tag| process_tag(tag)).collect::<Vec<String>>();
+    Ok(tag_values.join(", "))
 }
