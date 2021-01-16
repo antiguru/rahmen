@@ -2,9 +2,11 @@
 
 use std::io::BufReader;
 use std::path::Path;
-use itertools::Itertools;
 
+use convert_case::{Case, Casing};
 use image::{DynamicImage, Pixel};
+use itertools::Itertools;
+use regex::Regex;
 use rexiv2::Metadata;
 
 use crate::errors::{RahmenError, RahmenResult};
@@ -79,11 +81,35 @@ const FIELD_LOOKUP_TABLE: &[&[&str]] = &[
     &["Xmp.dc.creator"],
 ];
 
+/// process metadata tags to beautify the status line
+/* TODO this is too generic, it's ugly that it processes data that we know it doesn't have to, and it's not possible to narrow
+   it down to specific metadata tags this way (e.g., return only first word of creator tag) -> how do we get access to the tag name?
+   Insert the map where we're called further up in the iterator over the tag values?
+   also, make this configurable
+   also, harness a function to reuse the repeated stuff
+   also, what about redefining re and s?
+*/
+pub fn process_tag(tag: &String) -> String {
+    // convert date to German format
+    let re = Regex::new(r"(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})").unwrap();
+    let s = re.replace_all(tag, "$d.$m.$y").to_string();
+    // remove leading zeros everywhere
+    let re = Regex::new(r"\b0").unwrap();
+    let s = re.replace_all(&s, "").to_string();
+    // remove www stuff
+    let re = Regex::new(r"\b<?www.").unwrap();
+    let s = re.replace_all(&s, "").to_string();
+    // remove numeric strings starting with plus sign after whitespace (phone numbers)
+    let re = Regex::new(r"\s\+\d+").unwrap();
+    // and convert from UPPER CASE to Title Case
+    re.replace_all(&s, "").to_string().from_case(Case::Upper).to_case(Case::Title)
+}
+
 /// Format the metadata tags from an image to show a status line
 pub fn format_exif<P: AsRef<std::ffi::OsStr>>(path: P) -> RahmenResult<String> {
     let metadata = Metadata::new_from_path(path)?;
     // iterate over the tag table
-    let result = FIELD_LOOKUP_TABLE
+    let tag_values = FIELD_LOOKUP_TABLE
         .iter()
         .flat_map(move |lookup| {
             lookup
@@ -96,6 +122,8 @@ pub fn format_exif<P: AsRef<std::ffi::OsStr>>(path: P) -> RahmenResult<String> {
         })
         // remove multiples (e.g. if City and  ProvinceState are the same)
         .unique()
+        // insert date and text conversion logic here?
         .collect::<Vec<String>>();
-    Ok(result.join(", "))
+    let processed_tag_values = tag_values.iter().map(|tag| process_tag(tag)).collect::<Vec<String>>();
+    Ok(processed_tag_values.join(", "))
 }
