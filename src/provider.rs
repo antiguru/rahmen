@@ -78,7 +78,6 @@ const FIELD_LOOKUP_TABLE: &[&[&str]] = &[
     &["Iptc.Application2.City"],
     &["Iptc.Application2.ProvinceState"],
     &["Iptc.Application2.CountryName"],
-    //&["Iptc.Application2.DigitizationDate"],
     &["Exif.Photo.DateTimeOriginal"],
     &["Xmp.dc.creator"],
 ];
@@ -125,10 +124,8 @@ pub fn format_exif<P: AsRef<std::ffi::OsStr>>(path: P) -> RahmenResult<String> {
         })
         // remove multiples (e.g. if City and  ProvinceState are the same)
         .unique()
-        // insert date and text conversion logic here?
         .map(|tag|process_tag(&tag))
         .collect::<Vec<String>>();
     println!("{:?}", tag_values);
-    //let processed_tag_values = tag_values.iter().map(|tag| process_tag(tag)).collect::<Vec<String>>();
     Ok(tag_values.join(", "))
 }
