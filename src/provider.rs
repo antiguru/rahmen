@@ -132,6 +132,5 @@ pub fn format_exif<P: AsRef<std::ffi::OsStr>>(path: P) -> RahmenResult<String> {
         .unique()
         .map(|tag| process_tag(&tag))
         .collect::<Vec<String>>();
-    println!("{:?}", tag_values);
     Ok(tag_values.join(", "))
 }

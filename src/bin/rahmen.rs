@@ -217,7 +217,7 @@ fn main() -> RahmenResult<()> {
     let start_time = Instant::now();
     let mut dimensions = None;
     // font size to use (px?)
-    input_configuration.send(Configuration::FontSize(30.));
+    input_configuration.send(Configuration::FontSize(24.));
     // enlarge font canvas vertically by this factor (default: 1.5)
     input_configuration.send(Configuration::FontCanvasVStretch(1.5));
 
