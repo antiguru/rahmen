@@ -13,6 +13,7 @@ use timely::dataflow::operators::{
 };
 use timely::dataflow::{InputHandle, ProbeHandle, Scope};
 use timely::order::Product;
+use timely::worker::Config;
 
 use rahmen::dataflow::{ComposeImage, Configuration, FormatText, ResizeImage};
 use rahmen::display::Display;
@@ -134,7 +135,7 @@ fn main() -> RahmenResult<()> {
 
     // initialization for timely dataflow
     let allocator = timely::communication::allocator::Thread::new();
-    let mut worker = timely::worker::Worker::new(allocator);
+    let mut worker = timely::worker::Worker::new(Config::default(), allocator);
 
     // input: #1 timeline #2 screen resolution
     let mut input_configuration: InputHandle<_, Configuration> = InputHandle::new();
