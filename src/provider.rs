@@ -78,7 +78,8 @@ const FIELD_LOOKUP_TABLE: &[&[&str]] = &[
     &["Iptc.Application2.City"],
     &["Iptc.Application2.ProvinceState"],
     &["Iptc.Application2.CountryName"],
-    &["Iptc.Application2.DigitizationDate"],
+    //&["Iptc.Application2.DigitizationDate"],
+    &["Exif.Photo.DateTimeOriginal"],
     &["Xmp.dc.creator"],
 ];
 
@@ -92,11 +93,12 @@ const FIELD_LOOKUP_TABLE: &[&[&str]] = &[
 */
 pub fn process_tag(tag: &String) -> String {
     // convert date to German format
-    let re = Regex::new(r"(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})").unwrap();
-    let s = re.replace_all(tag, "$d.$m.$y").to_string();
-    // remove leading zeros everywhere
-    let re = Regex::new(r"\b0").unwrap();
-    let s = re.replace_all(&s, "").to_string();
+    let re = Regex::new(r"(?P<y>\d{4})[-:](?P<m>\d{2})[-:](?P<d>\d{2})").unwrap();
+    // TODO find better way to insert comma after year, might lead to a surplus comma if no time is found in metadata? (but Exif.Photo.DateTimeOriginal _should_ contain a time)
+    let s = re.replace_all(tag, "$d.$m.$y,").to_string();
+    // remove leading zeros after dot (date)
+    let re = Regex::new(r"\.0").unwrap();
+    let s = re.replace_all(&s, ".").to_string();
     // remove www stuff
     let re = Regex::new(r"\b<?www.").unwrap();
     let s = re.replace_all(&s, "").to_string();
@@ -125,6 +127,7 @@ pub fn format_exif<P: AsRef<std::ffi::OsStr>>(path: P) -> RahmenResult<String> {
         .unique()
         // insert date and text conversion logic here?
         .collect::<Vec<String>>();
+    println!("{:?}", tag_values);
     let processed_tag_values = tag_values.iter().map(|tag| process_tag(tag)).collect::<Vec<String>>();
     Ok(processed_tag_values.join(", "))
 }
