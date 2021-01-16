@@ -5,6 +5,12 @@ Rah·men [[ˈʁaːmən]](https://de.wiktionary.org/wiki/Rahmen) German: frame
 Rahmen is a lightweight tool to present an image slideshow while consuming little resources. It takes a list of files or
 a pattern, and periodically shows the next image.
 
+Below the image, some information gathered from the image's metadata will be shown.
+Right now, this is location data, time and date (formatted to German m.d.yyyy, h:mm), and
+the creator info (gathered from the copyright info set in the camera).
+If the data is not found, nothing is displayed.
+It's planned to make this feature configurable in the future.
+
 Rahmen is designed to run on low-power devices, such as the Raspberry Pi 1. While it is not heavily optimized to consume
 little resources, some effort has been put into loading, pre-processing and rendering images.
 
