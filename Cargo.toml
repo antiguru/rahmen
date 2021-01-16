@@ -18,6 +18,7 @@ debug = true
 
 [dependencies]
 clap = { version = "3.0.0-beta.2", default-features = false, features = ["color", "std"] }
+convert_case = "0.4.0"
 ctrlc = "3.1.7"
 fltk = { version = "0.12.2", optional = true, features = ["fltk-shared"] }
 font-kit = "0.10.0"
@@ -28,6 +29,7 @@ memmap = "0.7.0"
 mozjpeg = "0.8.21"
 pathfinder_geometry = "0.5.1"
 rexiv2 = "0.9.1"
+regex = "1"
 timely = { git = "https://github.com/TimelyDataflow/timely-dataflow" }
 
 [dependencies.image]
