@@ -99,7 +99,7 @@ pub fn process_tag(tag: &String) -> String {
     let re = Regex::new(r"(?P<h>\d{2}):(?P<m>\d{2}):(?P<s>\d{2})").unwrap();
     let s = re.replace_all(&s, "$h:$m").into_owned();
     // remove leading zeros after whitespace/dot (date)
-    let re = Regex::new(r"[\s\.]0").unwrap();
+    let re = Regex::new(r"[\s.]0").unwrap();
     let s = re.replace_all(&s, ".").into_owned();
     // remove www stuff
     let re = Regex::new(r"\b<?www.").unwrap();
