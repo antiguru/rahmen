@@ -104,7 +104,10 @@ pub fn process_tag(tag: &String) -> String {
     // remove numeric strings starting with plus sign after whitespace (phone numbers)
     let re = Regex::new(r"\s\+\d+").unwrap();
     // and convert from UPPER CASE to Title Case
-    re.replace_all(&s, "").into_owned().from_case(Case::Upper).to_case(Case::Title)
+    re.replace_all(&s, "")
+        .into_owned()
+        .from_case(Case::Upper)
+        .to_case(Case::Title)
 }
 
 /// Format the metadata tags from an image to show a status line
@@ -124,7 +127,7 @@ pub fn format_exif<P: AsRef<std::ffi::OsStr>>(path: P) -> RahmenResult<String> {
         })
         // remove multiples (e.g. if City and  ProvinceState are the same)
         .unique()
-        .map(|tag|process_tag(&tag))
+        .map(|tag| process_tag(&tag))
         .collect::<Vec<String>>();
     println!("{:?}", tag_values);
     Ok(tag_values.join(", "))
