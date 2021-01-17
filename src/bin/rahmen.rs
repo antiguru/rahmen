@@ -188,6 +188,7 @@ fn main() -> RahmenResult<()> {
             // Hack: adjust screen size for the resize operator to reserve space for the status line
             let mut current_font_size = None;
             let mut current_font_canvas_vstretch = None;
+            let mut current_show_time = None;
             configuration_stream.map(move |configuration| match configuration {
                 Configuration::FontSize(font_size) => {
                     current_font_size = Some(font_size);
@@ -196,6 +197,10 @@ fn main() -> RahmenResult<()> {
                 Configuration::FontCanvasVStretch(font_canvas_vstretch) => {
                     current_font_canvas_vstretch = Some(font_canvas_vstretch);
                     Configuration::FontCanvasVStretch(font_canvas_vstretch)
+                }
+                Configuration::ShowTime(show_time) => {
+                    current_show_time = Some(show_time);
+                    Configuration::ShowTime(show_time)
                 }
                 Configuration::ScreenDimensions(width, height) => Configuration::ScreenDimensions(
                     width,
@@ -230,8 +235,10 @@ fn main() -> RahmenResult<()> {
     // font size to use (px)
     let font_size_f = matches.value_of("font_size").unwrap().parse().unwrap();
     input_configuration.send(Configuration::FontSize(font_size_f));
-    // enlarge font canvas vertically by this factor (default: 1.5)
+    // enlarge font canvas vertically by this factor (default given here: 1.5)
     input_configuration.send(Configuration::FontCanvasVStretch(1.5));
+    // show time in status line or don't
+    input_configuration.send(Configuration::ShowTime(true));
 
     let mut next_image_at = start_time.elapsed();
 
