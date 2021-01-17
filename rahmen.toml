@@ -1,3 +1,4 @@
+# Configuration for Rahmen
 
 font_size = 30
 # Delay between transitions
@@ -36,9 +37,3 @@ regex = '(\s\+\d+)|(\b<?www.)'
 replace = ''
 # and convert from UPPER CASE to Title Case
 capitalize = true
-# // remove leading zeros after dot (date)
-# let re = Regex::new(r"\.0").unwrap();
-# let s = re.replace_all(&s, ".").into_owned();
-# // remove www stuff
-# let re = Regex::new(r"\b<?www.").unwrap();
-# let s = re.replace_all(&s, "").into_owned();

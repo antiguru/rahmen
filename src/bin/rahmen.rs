@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::BufReader;
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -25,7 +26,6 @@ use rahmen::errors::{RahmenError, RahmenResult};
 use rahmen::font::FontRenderer;
 use rahmen::provider::{load_image_from_path, Provider, StatusLineFormatter};
 use rahmen::provider_list::ListProvider;
-use std::path::Path;
 
 /// dataflow control, this is used as result R part
 #[derive(Copy, Clone, Eq, PartialEq)]
