@@ -9,6 +9,7 @@ use itertools::Itertools;
 use regex::Regex;
 use rexiv2::Metadata;
 
+use crate::config::Element;
 use crate::errors::{RahmenError, RahmenResult};
 
 /// Provider trait to produce images, or other types
@@ -72,68 +73,94 @@ pub fn load_image_from_path<P: AsRef<Path>>(
     }
 }
 
-const FIELD_LOOKUP_TABLE: &[&[&str]] = &[
-    &["Iptc.Application2.ObjectName"],
-    &["Iptc.Application2.SubLocation"],
-    &["Iptc.Application2.City"],
-    &["Iptc.Application2.ProvinceState"],
-    &["Iptc.Application2.CountryName"],
-    &["Exif.Photo.DateTimeOriginal"],
-    &["Xmp.dc.creator"],
-];
-
-/// process metadata tags to beautify the status line
-/* TODO this is too generic, it's ugly that it processes data that we know it doesn't have to, and it's not possible to narrow
-   it down to specific metadata tags this way (e.g., return only first word of creator tag) -> how do we get access to the tag name?
-   Insert the map where we're called further up in the iterator over the tag values?
-   also, make this configurable
-   also, harness a function to reuse the repeated stuff
-   also, what about redefining re and s?
-*/
-pub fn process_tag(tag: &String) -> String {
-    println!("Process_Tag: {:?}", &tag);
-    // convert date to German format
-    let re = Regex::new(r"(?P<y>\d{4})[-:](?P<m>\d{2})[-:](?P<d>\d{2})").unwrap();
-    // TODO find better way to insert comma after year, might lead to a surplus comma if no time is found in metadata? (but Exif.Photo.DateTimeOriginal _should_ contain a time)
-    let s = re.replace_all(tag, "$d.$m.$y,").into_owned();
-    // remove seconds from time
-    let re = Regex::new(r"(?P<h>\d{2}):(?P<m>\d{2}):(?P<s>\d{2})").unwrap();
-    let s = re.replace_all(&s, "$h:$m").into_owned();
-    // remove leading zeros at beginning of line/after whitespace/dot (date)
-    let re = Regex::new(r"^0").unwrap();
-    let s = re.replace_all(&s, "").into_owned();
-    let re = Regex::new(r"[\s.]0").unwrap();
-    let s = re.replace_all(&s, ".").into_owned();
-    // remove www stuff
-    let re = Regex::new(r"\b<?www.").unwrap();
-    let s = re.replace_all(&s, "").into_owned();
-    // remove numeric strings starting with plus sign after whitespace (phone numbers)
-    let re = Regex::new(r"\s\+\d+").unwrap();
-    // and convert from UPPER CASE to Title Case
-    re.replace_all(&s, "")
-        .into_owned()
-        .from_case(Case::Upper)
-        .to_case(Case::Title)
+#[derive(Debug)]
+enum StatusLineTransformation {
+    RegexReplace(Regex, String),
+    Capitalize,
 }
 
-/// Format the metadata tags from an image to show a status line
-pub fn format_exif<P: AsRef<std::ffi::OsStr>>(path: P) -> RahmenResult<String> {
-    let metadata = Metadata::new_from_path(path)?;
-    // iterate over the tag table
-    let tag_values = FIELD_LOOKUP_TABLE
-        .iter()
-        .flat_map(move |lookup| {
-            lookup
-                //iterate over each exif result, check if the tag is available  and return value if one exists
-                .iter()
-                .filter(|f| metadata.has_tag(f))
-                .map(|f| metadata.get_tag_interpreted_string(*f).ok())
-                .find(Option::is_some)
-                .map(Option::unwrap)
+impl StatusLineTransformation {
+    fn transform<S: AsRef<str>>(&self, input: S) -> String {
+        match self {
+            Self::RegexReplace(re, replacement) => re
+                .replace_all(input.as_ref(), replacement.as_str())
+                .into_owned(),
+            Self::Capitalize => input.as_ref().from_case(Case::Upper).to_case(Case::Title),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct StatusLineElement {
+    tags: Vec<String>,
+    transformations: Vec<StatusLineTransformation>,
+}
+
+impl StatusLineElement {
+    fn from(element: Element) -> RahmenResult<Self> {
+        Ok(Self {
+            transformations: {
+                let mut t = vec![];
+                if element.regex.is_some() || element.replace.is_some() {
+                    t.push(StatusLineTransformation::RegexReplace(
+                        Regex::new(element.regex.expect("Regex missing").as_ref())?,
+                        element.replace.expect("Replacement missing"),
+                    ));
+                }
+                if element.capitalize.unwrap_or(false) {
+                    t.push(StatusLineTransformation::Capitalize);
+                }
+                t
+            },
+            tags: element.exif_tags,
         })
-        // remove multiples (e.g. if City and  ProvinceState are the same)
-        .unique()
-        .map(|tag| process_tag(&tag))
-        .collect::<Vec<String>>();
-    Ok(tag_values.join(", "))
+    }
+
+    fn process(&self, metadata: &Metadata) -> Option<String> {
+        if let Some(mut value) = self
+            .tags
+            .iter()
+            .filter(|f| metadata.has_tag(f))
+            .map(|f| metadata.get_tag_interpreted_string(f).ok())
+            .find(Option::is_some)
+            .flatten()
+        {
+            for transformation in &self.transformations {
+                value = transformation.transform(value);
+            }
+            Some(value)
+        } else {
+            None
+        }
+    }
+}
+
+/// A status line formatter formats meta data tags according to configured elements
+#[derive(Debug)]
+pub struct StatusLineFormatter {
+    elements: Vec<StatusLineElement>,
+}
+
+impl StatusLineFormatter {
+    /// Construct a new `StatusLineFormatter` from a collection of elements
+    pub fn new<I: Iterator<Item = Element>>(elements_iter: I) -> RahmenResult<Self> {
+        let mut elements = vec![];
+        for element in elements_iter {
+            elements.push(StatusLineElement::from(element)?);
+        }
+        Ok(Self { elements })
+    }
+
+    /// Format the meta data from the given path using this formatter
+    pub fn format<P: AsRef<std::ffi::OsStr>>(&self, path: P) -> RahmenResult<String> {
+        let metadata = Metadata::new_from_path(path)?;
+        // iterate over the tag table
+        Ok(self
+            .elements
+            .iter()
+            .flat_map(move |element| element.process(&metadata))
+            // remove multiples (e.g. if City and  ProvinceState are the same)
+            .unique()
+            .join(", "))
+    }
 }
