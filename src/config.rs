@@ -18,6 +18,8 @@ pub struct Element {
 pub struct Settings {
     /// Transition delay between images
     pub delay: Option<f64>,
+    /// Font size of the status line
+    pub font_size: Option<f32>,
     /// Status line elements
     pub status_line: Vec<Element>,
 }

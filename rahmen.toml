@@ -1,6 +1,7 @@
 # Configuration for Rahmen
 
-font_size = 30
+# Font size of the status line
+font_size = 24
 # Delay between transitions
 delay = 90
 

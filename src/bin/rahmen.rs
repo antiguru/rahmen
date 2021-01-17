@@ -110,8 +110,7 @@ fn main() -> RahmenResult<()> {
             Arg::new("font_size")
                 .long("font_size")
                 .takes_value(true)
-                .validator(|v| f32::from_str(v))
-                .default_value("24"),
+                .validator(|v| f32::from_str(v)),
         )
         .get_matches();
 
@@ -151,6 +150,14 @@ fn main() -> RahmenResult<()> {
         * 1000f64) as u64;
     let delay = Duration::from_millis(duration_millis);
     println!("Delay: {:?}", delay);
+
+    // font size to use (px)
+    let font_size_f = matches
+        .value_of("font_size")
+        .map(str::parse)
+        .transpose()?
+        .or(settings.font_size)
+        .unwrap_or(30.);
 
     // initialization for timely dataflow
     let allocator = timely::communication::allocator::Thread::new();
@@ -241,8 +248,6 @@ fn main() -> RahmenResult<()> {
     let start_time = Instant::now();
     let mut dimensions = None;
 
-    // font size to use (px)
-    let font_size_f = matches.value_of("font_size").unwrap().parse().unwrap();
     input_configuration.send(Configuration::FontSize(font_size_f));
     // enlarge font canvas vertically by this factor (default given here: 1.5)
     input_configuration.send(Configuration::FontCanvasVStretch(1.5));
