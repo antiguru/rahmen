@@ -5,21 +5,18 @@ Rah·men [[ˈʁaːmən]](https://de.wiktionary.org/wiki/Rahmen) German: frame
 Rahmen is a lightweight tool to present an image slideshow while consuming little resources. It takes a list of files or
 a pattern, and periodically shows the next image.
 
-Below the image, some information gathered from the image's metadata will be shown.
-Right now, this is location data, time and date (formatted to German m.d.yyyy, h:mm), and
-the creator info (gathered from the copyright info set in the camera).
-If the data is not found, nothing is displayed. If the same value is encountered
-more than once (e.g., when City and ProvinceState are identical), it will
-be displayed only once to save space.
+Below the image, some information gathered from the image's metadata will be shown. Right now, this is location data,
+time and date (formatted to German m.d.yyyy, h:mm), and the creator info (gathered from the copyright info set in the
+camera). If the data is not found, nothing is displayed. If the same value is encountered more than once (e.g., when
+City and ProvinceState are identical), it will be displayed only once to save space.
 
 It's planned to make this feature configurable in the future.
 
-All the information will be displayed in one line. If this line is too long
-for the screen, some text will overflow and not be shown at the end of the line.
-Use a wider screen or a narrower font to reduce the probability that this will
+All the information will be displayed in one line. If this line is too long for the screen, some text will overflow and
+not be shown at the end of the line. Use a wider screen or a narrower font to reduce the probability that this will
 happen.
 
-The font size is configurable to a certain extent using the font_size argument.
+The font size is configurable to a certain extent using the `font_size` argument.
 
 Rahmen is designed to run on low-power devices, such as the Raspberry Pi 1. While it is not heavily optimized to consume
 little resources, some effort has been put into loading, pre-processing and rendering images.
@@ -94,6 +91,11 @@ could lead to the image displaying for less than 1 second.
 
 ## Cross-compiling for the Raspberry Pi 1
 
+Cross-compilation is a mess. The instructions below wokred until we decided to include a dependency on `libgexiv2` to
+extract image metadata. It has some trouble cross-compiling and eventually, we gave up on it. Currently, we build Rahmen
+on a Raspberry Pi 4, and cross-compile to ARMv6 on this platform---it works, although it's still a hack. At least
+compilation times are less than "a night."
+
 Preparation:
 
 1. Add the Rust toolchain:
@@ -134,10 +136,8 @@ Now, issue the following command to cross-compile the binary.
 
 ```shell
 cargo build --target arm-unknown-linux-gnueabihf --bin rahmen \
-  --release --no-default-features
+  --release
 ```
-
-We pass `--no-default-features` to disable the FLTK display support.
 
 If the build fails in `font-kit` with a message that the C compiler cannot produce executables, try to force CC and AR
 using the following command line:
@@ -161,4 +161,4 @@ the debug symbols from the binary:
 
 The FLTK renders a window on various platforms, which can be used for development.
 
-The feature `fltk` is enabled by default. Pass `--no-default-features` to `cargo build` to disable.
+The feature `fltk` is not enabled by default. Pass `--features fltk` to `cargo build` to enable.
