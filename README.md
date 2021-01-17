@@ -8,7 +8,10 @@ a pattern, and periodically shows the next image.
 Below the image, some information gathered from the image's metadata will be shown.
 Right now, this is location data, time and date (formatted to German m.d.yyyy, h:mm), and
 the creator info (gathered from the copyright info set in the camera).
-If the data is not found, nothing is displayed.
+If the data is not found, nothing is displayed. If the same value is encountered
+more than once (e.g., when City and ProvinceState are identical), it will
+be displayed only once to save space.
+
 It's planned to make this feature configurable in the future.
 
 All the information will be displayed in one line. If this line is too long
@@ -16,6 +19,7 @@ for the screen, some text will overflow and not be shown at the end of the line.
 Use a wider screen or a narrower font to reduce the probability that this will
 happen.
 
+The font size is configurable to a certain extent using the font_size argument.
 
 Rahmen is designed to run on low-power devices, such as the Raspberry Pi 1. While it is not heavily optimized to consume
 little resources, some effort has been put into loading, pre-processing and rendering images.

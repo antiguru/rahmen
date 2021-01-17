@@ -35,7 +35,7 @@ impl FontRenderer {
 
         let metrics = self.font.metrics();
         // width of character, larger values of optional factor (eg size * 1.1) increase spacing
-        let em = size;
+        let em = size * 1.05;
         // horizontal offset from the start of the text
         let mut base_x = 0.;
         // dimensions are set in dataflow.rs
