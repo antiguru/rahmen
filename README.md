@@ -11,6 +11,12 @@ the creator info (gathered from the copyright info set in the camera).
 If the data is not found, nothing is displayed.
 It's planned to make this feature configurable in the future.
 
+All the information will be displayed in one line. If this line is too long
+for the screen, some text will overflow and not be shown at the end of the line.
+Use a wider screen or a narrower font to reduce the probability that this will
+happen.
+
+
 Rahmen is designed to run on low-power devices, such as the Raspberry Pi 1. While it is not heavily optimized to consume
 little resources, some effort has been put into loading, pre-processing and rendering images.
 
