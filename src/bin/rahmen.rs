@@ -109,9 +109,7 @@ fn main() -> RahmenResult<()> {
             Arg::new("font_size")
                 .long("font_size")
                 .takes_value(true)
-                .possible_values(&[
-                    "8", "12", "16", "20", "24", "28", "32", "40", "48", "56", "64",
-                ])
+                .validator(|v| f32::from_str(v))
                 .default_value("24"),
         )
         .get_matches();
@@ -136,7 +134,6 @@ fn main() -> RahmenResult<()> {
         .unwrap();
 
     let font = Font::from_path(matches.value_of("font").unwrap(), 0).unwrap();
-
     let font_renderer = FontRenderer::with_font(font);
 
     let time_str = matches.value_of("time").unwrap();
@@ -207,7 +204,7 @@ fn main() -> RahmenResult<()> {
                     height
                         - (current_font_size.unwrap_or(0.)
                             * current_font_canvas_vstretch.unwrap_or(1.0))
-                            as u32,
+                        .ceil() as u32,
                 ),
                 configuration => configuration,
             })
