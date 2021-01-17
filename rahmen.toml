@@ -1,0 +1,40 @@
+# Configuration for Rahmen
+
+# Font size of the status line
+font_size = 24
+# Delay between transitions
+delay = 90
+
+[[status_line]]
+exif_tags = ["Iptc.Application2.ObjectName"]
+
+[[status_line]]
+exif_tags = ["Iptc.Application2.ObjectName"]
+
+[[status_line]]
+exif_tags = ["Iptc.Application2.SubLocation"]
+
+[[status_line]]
+exif_tags = ["Iptc.Application2.City"]
+
+[[status_line]]
+exif_tags = ["Iptc.Application2.ProvinceState"]
+
+[[status_line]]
+exif_tags = ["Iptc.Application2.CountryName"]
+
+[[status_line]]
+exif_tags = ["Exif.Photo.DateTimeOriginal"]
+# convert date to German format
+regex = '(?P<y>\d{4})[-:]0*(?P<M>\d+)[-:]0*(?P<d>\d+)\s+0*(?P<h>\d+:)0*(?P<m>\d+):(?P<s>\d{2})'
+# TODO find better way to insert comma after year, might lead to a surplus comma if no time is found in metadata?
+# (but Exif.Photo.DateTimeOriginal _should_ contain a time)
+replace = '$d.$M.$y, $h$m'
+
+[[status_line]]
+exif_tags = ["Xmp.dc.creator"]
+# remove numeric strings starting with plus sign after whitespace (phone numbers)
+regex = '(\s\+\d+)|(\b<?www.)'
+replace = ''
+# and convert from UPPER CASE to Title Case
+capitalize = true

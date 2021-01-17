@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::BufReader;
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -15,6 +16,7 @@ use timely::dataflow::{InputHandle, ProbeHandle, Scope};
 use timely::order::Product;
 use timely::worker::Config;
 
+use rahmen::config::Settings;
 use rahmen::dataflow::{ComposeImage, Configuration, FormatText, ResizeImage};
 use rahmen::display::Display;
 #[cfg(feature = "fltk")]
@@ -22,7 +24,7 @@ use rahmen::display_fltk::FltkDisplay;
 use rahmen::display_framebuffer::FramebufferDisplay;
 use rahmen::errors::{RahmenError, RahmenResult};
 use rahmen::font::FontRenderer;
-use rahmen::provider::{format_exif, load_image_from_path, Provider};
+use rahmen::provider::{load_image_from_path, Provider, StatusLineFormatter};
 use rahmen::provider_list::ListProvider;
 
 /// dataflow control, this is used as result R part
@@ -88,8 +90,7 @@ fn main() -> RahmenResult<()> {
                 .short('t')
                 .long("time")
                 .takes_value(true)
-                .validator(|v| f64::from_str(v))
-                .default_value("90"),
+                .validator(|v| f64::from_str(v)),
         )
         .arg(
             Arg::new("buffer_max_size")
@@ -109,8 +110,7 @@ fn main() -> RahmenResult<()> {
             Arg::new("font_size")
                 .long("font_size")
                 .takes_value(true)
-                .validator(|v| f32::from_str(v))
-                .default_value("24"),
+                .validator(|v| f32::from_str(v)),
         )
         .get_matches();
 
@@ -127,6 +127,11 @@ fn main() -> RahmenResult<()> {
         Box::new(rahmen::provider_glob::create(input)?)
     };
 
+    let mut c = config::Config::default();
+    c.merge(config::File::from(Path::new("rahmen.toml")))?;
+    let settings: Settings = c.try_into()?;
+    let status_line_formatter = StatusLineFormatter::new(settings.status_line.iter().cloned())?;
+
     let buffer_max_size: usize = matches
         .value_of("buffer_max_size")
         .expect("Missing buffer_max_size")
@@ -136,9 +141,23 @@ fn main() -> RahmenResult<()> {
     let font = Font::from_path(matches.value_of("font").unwrap(), 0).unwrap();
     let font_renderer = FontRenderer::with_font(font);
 
-    let time_str = matches.value_of("time").unwrap();
-    let delay = Duration::from_millis((f64::from_str(time_str).unwrap() * 1000f64) as u64);
+    let duration_millis = (matches
+        .value_of("time")
+        .map(str::parse)
+        .transpose()?
+        .or(settings.delay)
+        .unwrap_or(90.)
+        * 1000f64) as u64;
+    let delay = Duration::from_millis(duration_millis);
     println!("Delay: {:?}", delay);
+
+    // font size to use (px)
+    let font_size_f = matches
+        .value_of("font_size")
+        .map(str::parse)
+        .transpose()?
+        .or(settings.font_size)
+        .unwrap_or(30.);
 
     // initialization for timely dataflow
     let allocator = timely::communication::allocator::Thread::new();
@@ -175,7 +194,7 @@ fn main() -> RahmenResult<()> {
 
         let status_line_stream = img_path_stream
             .ok()
-            .flat_map(|(p, _img)| format_exif(&p).ok())
+            .flat_map(move |(p, _img)| status_line_formatter.format(&p).ok())
             .inspect(|loc| println!("Status line: {}", loc));
 
         let text_img_stream =
@@ -229,8 +248,6 @@ fn main() -> RahmenResult<()> {
     let start_time = Instant::now();
     let mut dimensions = None;
 
-    // font size to use (px)
-    let font_size_f = matches.value_of("font_size").unwrap().parse().unwrap();
     input_configuration.send(Configuration::FontSize(font_size_f));
     // enlarge font canvas vertically by this factor (default given here: 1.5)
     input_configuration.send(Configuration::FontCanvasVStretch(1.5));
