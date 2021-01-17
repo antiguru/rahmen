@@ -144,7 +144,8 @@ fn main() -> RahmenResult<()> {
 
     let duration_millis = (matches
         .value_of("time")
-        .map(|time_str| (f64::from_str(time_str).unwrap()))
+        .map(str::parse)
+        .transpose()?
         .or(settings.delay)
         .unwrap_or(90.)
         * 1000f64) as u64;

@@ -2,6 +2,7 @@
 
 use std::error::Error;
 use std::fmt;
+use std::num::ParseFloatError;
 use std::sync::Arc;
 
 /// Error types within Rahmen
@@ -13,6 +14,8 @@ pub enum RahmenError {
     IoError(std::io::Error),
     /// Errors from the image library
     ImageError(Arc<image::error::ImageError>),
+    /// Parsing a float failed
+    ParseFloatError(ParseFloatError),
     /// An error originating from regex processing
     RegexError(regex::Error),
     /// Pseudo-error to indicate a retry condition
@@ -32,6 +35,7 @@ impl fmt::Display for RahmenError {
             RahmenError::ConfigError(err) => err.fmt(f),
             RahmenError::IoError(err) => err.fmt(f),
             RahmenError::ImageError(err) => err.fmt(f),
+            RahmenError::ParseFloatError(err) => err.fmt(f),
             RahmenError::RegexError(err) => err.fmt(f),
             RahmenError::Retry => write!(f, "Retry"),
             RahmenError::Rexiv2Error(err) => err.fmt(f),
@@ -46,6 +50,7 @@ impl Error for RahmenError {
             RahmenError::ConfigError(err) => err.source(),
             RahmenError::IoError(err) => err.source(),
             RahmenError::ImageError(err) => err.source(),
+            RahmenError::ParseFloatError(err) => err.source(),
             RahmenError::RegexError(err) => err.source(),
             RahmenError::Retry => None,
             RahmenError::Rexiv2Error(err) => err.source(),
@@ -69,6 +74,12 @@ impl From<std::io::Error> for RahmenError {
 impl From<image::error::ImageError> for RahmenError {
     fn from(err: image::error::ImageError) -> Self {
         RahmenError::ImageError(Arc::new(err))
+    }
+}
+
+impl From<ParseFloatError> for RahmenError {
+    fn from(err: ParseFloatError) -> Self {
+        RahmenError::ParseFloatError(err)
     }
 }
 
