@@ -103,9 +103,7 @@ fn main() -> RahmenResult<()> {
                 .long("font")
                 .takes_value(true)
                 .validator(|f| File::open(f))
-                .default_value(
-                    "/usr/share/fonts/truetype/liberation/LiberationSansNarrow-Regular.ttf",
-                ),
+                .default_value("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"),
         )
         .arg(
             Arg::new("font_size")
@@ -138,6 +136,7 @@ fn main() -> RahmenResult<()> {
         .unwrap();
 
     let font = Font::from_path(matches.value_of("font").unwrap(), 0).unwrap();
+
     let font_renderer = FontRenderer::with_font(font);
 
     let time_str = matches.value_of("time").unwrap();
@@ -228,7 +227,7 @@ fn main() -> RahmenResult<()> {
     let start_time = Instant::now();
     let mut dimensions = None;
 
-    // font size to use (px?)
+    // font size to use (px)
     let font_size_f = matches.value_of("font_size").unwrap().parse().unwrap();
     input_configuration.send(Configuration::FontSize(font_size_f));
     // enlarge font canvas vertically by this factor (default: 1.5)
