@@ -103,7 +103,9 @@ fn main() -> RahmenResult<()> {
                 .long("font")
                 .takes_value(true)
                 .validator(|f| File::open(f))
-                .default_value("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"),
+                .default_value(
+                    "/usr/share/fonts/truetype/liberation/LiberationSansNarrow-Regular.ttf",
+                ),
         )
         .get_matches();
 
