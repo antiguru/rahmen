@@ -860,6 +860,7 @@ dependencies = [
  "serde 1.0.119",
  "serde_derive",
  "timely",
+ "xdg",
 ]
 
 [[package]]
@@ -1268,6 +1269,12 @@ checksum = "5d129932f4644ac2396cb456385cbf9e63b5b30c6e8dc4820bdca4eb082037a5"
 dependencies = [
  "winapi",
 ]
+
+[[package]]
+name = "xdg"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d089681aa106a86fade1b0128fb5daf07d5867a509ab036d99988dec80429a57"
 
 [[package]]
 name = "yaml-rust"

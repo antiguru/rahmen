@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::io::BufReader;
-use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -112,6 +111,13 @@ fn main() -> RahmenResult<()> {
                 .takes_value(true)
                 .validator(|v| f32::from_str(v)),
         )
+        .arg(
+            Arg::new("config")
+                .long("config")
+                .short('c')
+                .takes_value(true)
+                .validator(|f| File::open(f)),
+        )
         .get_matches();
 
     let input = matches.value_of("input").expect("Input missing");
@@ -128,7 +134,14 @@ fn main() -> RahmenResult<()> {
     };
 
     let mut c = config::Config::default();
-    c.merge(config::File::from(Path::new("rahmen.toml")))?;
+    let dirs = xdg::BaseDirectories::new().unwrap();
+    c.merge(config::File::from(
+        matches
+            .value_of("config")
+            .map(Into::into)
+            .or(dirs.find_config_file("rahmen.toml"))
+            .expect("Config file not found"),
+    ))?;
     let settings: Settings = c.try_into()?;
     let status_line_formatter = StatusLineFormatter::new(settings.status_line.iter().cloned())?;
 
