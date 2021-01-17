@@ -91,6 +91,7 @@ const FIELD_LOOKUP_TABLE: &[&[&str]] = &[
    also, what about redefining re and s?
 */
 pub fn process_tag(tag: &String) -> String {
+    println!("Process_Tag: {:?}", &tag);
     // convert date to German format
     let re = Regex::new(r"(?P<y>\d{4})[-:](?P<m>\d{2})[-:](?P<d>\d{2})").unwrap();
     // TODO find better way to insert comma after year, might lead to a surplus comma if no time is found in metadata? (but Exif.Photo.DateTimeOriginal _should_ contain a time)
@@ -98,7 +99,9 @@ pub fn process_tag(tag: &String) -> String {
     // remove seconds from time
     let re = Regex::new(r"(?P<h>\d{2}):(?P<m>\d{2}):(?P<s>\d{2})").unwrap();
     let s = re.replace_all(&s, "$h:$m").into_owned();
-    // remove leading zeros after whitespace/dot (date)
+    // remove leading zeros at beginning of line/after whitespace/dot (date)
+    let re = Regex::new(r"^0").unwrap();
+    let s = re.replace_all(&s, "").into_owned();
     let re = Regex::new(r"[\s.]0").unwrap();
     let s = re.replace_all(&s, ".").into_owned();
     // remove www stuff
