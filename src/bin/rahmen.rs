@@ -107,6 +107,15 @@ fn main() -> RahmenResult<()> {
                     "/usr/share/fonts/truetype/liberation/LiberationSansNarrow-Regular.ttf",
                 ),
         )
+        .arg(
+            Arg::new("font_size")
+                .long("font_size")
+                .takes_value(true)
+                .possible_values(&[
+                    "8", "12", "16", "20", "24", "28", "32", "40", "48", "56", "64",
+                ])
+                .default_value("24"),
+        )
         .get_matches();
 
     let input = matches.value_of("input").expect("Input missing");
@@ -218,8 +227,10 @@ fn main() -> RahmenResult<()> {
 
     let start_time = Instant::now();
     let mut dimensions = None;
+
     // font size to use (px?)
-    input_configuration.send(Configuration::FontSize(24.));
+    let font_size_f = matches.value_of("font_size").unwrap().parse().unwrap();
+    input_configuration.send(Configuration::FontSize(font_size_f));
     // enlarge font canvas vertically by this factor (default: 1.5)
     input_configuration.send(Configuration::FontCanvasVStretch(1.5));
 
