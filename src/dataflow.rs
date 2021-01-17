@@ -57,6 +57,7 @@ impl<S: Scope> FormatText<S> for Stream<S, String> {
         let mut current_screen_dimension = None;
         let mut current_font_size = None;
         let mut current_font_canvas_vstretch = None;
+        let mut current_show_time = None;
         let mut current_text = None;
         let mut in_buffer1 = vec![];
         let mut in_buffer2 = vec![];
