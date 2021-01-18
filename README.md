@@ -5,12 +5,19 @@ Rah·men [[ˈʁaːmən]](https://de.wiktionary.org/wiki/Rahmen) German: frame
 Rahmen is a lightweight tool to present an image slideshow while consuming little resources. It takes a list of files or
 a pattern, and periodically shows the next image.
 
-Below the image, some information gathered from the image's metadata will be shown. Right now, this is location data,
-time and date (formatted to German m.d.yyyy, h:mm), and the creator info (gathered from the copyright info set in the
-camera). If the data is not found, nothing is displayed. If the same value is encountered more than once (e.g., when
-City and ProvinceState are identical), it will be displayed only once to save space.
+Below the image, some information gathered from the image's metadata will be shown.
+This feature con be configured in the `rahmen.toml` configuration file. There, you can enter
+a metadata tag name known to the [exiv2](https://exiv2.org/metadata.html) library aand it will be used in the information line.
 
-It's planned to make this feature configurable in the future.
+Also, you can enter tuples of [regular expressions and replacements](https://docs.rs/regex/) that will be applied to the metadata.
+If you set the capitalize option to true then the metadata content will be transformed to Title Case
+before the regular expression(s) (if any) will be applied.
+
+See `rahmen.toml` for some examples.
+
+If the data is not found, nothing is displayed. If the same metadata value is encountered more than once (e.g., when
+City and ProvinceState are identical), it will be displayed only once to save space. This happens before the data gets
+processed further (e.g. capitalized or transformed by regular expressions).
 
 All the information will be displayed in one line. If this line is too long for the screen, some text will overflow and
 not be shown at the end of the line. Use a wider screen or a narrower font to reduce the probability that this will
@@ -68,11 +75,14 @@ Select the display provider [default: framebuffer] [possible values: framebuffer
 (If compiled with the FLTK option, the FLTK display provider will also be available, use `fltk` as value.)
 
 ```shell
+        --font_size <font_size>                
+```
+The font size to use in px.
+```shell
         --font <font>
             [default: /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf]
 ```
-
-Rahmen tries to guess the location of the image by looking up the GPS coordinates (if any), and will display it below
+Rahmen will display information from the image's metadata (see above) in a single line below
 the image in the given font. If the font is not found, the program exits. If you don't want to install lots of fonts,
 just point this option to a TrueType font file.
 

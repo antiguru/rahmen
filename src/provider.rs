@@ -11,6 +11,7 @@ use rexiv2::Metadata;
 
 use crate::config::Element;
 use crate::errors::{RahmenError, RahmenResult};
+use serde::__private::Option::Some;
 
 /// Provider trait to produce images, or other types
 pub trait Provider<D> {
@@ -101,14 +102,16 @@ impl StatusLineElement {
         Ok(Self {
             transformations: {
                 let mut t = vec![];
-                if element.regex.is_some() || element.replace.is_some() {
-                    t.push(StatusLineTransformation::RegexReplace(
-                        Regex::new(element.regex.expect("Regex missing").as_ref())?,
-                        element.replace.expect("Replacement missing"),
-                    ));
-                }
                 if element.capitalize.unwrap_or(false) {
                     t.push(StatusLineTransformation::Capitalize);
+                }
+                for replace in element.replace.into_iter().flat_map(Vec::into_iter) {
+                    if replace.regex.is_some() || replace.replace.is_some() {
+                        t.push(StatusLineTransformation::RegexReplace(
+                            Regex::new(replace.regex.expect("Regex missing").as_ref())?,
+                            replace.replace.expect("Replacement missing"),
+                        ));
+                    }
                 }
                 t
             },

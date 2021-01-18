@@ -204,7 +204,7 @@ fn main() -> RahmenResult<()> {
             // Hack: adjust screen size for the resize operator to reserve space for the status line
             let mut current_font_size = None;
             let mut current_font_canvas_vstretch = None;
-            let mut current_show_time = None;
+
             configuration_stream.map(move |configuration| match configuration {
                 Configuration::FontSize(font_size) => {
                     current_font_size = Some(font_size);
@@ -213,10 +213,6 @@ fn main() -> RahmenResult<()> {
                 Configuration::FontCanvasVStretch(font_canvas_vstretch) => {
                     current_font_canvas_vstretch = Some(font_canvas_vstretch);
                     Configuration::FontCanvasVStretch(font_canvas_vstretch)
-                }
-                Configuration::ShowTime(show_time) => {
-                    current_show_time = Some(show_time);
-                    Configuration::ShowTime(show_time)
                 }
                 Configuration::ScreenDimensions(width, height) => Configuration::ScreenDimensions(
                     width,
