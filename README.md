@@ -5,6 +5,8 @@ Rah·men [[ˈʁaːmən]](https://de.wiktionary.org/wiki/Rahmen) German: frame
 Rahmen is a lightweight tool to present an image slideshow while consuming little resources. It takes a list of files or
 a pattern, and periodically shows the next image.
 
+If you'd prefer a random image order, use the `shuf` command on a file list.
+
 Below the image, some information gathered from the image's metadata will be shown.
 This feature con be configured in the `rahmen.toml` configuration file. There, you can enter
 a metadata tag name known to the [exiv2](https://exiv2.org/metadata.html) library aand it will be used in the information line.
@@ -25,7 +27,9 @@ happen.
 
 The font size is configurable to a certain extent using the `font_size` argument.
 
-Rahmen is designed to run on low-power devices, such as the Raspberry Pi 1. While it is not heavily optimized to consume
+Rahmen is designed to run on low-power devices, such as the Raspberry Pi 1 (in fact it was specifically created to 
+build a digital picture frame out of an old monitor and an old Raspberry Pi 1 due to the lack of 
+capable software). While it is not heavily optimized to consume
 little resources, some effort has been put into loading, pre-processing and rendering images.
 
 ## Dependencies
@@ -98,6 +102,39 @@ seconds to scale larger images. If the time given is shorter than what it takes 
 skipped, the image will be displayed to the next full second after it is fully loaded plus the time it takes to load the
 next image. So on low-resource systems this should not be set too short, otherwise if the next image is very small, it
 could lead to the image displaying for less than 1 second.
+
+## Configuration File (rahmen.toml)
+```
+font_size = 24
+delay = 90
+```
+Values for font size (px) and the interval before the next image (in s, see above, --time parameter).
+
+### Metadata
+```toml
+[[status_line]]
+exif_tags = ["Iptc.Application2.ObjectName"]
+```
+Each `[[status_line]]` entry can contain one 
+
+`exif-tags = ["Some.Tag.Known.to.Exiv2"]`
+
+entry, and optionally, one
+
+`replace = [{ regex = 'regex1', replace = 'repl1' }, { regex = '...', replace = '...' }, ... ]` 
+
+entry, where one or more regular expressions and the replacements for the part they match could be supplied.
+For long expressions, or if you wish to comment them, this could also be written like
+```toml
+[[status_line.replace]]
+# get named fields of the date
+regex = '(?P<y>\d{4})[-:]0*(?P<M>\d+)[-:]0*(?P<d>\d+)\s+0*(?P<h>\d+:)0*(?P<m>\d+):(?P<s>\d{2})'
+## with time
+## replace = '$d.$M.$y, $h$m'
+# without time
+replace = '$d.$M.$y'
+```
+(Sorry if there are nonsensical escape characters in the regex and replace parts, these have been inserted by markdown).
 
 ## Cross-compiling for the Raspberry Pi 1
 
