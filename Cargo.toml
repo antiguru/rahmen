@@ -34,9 +34,25 @@ regex = "1"
 serde = "1.0.119"
 serde_derive = "1.0.119"
 timely = { git = "https://github.com/TimelyDataflow/timely-dataflow" }
+xdg = "2.2.0"
 
 [dependencies.image]
 version = "0.23.12"
 default-features = false
 # Disable jpeg_rayon
 features = ["jpeg"]
+
+[package.metadata.deb]
+maintainer = "Moritz Hoffmann <antiguru@gmail.com>"
+copyright = "2021, Moritz Hoffmann <antiguru@gmail.com>"
+license-file = ["LICENSE", "4"]
+extended-description = """\
+A simple tool to show images on a screen with little dependencies and resource requirements."""
+depends = "$auto"
+section = "utility"
+priority = "optional"
+conf-files = ["/etc/rahmen.toml"]
+assets = [
+    ["rahmen.toml", "etc/", "644"],
+    ["target/release/rahmen", "usr/bin/", "755"],
+]

@@ -21,7 +21,7 @@ pub struct Replacement {
 }
 
 /// Config file root structure
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Default, Deserialize, Clone)]
 pub struct Settings {
     /// Transition delay between images
     pub delay: Option<f64>,
