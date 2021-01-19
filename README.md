@@ -5,12 +5,21 @@ Rah·men [[ˈʁaːmən]](https://de.wiktionary.org/wiki/Rahmen) German: frame
 Rahmen is a lightweight tool to present an image slideshow while consuming little resources. It takes a list of files or
 a pattern, and periodically shows the next image.
 
-Below the image, some information gathered from the image's metadata will be shown. Right now, this is location data,
-time and date (formatted to German m.d.yyyy, h:mm), and the creator info (gathered from the copyright info set in the
-camera). If the data is not found, nothing is displayed. If the same value is encountered more than once (e.g., when
-City and ProvinceState are identical), it will be displayed only once to save space.
+If you'd prefer a random image order, use the `shuf` command on a file list.
 
-It's planned to make this feature configurable in the future.
+Below the image, some information gathered from the image's metadata will be shown.
+This feature con be configured in the `rahmen.toml` configuration file. There, you can enter
+a metadata tag name known to the [exiv2](https://exiv2.org/metadata.html) library aand it will be used in the information line.
+
+Also, you can enter tuples of [regular expressions and replacements](https://docs.rs/regex/) that will be applied to the metadata.
+If you set the capitalize option to true then the metadata content will be transformed to Title Case
+before the regular expression(s) (if any) will be applied.
+
+See `rahmen.toml` for some examples.
+
+If the data is not found, nothing is displayed. If the same metadata value is encountered more than once (e.g., when
+City and ProvinceState are identical), it will be displayed only once to save space. This happens before the data gets
+processed further (e.g. capitalized or transformed by regular expressions).
 
 All the information will be displayed in one line. If this line is too long for the screen, some text will overflow and
 not be shown at the end of the line. Use a wider screen or a narrower font to reduce the probability that this will
@@ -18,7 +27,9 @@ happen.
 
 The font size is configurable to a certain extent using the `font_size` argument.
 
-Rahmen is designed to run on low-power devices, such as the Raspberry Pi 1. While it is not heavily optimized to consume
+Rahmen is designed to run on low-power devices, such as the Raspberry Pi 1 (in fact it was specifically created to 
+build a digital picture frame out of an old monitor and an old Raspberry Pi 1 due to the lack of 
+capable software). While it is not heavily optimized to consume
 little resources, some effort has been put into loading, pre-processing and rendering images.
 
 ## Dependencies
@@ -68,11 +79,14 @@ Select the display provider [default: framebuffer] [possible values: framebuffer
 (If compiled with the FLTK option, the FLTK display provider will also be available, use `fltk` as value.)
 
 ```shell
+        --font_size <font_size>                
+```
+The font size to use in px.
+```shell
         --font <font>
             [default: /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf]
 ```
-
-Rahmen tries to guess the location of the image by looking up the GPS coordinates (if any), and will display it below
+Rahmen will display information from the image's metadata (see above) in a single line below
 the image in the given font. If the font is not found, the program exits. If you don't want to install lots of fonts,
 just point this option to a TrueType font file.
 
@@ -88,6 +102,39 @@ seconds to scale larger images. If the time given is shorter than what it takes 
 skipped, the image will be displayed to the next full second after it is fully loaded plus the time it takes to load the
 next image. So on low-resource systems this should not be set too short, otherwise if the next image is very small, it
 could lead to the image displaying for less than 1 second.
+
+## Configuration File (rahmen.toml)
+```
+font_size = 24
+delay = 90
+```
+Values for font size (px) and the interval before the next image (in s, see above, --time parameter).
+
+### Metadata
+```toml
+[[status_line]]
+exif_tags = ["Iptc.Application2.ObjectName"]
+```
+Each `[[status_line]]` entry can contain one 
+
+`exif-tags = ["Some.Tag.Known.to.Exiv2"]`
+
+entry, and optionally, one
+
+`replace = [{ regex = 'regex1', replace = 'repl1' }, { regex = '...', replace = '...' }, ... ]` 
+
+entry, where one or more regular expressions and the replacements for the part they match could be supplied.
+For long expressions, or if you wish to comment them, this could also be written like
+```toml
+[[status_line.replace]]
+# get named fields of the date
+regex = '(?P<y>\d{4})[-:]0*(?P<M>\d+)[-:]0*(?P<d>\d+)\s+0*(?P<h>\d+:)0*(?P<m>\d+):(?P<s>\d{2})'
+## with time
+## replace = '$d.$M.$y, $h$m'
+# without time
+replace = '$d.$M.$y'
+```
+(Sorry if there are nonsensical escape characters in the regex and replace parts, these have been inserted by markdown).
 
 ## Cross-compiling for the Raspberry Pi 1
 

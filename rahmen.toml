@@ -1,13 +1,12 @@
 # Configuration for Rahmen
 
+# these will be overridden if also given on the command line
 # Font size of the status line
-font_size = 24
+font_size = 20
 # Delay between transitions
 delay = 90
 
-[[status_line]]
-exif_tags = ["Iptc.Application2.ObjectName"]
-
+# status line metadata (in this order) as provided by the exiv2 library
 [[status_line]]
 exif_tags = ["Iptc.Application2.ObjectName"]
 
@@ -19,22 +18,26 @@ exif_tags = ["Iptc.Application2.City"]
 
 [[status_line]]
 exif_tags = ["Iptc.Application2.ProvinceState"]
+replace = [{ regex = '(?i)Mecklenburg-Western\sPomerania', replace = 'MV' }]
 
 [[status_line]]
 exif_tags = ["Iptc.Application2.CountryName"]
+replace = [{ regex = 'South\sKorea', replace = 'Südkorea' }, { regex = '(?i)United\sStates\sOf\sAmerica', replace = 'USA' }, { regex = 'Germany', replace = ''}]
 
 [[status_line]]
 exif_tags = ["Exif.Photo.DateTimeOriginal"]
 # convert date to German format
+[[status_line.replace]]
 regex = '(?P<y>\d{4})[-:]0*(?P<M>\d+)[-:]0*(?P<d>\d+)\s+0*(?P<h>\d+:)0*(?P<m>\d+):(?P<s>\d{2})'
-# TODO find better way to insert comma after year, might lead to a surplus comma if no time is found in metadata?
-# (but Exif.Photo.DateTimeOriginal _should_ contain a time)
-replace = '$d.$M.$y, $h$m'
+# replace = '$d.$M.$y, $h$m'
+replace = '$d.$M.$y'
+
 
 [[status_line]]
 exif_tags = ["Xmp.dc.creator"]
-# remove numeric strings starting with plus sign after whitespace (phone numbers)
-regex = '(\s\+\d+)|(\b<?www.)'
-replace = ''
-# and convert from UPPER CASE to Title Case
+# convert input from UPPER CASE to Title Case
 capitalize = true
+## remove numeric strings starting with plus sign after whitespace (phone numbers) and www adresses and everything after the first word, add s/th before name
+## replace = [ {regex = '(\s\+\d+)|(\b<?www.)|(\s.*$)', replace = ''}, {regex = '(?P<a>^.*$)', replace = 'von $a'} ]
+# remove everything after the first word, add s/th before name
+replace = [{ regex = '\s.*$', replace = '' }, { regex = '(?P<a>^.*$)', replace = 'von $a' }]
