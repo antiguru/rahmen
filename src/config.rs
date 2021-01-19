@@ -7,9 +7,16 @@ pub struct Element {
     pub capitalize: Option<bool>,
     /// Collection of exif tags, ordered by priority
     pub exif_tags: Vec<String>,
-    /// Optional regular expression to extract data. Requires replacement pattern
+    /// Optional regex pattern and its replacement
+    pub replace: Option<Vec<Replacement>>,
+}
+
+/// replacement regular expression and value
+#[derive(Debug, Deserialize, Clone)]
+pub struct Replacement {
+    /// the regular expression to use
     pub regex: Option<String>,
-    /// Optional replacement pattern. Requires regex
+    /// the replacement for the regex match
     pub replace: Option<String>,
 }
 
