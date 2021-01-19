@@ -2,7 +2,7 @@
 
 # these will be overridden if also given on the command line
 # Font size of the status line
-font_size = 24
+font_size = 20
 # Delay between transitions
 delay = 90
 
@@ -22,7 +22,7 @@ replace = [{ regex = '(?i)Mecklenburg-Western\sPomerania', replace = 'MV' }]
 
 [[status_line]]
 exif_tags = ["Iptc.Application2.CountryName"]
-replace = [{ regex = 'South\sKorea', replace = 'Südkorea' }, { regex = '(?i)United\sStates\sOf\sAmerica', replace = 'USA' }]
+replace = [{ regex = 'South\sKorea', replace = 'Südkorea' }, { regex = '(?i)United\sStates\sOf\sAmerica', replace = 'USA' }, { regex = 'Germany', replace = ''}]
 
 [[status_line]]
 exif_tags = ["Exif.Photo.DateTimeOriginal"]

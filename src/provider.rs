@@ -11,7 +11,6 @@ use rexiv2::Metadata;
 
 use crate::config::Element;
 use crate::errors::{RahmenError, RahmenResult};
-use serde::__private::Option::Some;
 
 /// Provider trait to produce images, or other types
 pub trait Provider<D> {
