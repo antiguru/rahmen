@@ -1,5 +1,6 @@
 //! Utilities to provide images, and other abstractions
 
+use std::convert::{TryFrom, TryInto};
 use std::io::BufReader;
 use std::path::Path;
 
@@ -96,28 +97,28 @@ struct StatusLineElement {
     transformations: Vec<StatusLineTransformation>,
 }
 
-impl StatusLineElement {
-    fn from(element: Element) -> RahmenResult<Self> {
+impl TryFrom<Element> for StatusLineElement {
+    type Error = RahmenError;
+
+    fn try_from(value: Element) -> Result<Self, Self::Error> {
+        let mut transformations = vec![];
+        if value.capitalize.unwrap_or(false) {
+            transformations.push(StatusLineTransformation::Capitalize);
+        }
+        for replace in value.replace.into_iter().flat_map(Vec::into_iter) {
+            transformations.push(StatusLineTransformation::RegexReplace(
+                Regex::new(replace.regex.as_ref())?,
+                replace.replace,
+            ));
+        }
         Ok(Self {
-            transformations: {
-                let mut t = vec![];
-                if element.capitalize.unwrap_or(false) {
-                    t.push(StatusLineTransformation::Capitalize);
-                }
-                for replace in element.replace.into_iter().flat_map(Vec::into_iter) {
-                    if replace.regex.is_some() || replace.replace.is_some() {
-                        t.push(StatusLineTransformation::RegexReplace(
-                            Regex::new(replace.regex.expect("Regex missing").as_ref())?,
-                            replace.replace.expect("Replacement missing"),
-                        ));
-                    }
-                }
-                t
-            },
-            tags: element.exif_tags,
+            transformations,
+            tags: value.exif_tags,
         })
     }
+}
 
+impl StatusLineElement {
     fn process(&self, metadata: &Metadata) -> Option<String> {
         if let Some(mut value) = self
             .tags
@@ -148,7 +149,7 @@ impl StatusLineFormatter {
     pub fn new<I: Iterator<Item = Element>>(elements_iter: I) -> RahmenResult<Self> {
         let mut elements = vec![];
         for element in elements_iter {
-            elements.push(StatusLineElement::from(element)?);
+            elements.push(element.try_into()?);
         }
         Ok(Self { elements })
     }

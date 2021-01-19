@@ -15,9 +15,9 @@ pub struct Element {
 #[derive(Debug, Deserialize, Clone)]
 pub struct Replacement {
     /// the regular expression to use
-    pub regex: Option<String>,
+    pub regex: String,
     /// the replacement for the regex match
-    pub replace: Option<String>,
+    pub replace: String,
 }
 
 /// Config file root structure
