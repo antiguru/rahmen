@@ -51,7 +51,7 @@ A simple tool to show images on a screen with little dependencies and resource r
 depends = "$auto"
 section = "utility"
 priority = "optional"
-conf-files = ["rahmen.toml"]
+conf-files = ["/etc/rahmen.toml"]
 assets = [
     ["rahmen.toml", "etc/", "644"],
     ["target/release/rahmen", "usr/bin/", "755"],

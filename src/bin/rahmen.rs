@@ -61,6 +61,9 @@ fn suppress_err<T>(result: RahmenResult<T>) -> RunResult<T> {
 
 type RunResult<T> = Result<T, RunControl>;
 
+#[cfg(unix)]
+const SYSTEM_CONFIG_PATH: &str = "/etc/rahmen.toml";
+
 fn main() -> RahmenResult<()> {
     let matches = App::new("Rahmen client")
         .arg(
@@ -133,16 +136,28 @@ fn main() -> RahmenResult<()> {
         Box::new(rahmen::provider_glob::create(input)?)
     };
 
-    let mut c = config::Config::default();
     let dirs = xdg::BaseDirectories::new().unwrap();
-    c.merge(config::File::from(
-        matches
-            .value_of("config")
-            .map(Into::into)
-            .or(dirs.find_config_file("rahmen.toml"))
-            .expect("Config file not found"),
-    ))?;
-    let settings: Settings = c.try_into()?;
+    let settings: Settings = if let Some(path) = matches
+        .value_of("config")
+        .map(Into::into)
+        .or(dirs.find_config_file("rahmen.toml"))
+        .or_else(|| {
+            #[cfg(unix)]
+            if std::fs::metadata(SYSTEM_CONFIG_PATH).is_ok() {
+                Some(SYSTEM_CONFIG_PATH.into())
+            } else {
+                None
+            }
+            #[cfg(not(unix))]
+            None
+        }) {
+        let mut c = config::Config::default();
+        c.merge(config::File::from(path))?;
+        c.try_into()?
+    } else {
+        eprintln!("Config file not found, continuing with default settings");
+        Default::default()
+    };
     let status_line_formatter = StatusLineFormatter::new(settings.status_line.iter().cloned())?;
 
     let buffer_max_size: usize = matches
