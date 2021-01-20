@@ -75,14 +75,14 @@ pub fn load_image_from_path<P: AsRef<Path>>(
 }
 /// Tries to convert a string slice to a Case
 /// TODO convert to RahmenError and remove the unwraps where this is called
-pub fn str_to_case(s: &str) -> Result<Case, ()> {
+pub fn str_to_case(s: &str) -> Result<Case, String> {
     let case_str = s.to_case(Case::Flat);
     for case in Case::all_cases() {
         if case_str == format!("{:?}", case).to_case(Case::Flat) {
             return Ok(case);
         }
     }
-    Err(())
+    Err(format!("Unknown Case for conversion: {:}", &s))
 }
 
 #[derive(Debug)]
