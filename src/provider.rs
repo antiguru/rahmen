@@ -73,11 +73,23 @@ pub fn load_image_from_path<P: AsRef<Path>>(
         }
     }
 }
+/// Tries to convert a string slice to a Case
+/// TODO convert to RahmenError and remove the unwraps where this is called
+pub fn str_to_case(s: &str) -> Result<Case, ()> {
+    let case_str = s.to_case(Case::Flat);
+    for case in Case::all_cases() {
+        if case_str == format!("{:?}", case).to_case(Case::Flat) {
+            return Ok(case);
+        }
+    }
+    Err(())
+}
 
 #[derive(Debug)]
 enum StatusLineTransformation {
     RegexReplace(Regex, String),
     Capitalize,
+    ChangeCase(String, String),
 }
 
 impl StatusLineTransformation {
@@ -87,6 +99,10 @@ impl StatusLineTransformation {
                 .replace_all(input.as_ref(), replacement.as_str())
                 .into_owned(),
             Self::Capitalize => input.as_ref().from_case(Case::Upper).to_case(Case::Title),
+            Self::ChangeCase(fr, t) => input
+                .as_ref()
+                .from_case(str_to_case(fr).unwrap())
+                .to_case(str_to_case(t).unwrap()),
         }
     }
 }
@@ -102,6 +118,13 @@ impl TryFrom<Element> for StatusLineElement {
 
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         let mut transformations = vec![];
+        if value.case_from.is_some() || value.case_to.is_some() {
+            transformations.push(StatusLineTransformation::ChangeCase(
+                // what goes here?
+                value.case_from.expect("From case missing"),
+                value.case_to.expect("To case missing"),
+            ));
+        }
         if value.capitalize.unwrap_or(false) {
             transformations.push(StatusLineTransformation::Capitalize);
         }

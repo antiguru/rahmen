@@ -9,6 +9,11 @@ pub struct Element {
     pub exif_tags: Vec<String>,
     /// Optional regex pattern and its replacement
     pub replace: Option<Vec<Replacement>>,
+    /// Optional from and to cases
+    /// from
+    pub case_from: Option<String>,
+    /// to
+    pub case_to: Option<String>,
 }
 
 /// replacement regular expression and value
