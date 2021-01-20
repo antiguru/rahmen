@@ -2,7 +2,7 @@
 
 # these will be overridden if also given on the command line
 # Font size of the status line
-font_size = 20
+font_size = 32
 # Delay between transitions
 delay = 90
 

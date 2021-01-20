@@ -273,10 +273,9 @@ fn main() -> RahmenResult<()> {
     let mut dimensions = None;
 
     input_configuration.send(Configuration::FontSize(font_size_f));
-    // enlarge font canvas vertically by this factor (default given here: 1.5)
-    input_configuration.send(Configuration::FontCanvasVStretch(1.5));
+    // enlarge font canvas vertically by this factor (default given here: 1.4)
+    input_configuration.send(Configuration::FontCanvasVStretch(1.4));
     // show time in status line or don't
-    input_configuration.send(Configuration::ShowTime(true));
 
     let mut next_image_at = start_time.elapsed();
 
