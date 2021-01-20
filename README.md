@@ -8,11 +8,12 @@ a pattern, and periodically shows the next image.
 If you'd prefer a random image order, use the `shuf` command on a file list.
 
 Below the image, some information gathered from the image's metadata will be shown.
-This feature con be configured in the `rahmen.toml` configuration file. There, you can enter
-a metadata tag name known to the [exiv2](https://exiv2.org/metadata.html) library aand it will be used in the information line.
+This feature has to be configured in the `rahmen.toml` configuration file. There, you can enter
+one ore more metadata taga name known to the [exiv2](https://exiv2.org/metadata.html) library
+to be displayed in the information line.
 
 Also, you can enter tuples of [regular expressions and replacements](https://docs.rs/regex/) that will be applied to the metadata.
-If you set the capitalize option to true then the metadata content will be transformed to Title Case
+If you set the capitalize option to `true` then the metadata content will be transformed to Title Case
 before the regular expression(s) (if any) will be applied.
 
 See `rahmen.toml` for some examples.
@@ -25,7 +26,7 @@ All the information will be displayed in one line. If this line is too long for 
 not be shown at the end of the line. Use a wider screen or a narrower font to reduce the probability that this will
 happen.
 
-The font size is configurable to a certain extent using the `font_size` argument.
+The font size is configurable using the `font_size` argument or the configuration file.
 
 Rahmen is designed to run on low-power devices, such as the Raspberry Pi 1 (in fact it was specifically created to 
 build a digital picture frame out of an old monitor and an old Raspberry Pi 1 due to the lack of 
@@ -37,6 +38,8 @@ little resources, some effort has been put into loading, pre-processing and rend
 Rahmen depends on various libraries, which should be available on most Linux distributions. Specifically, it needs:
 
 * `libgexiv2-dev`
+
+Rahmen will not run if there's no configuration file (see below).
 
 ## Building
 
@@ -109,6 +112,7 @@ font_size = 24
 delay = 90
 ```
 Values for font size (px) and the interval before the next image (in s, see above, --time parameter).
+If command line parameters are given, they take precedence over the values in this file.
 
 ### Metadata
 ```toml
@@ -134,7 +138,14 @@ regex = '(?P<y>\d{4})[-:]0*(?P<M>\d+)[-:]0*(?P<d>\d+)\s+0*(?P<h>\d+:)0*(?P<m>\d+
 # without time
 replace = '$d.$M.$y'
 ```
-(Sorry if there are nonsensical escape characters in the regex and replace parts, these have been inserted by markdown).
+The [tag names that can be used are listed on the this exiv2 webpage](https://exiv2.org/metadata.html).
+This doesn't mean that all these are actually present in your image file. Use [exiftool](https://exiftool.org/)
+to show you the metadata in your file and see what is available.
+
+The human-readable location tags in the enclosed `rahmen.toml` file are based on the information
+you can tell Adobe Lightroom to add when it finds a GPS location in the image metadata.
+
+[The regular expressions and replacements are documented here.](https://docs.rs/regex/) 
 
 ## Cross-compiling for the Raspberry Pi 1
 
