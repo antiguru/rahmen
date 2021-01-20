@@ -106,7 +106,17 @@ skipped, the image will be displayed to the next full second after it is fully l
 next image. So on low-resource systems this should not be set too short, otherwise if the next image is very small, it
 could lead to the image displaying for less than 1 second.
 
-## Configuration File (rahmen.toml)
+```shell
+    -c, --config <config file>
+```
+Indicate the name and path of the configuration file to read. The default path is
+either `~/.config/rahmen.toml` or `/etc/rahmen.toml` [IS THAT SO?].
+
+
+## Configuration File (default name: rahmen.toml)
+
+The configuration file has to be written in TOML and takes the following instructions: 
+
 ```
 font_size = 24
 delay = 90
@@ -142,7 +152,7 @@ The [tag names that can be used are listed on the this exiv2 webpage](https://ex
 This doesn't mean that all these are actually present in your image file. Use [exiftool](https://exiftool.org/)
 to show you the metadata in your file and see what is available.
 
-The human-readable location tags in the enclosed `rahmen.toml` file are based on the information
+The human-readable location tags in the enclosed `rahmen.toml` example file are based on the information
 you can tell Adobe Lightroom to add when it finds a GPS location in the image metadata.
 
 [The regular expressions and replacements are documented here.](https://docs.rs/regex/) 
