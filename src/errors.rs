@@ -8,6 +8,9 @@ use std::sync::Arc;
 /// Error types within Rahmen
 #[derive(std::fmt::Debug)]
 pub enum RahmenError {
+    /// unknown case for conversion
+    /// TODO it's NYI
+    CaseUnknown,
     /// Errors originating from config loading
     ConfigError(Arc<config::ConfigError>),
     /// Errors interacting with I/O
@@ -32,6 +35,7 @@ pub type RahmenResult<T> = Result<T, RahmenError>;
 impl fmt::Display for RahmenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
+            RahmenError::CaseUnknown => write!(f, "Terminate"),
             RahmenError::ConfigError(err) => err.fmt(f),
             RahmenError::IoError(err) => err.fmt(f),
             RahmenError::ImageError(err) => err.fmt(f),
@@ -47,6 +51,7 @@ impl fmt::Display for RahmenError {
 impl Error for RahmenError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
+            RahmenError::CaseUnknown => None,
             RahmenError::ConfigError(err) => err.source(),
             RahmenError::IoError(err) => err.source(),
             RahmenError::ImageError(err) => err.source(),

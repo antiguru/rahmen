@@ -3,7 +3,7 @@
 Rah·men [[ˈʁaːmən]](https://de.wiktionary.org/wiki/Rahmen) German: frame
 
 Rahmen is a lightweight tool to present an image slideshow while consuming little resources. It takes a list of files or
-a pattern, and periodically shows the next image.
+a pattern, and periodically shows the next image. It's work in progress, but the code found here should work.
 
 If you'd prefer a random image order, use the `shuf` command on a file list.
 
@@ -16,7 +16,7 @@ Also, you can enter tuples of [regular expressions and replacements](https://doc
 If you set the capitalize option to `true` then the metadata content will be transformed to Title Case
 before the regular expression(s) (if any) will be applied.
 
-See `rahmen.toml` for some examples.
+See the example configuration file `rahmen.toml` for some examples.
 
 If the data is not found, nothing is displayed. If the same metadata value is encountered more than once (e.g., when
 City and ProvinceState are identical), it will be displayed only once to save space. This happens after the data gets
@@ -26,7 +26,7 @@ All the information items will be displayed on one line, with `", "` as separato
 not be shown at the end of the line. Use a wider screen or a narrower font to reduce the probability that this will
 happen.
 
-The font size is configurable using the `font_size` argument or the configuration file.
+The font size is configurable using the `--font_size` argument or the configuration file.
 
 Rahmen is designed to run on low-power devices, such as the Raspberry Pi 1 (in fact it was specifically created to 
 build a digital picture frame out of an old monitor and an old Raspberry Pi 1 due to the lack of 
@@ -160,6 +160,13 @@ The human-readable location tags in the enclosed `rahmen.toml` example file are 
 you can tell Adobe Lightroom to add when it finds a GPS location in the image metadata.
 
 [The regular expressions and replacements are documented here.](https://docs.rs/regex/) 
+
+##Bugs, Issues, Desiderata
+
+- The font rendering is not really beautiful and sometimes, glyphs overlap.
+- The overflowing text is just not displayed.
+- The text bar might look better centered.
+- There's no way to format metadata items in the text bar relative to other metadata.
 
 ## Cross-compiling for the Raspberry Pi 1
 

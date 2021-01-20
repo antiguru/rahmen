@@ -15,10 +15,10 @@ exif_tags = ["Iptc.Application2.SubLocation"]
 
 [[status_line]]
 exif_tags = ["Iptc.Application2.City"]
-replace = [{regex = 'Land', replace = 'Ld.'}]
+#replace = [{regex = 'Land', replace = 'Ld.'}]
 [[status_line]]
 exif_tags = ["Iptc.Application2.ProvinceState"]
-replace = [{ regex = '(?i)Mecklenburg-Western\sPomerania', replace = 'MV' }, {regex = 'Brandenburg', replace = 'Mark Bbg.'}]
+replace = [{ regex = '(?i)Mecklenburg-Western\sPomerania', replace = 'MV' }, {regex = 'Brandenburg', replace = 'Mark'}]
 
 [[status_line]]
 exif_tags = ["Iptc.Application2.CountryName"]
@@ -41,8 +41,9 @@ exif_tags = ["Xmp.dc.creator"]
 ## replace = [ {regex = '(\s\+\d+)|(\b<?www.)|(\s.*$)', replace = ''}, {regex = '(?P<a>^.*$)', replace = 'von $a'} ]
 # remove everything after the first word, add s/th before name
 replace = [{ regex = '\s.*$', replace = '' }, { regex = '(?P<a>^.*$)', replace = 'von $a' }]
-#case_from = 'Upper'
-#case_to = 'Title'
-#test error
-case_from = 'Trööt'
-case_to = 'Trööt'
+# convert from case to case (see https://github.com/rutrum/convert-case#cases)
+case_from = 'Upper'
+case_to = 'Title'
+##test error
+##case_from = 'Trööt'
+##case_to = 'Trööt'

@@ -74,8 +74,9 @@ pub fn load_image_from_path<P: AsRef<Path>>(
     }
 }
 /// Tries to convert a string slice to a Case
-/// TODO convert to RahmenError and remove the unwraps where this is called
+// TODO convert to RahmenError and remove the unwraps where this is called
 pub fn str_to_case(s: &str) -> Result<Case, String> {
+    // TODO pub fn str_to_case(s: &str) -> RahmenResult<Case> {
     let case_str = s.to_case(Case::Flat);
     for case in Case::all_cases() {
         if case_str == format!("{:?}", case).to_case(Case::Flat) {
@@ -83,6 +84,7 @@ pub fn str_to_case(s: &str) -> Result<Case, String> {
         }
     }
     Err(format!("Unknown Case for conversion: {:}", &s))
+    // TODO Err(RahmenError::CaseUnknown)
 }
 
 #[derive(Debug)]
@@ -120,9 +122,9 @@ impl TryFrom<Element> for StatusLineElement {
         let mut transformations = vec![];
         if value.case_from.is_some() || value.case_to.is_some() {
             transformations.push(StatusLineTransformation::ChangeCase(
-                // what goes here?
-                value.case_from.expect("From case missing"),
-                value.case_to.expect("To case missing"),
+                // TODO bad error handling
+                value.case_from.expect("case_from missing in config file"),
+                value.case_to.expect("case_to missing in config file"),
             ));
         }
         if value.capitalize.unwrap_or(false) {
