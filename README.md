@@ -22,7 +22,7 @@ If the data is not found, nothing is displayed. If the same metadata value is en
 City and ProvinceState are identical), it will be displayed only once to save space. This happens before the data gets
 processed further (e.g. capitalized or transformed by regular expressions).
 
-All the information will be displayed in one line. If this line is too long for the screen, some text will overflow and
+All the information items will be displayed on one line, with `", "` as separator. If this line is too long for the screen, some text will overflow and
 not be shown at the end of the line. Use a wider screen or a narrower font to reduce the probability that this will
 happen.
 
