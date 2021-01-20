@@ -162,6 +162,8 @@ impl StatusLineFormatter {
             .elements
             .iter()
             .flat_map(move |element| element.process(&metadata))
+            // remove empty strings (which may be the result of a transformation regex replacement)
+            .filter(|x| !x.is_empty())
             // remove multiples (e.g. if City and  ProvinceState are the same)
             .unique()
             .join(", "))
