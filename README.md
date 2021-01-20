@@ -9,7 +9,7 @@ If you'd prefer a random image order, use the `shuf` command on a file list.
 
 Below the image, some information gathered from the image's metadata will be shown.
 This feature has to be configured in the `rahmen.toml` configuration file. There, you can enter
-one ore more metadata taga name known to the [exiv2](https://exiv2.org/metadata.html) library
+one ore more metadata tags name known to the [exiv2](https://exiv2.org/metadata.html) library
 to be displayed in the information line.
 
 Also, you can enter tuples of [regular expressions and replacements](https://docs.rs/regex/) that will be applied to the metadata.
@@ -22,7 +22,7 @@ If the data is not found, nothing is displayed. If the same metadata value is en
 City and ProvinceState are identical), it will be displayed only once to save space. This happens before the data gets
 processed further (e.g. capitalized or transformed by regular expressions).
 
-All the information will be displayed in one line. If this line is too long for the screen, some text will overflow and
+All the information items will be displayed on one line, with `", "` as separator. If this line is too long for the screen, some text will overflow and
 not be shown at the end of the line. Use a wider screen or a narrower font to reduce the probability that this will
 happen.
 
