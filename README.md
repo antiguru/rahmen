@@ -39,7 +39,7 @@ Rahmen depends on various libraries, which should be available on most Linux dis
 
 * `libgexiv2-dev`
 
-Rahmen will if there's no configuration file, but will use minimal defaults (see below).
+Rahmen will run if there's no configuration file, but will use minimal defaults (see below).
 
 ## Building
 
@@ -109,8 +109,7 @@ could lead to the image displaying for less than 1 second.
 ```shell
     -c, --config <config file>
 ```
-Indicate the name and path of the configuration file to read. The default path is
-either `~/.config/rahmen.toml` or `/etc/rahmen.toml` [IS THAT SO?].
+Indicate the name and path of the configuration file to read. This takes precedence.
 
 
 ## Configuration File (default name: rahmen.toml)
@@ -118,6 +117,9 @@ either `~/.config/rahmen.toml` or `/etc/rahmen.toml` [IS THAT SO?].
 Rahmen will run without configuration file using the default settings given above, but no metadata will be
 displayed below the image. To show metadata, a configuration file must be used; an example
 file (`rahmen.toml`) can be found among the sources.
+
+The default lookup paths for the configuration file are either `~/.config/rahmen.toml` or `/etc/rahmen.toml`.
+If both are present, the file in the home directory takes precedence.
 
 The configuration file has to be written in TOML and takes the following instructions: 
 
