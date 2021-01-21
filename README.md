@@ -2,7 +2,7 @@
 
 Rah·men [[ˈʁaːmən]](https://de.wiktionary.org/wiki/Rahmen) German: frame
 
-Rahmen is a lightweight tool to present an image slideshow while consuming little resources. It takes a list of files or
+Rahmen is a lightweight tool to present a slideshow of one or more JPEG images while consuming little resources. It takes a list of files or
 a pattern, and periodically shows the next image. It's work in progress, but the code found here should work.
 
 If you'd prefer a random image order, use the `shuf` command on a file list.
@@ -142,6 +142,7 @@ entry, and optionally, one
 `replace = [{ regex = 'regex1', replace = 'repl1' }, { regex = '...', replace = '...' }, ... ]` 
 
 entry, where one or more regular expressions and the replacements for the part they match could be supplied.
+The regular expression operations will be applied one after the other in the given order.
 For long expressions, or if you wish to comment them, this could also be written like
 ```toml
 [[status_line.replace]]
@@ -155,6 +156,19 @@ replace = '$d.$M.$y'
 The [tag names that can be used are listed on the this exiv2 webpage](https://exiv2.org/metadata.html).
 This doesn't mean that all these are actually present in your image file. Use [exiftool](https://exiftool.org/)
 to show you the metadata in your file and see what is available.
+
+Because some of the tags we used were in ALL-CAPS which doesn't look nice, we offer case conversions that you can apply
+to the data before they are processed by the regular expressions described above. The order in the configuration file
+doesn't matter here. The [available case strings can be found here.](https://github.com/rutrum/convert-case#cases) 
+See the following example. The previous method of setting the `capitalize` variable is also still available.
+```toml
+# convert from UPPER CASE to Title Case 
+case_from = 'Upper'
+case_to = 'Title'
+# this does the same
+capitalize = true
+```
+
 
 The human-readable location tags in the enclosed `rahmen.toml` example file are based on the information
 you can tell Adobe Lightroom to add when it finds a GPS location in the image metadata.
