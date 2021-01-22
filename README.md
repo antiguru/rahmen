@@ -164,13 +164,11 @@ to the data before they are processed by the regular expressions described above
 doesn't matter here. The [available case strings can be found here.](https://github.com/rutrum/convert-case#cases) 
 See the following example. The previous method of setting the `capitalize` variable is also still available.
 ```toml
-# convert from UPPER CASE to Title Case 
-case_from = 'Upper'
-case_to = 'Title'
-# this does the same
+# convert input from UPPER CASE to Title Case 
+case_conversion = { from = 'Upper', to = 'Title' }
+# this does the same, but only from UPPER to Title Case
 capitalize = true
 ```
-
 
 The human-readable location tags in the enclosed `rahmen.toml` example file are based on the information
 you can tell Adobe Lightroom to add when it finds a GPS location in the image metadata.
