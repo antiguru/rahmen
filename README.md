@@ -18,11 +18,11 @@ before the regular expression(s) (if any) will be applied.
 
 See the example configuration file `rahmen.toml` for some examples.
 
-If the data is not found, nothing is displayed. If the same metadata value is encountered more than once (e.g., when
-City and ProvinceState are identical), it will be displayed only once to save space. This happens after the data gets
+If the data is not found, per default, nothing is displayed. If the same metadata value is encountered more than once (e.g., when
+City and ProvinceState are identical), it will (per default) be displayed only once to save space. This happens after the data gets
 processed further (e.g. capitalized or transformed by regular expressions).
 
-All the information items will be displayed on one line, with `", "` as separator. If this line is too long for the screen, some text will overflow and
+All the information items will be displayed on one line, with `", "` as (default) separator. If this line is too long for the screen, some text will overflow and
 not be shown at the end of the line. Use a wider screen or a narrower font to reduce the probability that this will
 happen.
 
@@ -111,6 +111,12 @@ could lead to the image displaying for less than 1 second.
 ```
 Indicate the name and path of the configuration file to read. This takes precedence.
 
+###Shell script
+
+We have added a basic bash script (in the ``utils`` directory) which creates a random image list from a 
+given folder and starts ``rahmen``. You could configure the machine to use autologin and call this script from the end of your
+``.bashrc`` to start a ``rahmen`` slideshow automatically after the system has started up. Of course, be sure
+to change to folders and paths to match your setup.
 
 ## Configuration File (default name: rahmen.toml)
 
@@ -169,6 +175,30 @@ case_conversion = { from = 'Upper', to = 'Title' }
 # this does the same, but only from UPPER to Title Case
 capitalize = true
 ```
+Post-processing the metadata line: Optionally, the metadata line can be processed after it has been assembled
+from the tags described above. This can be finely controlled using the following settings:
+```toml
+separator = "|"
+uniquify = false
+hide_empty = false
+```
+That way it's possible to set a custom separator, and to display multiple identical and/or empty tags, too
+(the defaults are `", "` for the separator and `false` for both other values.)
+
+Then, you can apply regular expressions to the whole line, in the same way described above for the
+individual tags. But you'll have to take care of removing empty entries (if not set to hide)
+(resulting in superfluous separators) and take care of deduplication
+(if disabled) by yourself. This creates a way to format metadata items in the text bar relative to other metadata.
+```toml
+line_replacements = [
+    {regex = '(?P<text>^.*), (?P<subloc>.*), (?P<loc>.*), (?P<province>Mark), (?P<rest>.*$)', replace = '$text, $subloc ($province), $rest'},
+    {regex = '(?P<text>^.*), (?P<subloc>.*), (?P<loc>.*), (?P<province>.*), (?P<country>Südkorea), (?P<rest>.*$)', replace = '$text, $loc, $province, $country, $rest'},
+    {regex = '(?P<text>^.*), (?P<sublocation>.*), (?P<location>.*), (?P<province>.*), (?P<country>Morocco), (?P<rest>.*$)',replace = '$text, $sublocation, $location, $country, $rest'},
+    #zap empty commas from the separator
+    {regex = '^, ', replace = ','},
+    {regex = '^[ ,]', replace = ''},
+]
+```
 
 The human-readable location tags in the enclosed `rahmen.toml` example file are based on the information
 you can tell Adobe Lightroom to add when it finds a GPS location in the image metadata.
@@ -180,7 +210,7 @@ you can tell Adobe Lightroom to add when it finds a GPS location in the image me
 - The font rendering is not really beautiful and sometimes, glyphs overlap.
 - The overflowing text is just not displayed.
 - The text bar might look better centered.
-- There's no way to format metadata items in the text bar relative to other metadata.
+
 
 ## Cross-compiling for the Raspberry Pi 1
 
