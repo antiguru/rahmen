@@ -6,6 +6,14 @@ font_size = 32
 # Delay between transitions
 delay = 90
 
+# Regular expression(s) to apply to the whole line, after all the individual metadata has been processed
+# and joined using the separator.
+# e.g. this looks for the third field after the separator and if it matches, restructures the output line
+line_replace = [{regex = '(?P<sublocation>.*), (?P<location>.*), (?P<province>Mark), (?P<rest>.*$)',replace = '$sublocation ($province), $rest'}]
+
+# What to insert between the metadata, default: insert nothing, which you probably do not want.
+separator = ", "
+
 # status line metadata (in this order) as provided by the exiv2 library
 [[status_line]]
 exif_tags = ["Iptc.Application2.ObjectName"]
@@ -43,3 +51,5 @@ case_conversion = {from = 'Upper', to = 'Title'}
 ## replace = [ {regex = '(\s\+\d+)|(\b<?www.)|(\s.*$)', replace = ''}, {regex = '(?P<a>^.*$)', replace = 'von $a'} ]
 # remove everything after the first word, add s/th before name
 replace = [{ regex = '\s.*$', replace = '' }, { regex = '(?P<a>^.*$)', replace = 'von $a' }]
+
+

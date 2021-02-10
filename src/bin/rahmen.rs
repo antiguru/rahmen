@@ -1,3 +1,4 @@
+use std::convert::identity;
 use std::fs::File;
 use std::io::BufReader;
 use std::str::FromStr;
@@ -158,7 +159,18 @@ fn main() -> RahmenResult<()> {
         eprintln!("Config file not found, continuing with default settings");
         Default::default()
     };
-    let status_line_formatter = StatusLineFormatter::new(settings.status_line.iter().cloned())?;
+    // build the status line, using the settings from the config file (first for the individual
+    // metadata tags, second for the regex(es) to process the whole status line),
+    // the metadata items being joined using the separator from the config file (or with nothing
+    // if no separator is given there)
+    let status_line_formatter = StatusLineFormatter::new(
+        settings.status_line.iter().cloned(),
+        settings.line_replace.iter().flat_map(identity).cloned(),
+        // TODO I do not like this hack. It should evaluate as None if none is given in config,
+        // and we should process it as None, i.e. do not call join in the formatter.
+        // How can this be done without having an unwieldy if construction with four branches?
+        settings.separator.unwrap_or("".to_string()),
+    )?;
 
     let buffer_max_size: usize = matches
         .value_of("buffer_max_size")

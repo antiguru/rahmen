@@ -10,7 +10,7 @@ use itertools::Itertools;
 use regex::Regex;
 use rexiv2::Metadata;
 
-use crate::config::Element;
+use crate::config::{Element, Replacement};
 use crate::errors::{RahmenError, RahmenResult};
 
 /// Provider trait to produce images, or other types
@@ -73,6 +73,9 @@ pub fn load_image_from_path<P: AsRef<Path>>(
         }
     }
 }
+
+/// The following are the ops concerning the status line (text being displayed below the image)
+
 /// Tries to convert a string slice to a Case
 pub fn str_to_case(s: String) -> RahmenResult<Case> {
     let case_str = s.to_case(Case::Flat);
@@ -81,9 +84,10 @@ pub fn str_to_case(s: String) -> RahmenResult<Case> {
             return Ok(case);
         }
     }
-    Err(RahmenError::CaseUnknown(format!("{:}", &s)))
+    Err(RahmenError::CaseUnknown(s))
 }
 
+/// abstract runtime definitions for the transformation ops for the meta data entries
 #[derive(Debug)]
 enum StatusLineTransformation {
     RegexReplace(Regex, String),
@@ -91,6 +95,7 @@ enum StatusLineTransformation {
     ChangeCase(Case, Case),
 }
 
+/// runtime transformation ops for the metadata values (the parameters are gathered in the try_from function)
 impl StatusLineTransformation {
     fn transform<S: AsRef<str>>(&self, input: S) -> String {
         match self {
@@ -103,48 +108,81 @@ impl StatusLineTransformation {
     }
 }
 
+/// prepare ops (regexes/replacements) to process the complete status line
+impl TryFrom<Replacement> for StatusLineTransformation {
+    type Error = RahmenError;
+    /// build each status line element with its transformations and the tag
+    fn try_from(value: Replacement) -> Result<Self, Self::Error> {
+        // collect the transformation ops and store their parameters
+        // iterate over the regex(es)
+
+        Ok(StatusLineTransformation::RegexReplace(
+            Regex::new(value.regex.as_ref())?,
+            value.replace,
+        ))
+    }
+}
+
+/// a status line meta data element: a string and transformations to perform on it
 #[derive(Debug)]
 struct StatusLineElement {
-    tags: Vec<String>,
+    tag: Vec<String>,
     transformations: Vec<StatusLineTransformation>,
 }
 
+/// prepare the ops for the processing of an element
 impl TryFrom<Element> for StatusLineElement {
     type Error = RahmenError;
-
+    /// build each status line element with its transformations and the tag
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         let mut transformations = vec![];
+        // collect the transformation ops and store their parameters
+        // the case conversion to apply
         if let Some(case_conversion) = value.case_conversion {
             transformations.push(StatusLineTransformation::ChangeCase(
                 str_to_case(case_conversion.from)?,
                 str_to_case(case_conversion.to)?,
             ));
         }
+        // the capitalize instruction
         if value.capitalize.unwrap_or(false) {
             transformations.push(StatusLineTransformation::Capitalize);
         }
+        // iterate over the regex(es)
         for replace in value.replace.into_iter().flat_map(Vec::into_iter) {
             transformations.push(StatusLineTransformation::RegexReplace(
                 Regex::new(replace.regex.as_ref())?,
                 replace.replace,
             ));
         }
+
+        // return the transformations and the tags vector
         Ok(Self {
             transformations,
-            tags: value.exif_tags,
+            tag: value.exif_tags,
         })
     }
 }
 
+/// the status line meta data element
 impl StatusLineElement {
+    /// this processes each metadata tag and subordinate instructions from the config file
     fn process(&self, metadata: &Metadata) -> Option<String> {
+        // metadata processor: get the metadata value of the given meta tag (self.tag, from try_from above)
+        // so we have three values here, self.tag (the tag), metadata (the data for this tag),
+        // and value (the processed and later transformed metadata)
+        // If the current metadata tag (self.tag.iter) can be converted to some value...
         if let Some(mut value) = self
-            .tags
+            .tag
             .iter()
+            // ...check if data present...
             .filter(|f| metadata.has_tag(f))
+            // ...get tag as string...
             .map(|f| metadata.get_tag_interpreted_string(f).ok())
+            // ...if it is s/th,...
             .find(Option::is_some)
             .flatten()
+        // ...process that value using the pushed transformation ops and return the transformed value
         {
             for transformation in &self.transformations {
                 value = transformation.transform(value);
@@ -156,34 +194,77 @@ impl StatusLineElement {
     }
 }
 
-/// A status line formatter formats meta data tags according to configured elements
+/// A status line formatter formats meta data tags according to configured elements into a string
+/// and then processes that string using regexes/replacements as configured
 #[derive(Debug)]
 pub struct StatusLineFormatter {
+    // these are the meta tag entries in the config file
     elements: Vec<StatusLineElement>,
+    // these are the instructions to process the whole line
+    line_transformations: Vec<StatusLineTransformation>,
+    // the separator to use for the join op
+    separator: String,
 }
 
 impl StatusLineFormatter {
     /// Construct a new `StatusLineFormatter` from a collection of elements
-    pub fn new<I: Iterator<Item = Element>>(elements_iter: I) -> RahmenResult<Self> {
+    pub fn new<I: Iterator<Item = Element>, J: Iterator<Item = Replacement>>(
+        // we get the arguments when we're called
+        statusline_elements_iter: I,
+        line_trans_iter: J,
+        separator: String,
+    ) -> RahmenResult<Self> {
+        // read the metadata config entries and store them to the elements vector
         let mut elements = vec![];
-        for element in elements_iter {
+        for element in statusline_elements_iter {
             elements.push(element.try_into()?);
         }
-        Ok(Self { elements })
+        // read the postprocessing regexes and store them to the line_transformations vector
+        let mut line_transformations = vec![];
+        for line_transform in line_trans_iter {
+            //println!("LT: {:?}", line_transform);
+            line_transformations.push(line_transform.try_into()?);
+        }
+        // return the vector(s)
+        Ok(Self {
+            elements,
+            line_transformations,
+            separator,
+        })
     }
 
-    /// Format the meta data from the given path using this formatter
+    /// Format the meta data from the given path (called as an adaptor to the status line formatter)
     pub fn format<P: AsRef<std::ffi::OsStr>>(&self, path: P) -> RahmenResult<String> {
         let metadata = Metadata::new_from_path(path)?;
-        // iterate over the tag table
-        Ok(self
+        // iterate over the tag vector we built in the constructor, but stop when we have an
+        // iterator of strings
+        //let mut status_line = self
+        let mut element_iter = self
             .elements
             .iter()
+            // process each metadata section (element) using the associated transformation instructions
             .flat_map(move |element| element.process(&metadata))
             // remove empty strings (which may be the result of a transformation regex replacement)
-            .filter(|x| !x.is_empty())
-            // remove multiples (e.g. if City and  ProvinceState are the same)
-            .unique()
-            .join(", "))
+            .filter(|x| !x.is_empty());
+        // TODO discuss if this should better be made configurable (possibly so)
+        // when there is no postprocessing regex...
+        let mut status_line = if self.line_transformations.iter().peekable().peek().is_none() {
+            // ...remove multiples (e.g. if City and  ProvinceState are the same) and
+            // join the strings using the separator
+            element_iter.unique().join(&self.separator)
+        } else {
+            // ...else only create a joint string ('line')
+            element_iter.join(&self.separator)
+        };
+
+        for transformation in &self.line_transformations {
+            status_line = transformation.transform(&status_line);
+        }
+
+        // you could write the above for... statement like this, too
+        /*
+        status_line = self.line_transformations.iter().fold(status_line.clone(), |sl, t| t.transform(sl));
+        */
+        Ok(status_line)
     }
 }

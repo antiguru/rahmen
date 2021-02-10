@@ -3,9 +3,9 @@
 /// An element of the status line
 #[derive(Debug, Deserialize, Clone)]
 pub struct Element {
-    /// Capitalize the words in the tag
+    /// Capitalize the words in the tag (optional)
     pub capitalize: Option<bool>,
-    /// Collection of exif tags, ordered by priority
+    /// Collection of exif tags, ordered by priority (mandatory)
     pub exif_tags: Vec<String>,
     /// Optional regex pattern and its replacement
     pub replace: Option<Vec<Replacement>>,
@@ -33,11 +33,17 @@ pub struct Replacement {
 
 /// Config file root structure
 #[derive(Debug, Default, Deserialize, Clone)]
+// this is called in rahmen.rs where a new status line formatter is constructed
 pub struct Settings {
-    /// Transition delay between images
+    /// Transition delay between images (optional)
     pub delay: Option<f64>,
-    /// Font size of the status line
+    /// Font size of the status line (optional)
     pub font_size: Option<f32>,
-    /// Status line elements
+    /// Status line: a collection of  elements (metadata tags, mandatory)
     pub status_line: Vec<Element>,
+    /// to post-process the status line with one or more regular expressions (optional)
+    pub line_replace: Option<Vec<Replacement>>,
+    /// the separator that will be inserted between every element (metadata) of the
+    /// status line (optional, but default is to insert nothing)
+    pub separator: Option<String>,
 }
