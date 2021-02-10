@@ -77,8 +77,11 @@ pub fn load_image_from_path<P: AsRef<Path>>(
 /// settings for the status line formatter
 #[derive(Debug, Deserialize, Clone)]
 pub struct LineSettings {
+    /// the separator to insert between the metadata
     pub separator: String,
+    /// should we deduplicate metadata?
     pub uniquify: bool,
+    /// should we hide empty metadata?
     pub hide_empty: bool,
 }
 
@@ -134,7 +137,7 @@ impl TryFrom<Replacement> for StatusLineTransformation {
 /// a status line meta data element: a string and transformations to perform on it
 #[derive(Debug)]
 struct StatusLineElement {
-    tag: Vec<String>,
+    tags: Vec<String>,
     transformations: Vec<StatusLineTransformation>,
 }
 
@@ -167,7 +170,7 @@ impl TryFrom<Element> for StatusLineElement {
         // return the transformations and the tags vector
         Ok(Self {
             transformations,
-            tag: value.exif_tags,
+            tags: value.exif_tags,
         })
     }
 }
@@ -181,7 +184,7 @@ impl StatusLineElement {
         // and value (the processed and later transformed metadata)
         // If the current metadata tag (self.tag.iter) can be converted to some value...
         if let Some(mut value) = self
-            .tag
+            .tags
             .iter()
             // ...check if data present...
             .filter(|f| metadata.has_tag(f))
@@ -230,7 +233,7 @@ impl StatusLineFormatter {
     pub fn new<I: Iterator<Item = Element>, J: Iterator<Item = Replacement>>(
         // we get the arguments when we're called
         statusline_elements_iter: I,
-        line_trans_iter: J,
+        line_transformations_iter: J,
         line_settings: LineSettings,
     ) -> RahmenResult<Self> {
         // read the metadata config entries and store them to the elements vector
@@ -240,8 +243,7 @@ impl StatusLineFormatter {
         }
         // read the postprocessing regexes and store them to the line_transformations vector
         let mut line_transformations = vec![];
-        for line_transform in line_trans_iter {
-            //println!("LT: {:?}", line_transform);
+        for line_transform in line_transformations_iter {
             line_transformations.push(line_transform.try_into()?);
         }
 
@@ -262,13 +264,12 @@ impl StatusLineFormatter {
         let metadata = Metadata::new_from_path(path)?;
         // iterate over the tag vector we built in the constructor, but stop when we have an
         // iterator of strings
-        //let mut status_line = self
         let mut element_iter = self
             .elements
             .iter()
             // process each metadata section (element) using the associated transformation instructions
             .flat_map(move |element| element.process(&metadata, line_settings));
-        let mut status_line = match (
+        let status_line = match (
             // hide empty entries
             self.line_settings.hide_empty,
             // don't show duplicates
@@ -289,15 +290,9 @@ impl StatusLineFormatter {
                 .join(&self.line_settings.separator),
             (false, true) => element_iter.unique().join(&self.line_settings.separator),
         };
-
-        for transformation in &self.line_transformations {
-            status_line = transformation.transform(&status_line);
-        }
-
-        // you could write the above for... statement like this, too
-        /*
-        status_line = self.line_transformations.iter().fold(status_line.clone(), |sl, t| t.transform(sl));
-        */
-        Ok(status_line)
+        Ok(self
+            .line_transformations
+            .iter()
+            .fold(status_line, |sl, t| t.transform(sl)))
     }
 }

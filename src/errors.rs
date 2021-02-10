@@ -9,7 +9,6 @@ use std::sync::Arc;
 #[derive(std::fmt::Debug)]
 pub enum RahmenError {
     /// unknown case for conversion
-    /// TODO it's NYI
     CaseUnknown(String),
     /// Errors originating from config loading
     ConfigError(Arc<config::ConfigError>),

@@ -42,7 +42,7 @@ pub struct Settings {
     /// Status line: a collection of  elements (metadata tags, mandatory)
     pub status_line: Vec<Element>,
     /// to post-process the status line with one or more regular expressions (optional)
-    pub line_replace: Option<Vec<Replacement>>,
+    pub line_replacements: Option<Vec<Replacement>>,
     /// the separator that will be inserted between every element (metadata) of the
     /// status line (optional, but default is to insert nothing)
     pub separator: Option<String>,

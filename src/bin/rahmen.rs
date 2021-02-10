@@ -165,14 +165,18 @@ fn main() -> RahmenResult<()> {
     // if no separator is given there)
 
     let line_settings: LineSettings = LineSettings {
-        separator: settings.separator.unwrap_or("".to_string()),
+        separator: settings.separator.unwrap_or(", ".to_string()),
         uniquify: settings.uniquify.unwrap_or(true),
         hide_empty: settings.hide_empty.unwrap_or(true),
     };
 
     let status_line_formatter = StatusLineFormatter::new(
         settings.status_line.iter().cloned(),
-        settings.line_replace.iter().flat_map(identity).cloned(),
+        settings
+            .line_replacements
+            .iter()
+            .flat_map(identity)
+            .cloned(),
         line_settings.clone(),
     )?;
 
