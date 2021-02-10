@@ -159,17 +159,19 @@ fn main() -> RahmenResult<()> {
         eprintln!("Config file not found, continuing with default settings");
         Default::default()
     };
-    // build the status line, using the settings from the config file (first for the individual
-    // metadata tags, second for the regex(es) to process the whole status line),
-    // the metadata items being joined using the separator from the config file (or with nothing
-    // if no separator is given there)
 
+    // if no entries are present in the config file, we set default values
+    // for the metadata separator, and for deduplication and hiding of empty tags;
+    // both of these are enabled by default
     let line_settings: LineSettings = LineSettings {
         separator: settings.separator.unwrap_or(", ".to_string()),
         uniquify: settings.uniquify.unwrap_or(true),
         hide_empty: settings.hide_empty.unwrap_or(true),
     };
-
+    // build the status line, using the settings from the config file (first for the individual
+    // metadata tags, second for the regex(es) to process the whole status line),
+    // the metadata items being joined using the separator from the config file (or with the
+    // default value (see above) if no separator is given there)
     let status_line_formatter = StatusLineFormatter::new(
         settings.status_line.iter().cloned(),
         settings
