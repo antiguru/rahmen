@@ -24,7 +24,7 @@ use rahmen::display_fltk::FltkDisplay;
 use rahmen::display_framebuffer::FramebufferDisplay;
 use rahmen::errors::{RahmenError, RahmenResult};
 use rahmen::font::FontRenderer;
-use rahmen::provider::{load_image_from_path, Provider, StatusLineFormatter};
+use rahmen::provider::{load_image_from_path, LineSettings, Provider, StatusLineFormatter};
 use rahmen::provider_list::ListProvider;
 
 /// dataflow control, this is used as result R part
@@ -163,13 +163,17 @@ fn main() -> RahmenResult<()> {
     // metadata tags, second for the regex(es) to process the whole status line),
     // the metadata items being joined using the separator from the config file (or with nothing
     // if no separator is given there)
+
+    let line_settings: LineSettings = LineSettings {
+        separator: settings.separator.unwrap_or("".to_string()),
+        uniquify: settings.uniquify.unwrap_or(true),
+        hide_empty: settings.hide_empty.unwrap_or(true),
+    };
+
     let status_line_formatter = StatusLineFormatter::new(
         settings.status_line.iter().cloned(),
         settings.line_replace.iter().flat_map(identity).cloned(),
-        // TODO I do not like this hack. It should evaluate as None if none is given in config,
-        // and we should process it as None, i.e. do not call join in the formatter.
-        // How can this be done without having an unwieldy if construction with four branches?
-        settings.separator.unwrap_or("".to_string()),
+        line_settings.clone(),
     )?;
 
     let buffer_max_size: usize = matches
@@ -234,7 +238,7 @@ fn main() -> RahmenResult<()> {
 
         let status_line_stream = img_path_stream
             .ok()
-            .flat_map(move |(p, _img)| status_line_formatter.format(&p).ok())
+            .flat_map(move |(p, _img)| status_line_formatter.format(&p, &line_settings).ok())
             .inspect(|loc| println!("Status line: {}", loc));
 
         let text_img_stream =

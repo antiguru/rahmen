@@ -46,4 +46,8 @@ pub struct Settings {
     /// the separator that will be inserted between every element (metadata) of the
     /// status line (optional, but default is to insert nothing)
     pub separator: Option<String>,
+    /// should we return duplicate strings? if not, set to true (optional, default: true)
+    pub uniquify: Option<bool>,
+    /// should we hide empty fields? (optional, default: true)
+    pub hide_empty: Option<bool>,
 }

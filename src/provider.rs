@@ -74,6 +74,14 @@ pub fn load_image_from_path<P: AsRef<Path>>(
     }
 }
 
+/// settings for the status line formatter
+#[derive(Debug, Deserialize, Clone)]
+pub struct LineSettings {
+    pub separator: String,
+    pub uniquify: bool,
+    pub hide_empty: bool,
+}
+
 /// The following are the ops concerning the status line (text being displayed below the image)
 
 /// Tries to convert a string slice to a Case
@@ -167,7 +175,7 @@ impl TryFrom<Element> for StatusLineElement {
 /// the status line meta data element
 impl StatusLineElement {
     /// this processes each metadata tag and subordinate instructions from the config file
-    fn process(&self, metadata: &Metadata) -> Option<String> {
+    fn process(&self, metadata: &Metadata, line_settings: &LineSettings) -> Option<String> {
         // metadata processor: get the metadata value of the given meta tag (self.tag, from try_from above)
         // so we have three values here, self.tag (the tag), metadata (the data for this tag),
         // and value (the processed and later transformed metadata)
@@ -189,7 +197,18 @@ impl StatusLineElement {
             }
             Some(value)
         } else {
-            None
+            // empty tags (no metadata found): when hide_empty is false,
+            // we will return an empty string to make sure all metatags are
+            // added to the status line. This way, we can postprocess the status line
+            // being sure that parameters stay at their position.
+
+            // return None if we do not want to use it further
+            if line_settings.hide_empty {
+                None
+            } else {
+                // return empty string to give the field a value
+                Some("".to_string())
+            }
         }
     }
 }
@@ -203,7 +222,7 @@ pub struct StatusLineFormatter {
     // these are the instructions to process the whole line
     line_transformations: Vec<StatusLineTransformation>,
     // the separator to use for the join op
-    separator: String,
+    line_settings: LineSettings,
 }
 
 impl StatusLineFormatter {
@@ -212,7 +231,7 @@ impl StatusLineFormatter {
         // we get the arguments when we're called
         statusline_elements_iter: I,
         line_trans_iter: J,
-        separator: String,
+        line_settings: LineSettings,
     ) -> RahmenResult<Self> {
         // read the metadata config entries and store them to the elements vector
         let mut elements = vec![];
@@ -225,16 +244,21 @@ impl StatusLineFormatter {
             //println!("LT: {:?}", line_transform);
             line_transformations.push(line_transform.try_into()?);
         }
+
         // return the vector(s)
         Ok(Self {
             elements,
             line_transformations,
-            separator,
+            line_settings,
         })
     }
 
     /// Format the meta data from the given path (called as an adaptor to the status line formatter)
-    pub fn format<P: AsRef<std::ffi::OsStr>>(&self, path: P) -> RahmenResult<String> {
+    pub fn format<P: AsRef<std::ffi::OsStr>>(
+        &self,
+        path: P,
+        line_settings: &LineSettings,
+    ) -> RahmenResult<String> {
         let metadata = Metadata::new_from_path(path)?;
         // iterate over the tag vector we built in the constructor, but stop when we have an
         // iterator of strings
@@ -243,18 +267,27 @@ impl StatusLineFormatter {
             .elements
             .iter()
             // process each metadata section (element) using the associated transformation instructions
-            .flat_map(move |element| element.process(&metadata))
-            // remove empty strings (which may be the result of a transformation regex replacement)
-            .filter(|x| !x.is_empty());
-        // TODO discuss if this should better be made configurable (possibly so)
-        // when there is no postprocessing regex...
-        let mut status_line = if self.line_transformations.iter().peekable().peek().is_none() {
-            // ...remove multiples (e.g. if City and  ProvinceState are the same) and
-            // join the strings using the separator
-            element_iter.unique().join(&self.separator)
-        } else {
-            // ...else only create a joint string ('line')
-            element_iter.join(&self.separator)
+            .flat_map(move |element| element.process(&metadata, line_settings));
+        let mut status_line = match (
+            // hide empty entries
+            self.line_settings.hide_empty,
+            // don't show duplicates
+            self.line_settings.uniquify,
+        ) {
+            (true, true) => element_iter
+                // remove empty strings (which may be the result of a transformation regex replacement)
+                .filter(|x| !x.is_empty())
+                // ...remove multiples (e.g. if City and  ProvinceState are the same) and
+                .unique()
+                // join the strings using the separator
+                .join(&self.line_settings.separator),
+            (false, false) => element_iter.join(&self.line_settings.separator),
+            (true, false) => element_iter
+                // remove empty strings (which may be the result of a transformation regex replacement)
+                .filter(|x| !x.is_empty())
+                // join the strings using the separator
+                .join(&self.line_settings.separator),
+            (false, true) => element_iter.unique().join(&self.line_settings.separator),
         };
 
         for transformation in &self.line_transformations {

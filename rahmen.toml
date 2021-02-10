@@ -6,13 +6,27 @@ font_size = 32
 # Delay between transitions
 delay = 90
 
+# Parameters to tune the information line below the image.
+# The following are probably only useful when post-processing using the line_replace regex(es).
+
+# What to insert between the metadata, default: insert nothing, which you probably do not want. We propose ", ".
+separator = ", "
+# Should we show duplicate strings only once (default: true)?
+#uniquify = false
+#Should we hide empty results (default: true)?
+hide_empty = false
+
 # Regular expression(s) to apply to the whole line, after all the individual metadata has been processed
 # and joined using the separator.
-# e.g. this looks for the third field after the separator and if it matches, restructures the output line
-line_replace = [{regex = '(?P<sublocation>.*), (?P<location>.*), (?P<province>Mark), (?P<rest>.*$)',replace = '$sublocation ($province), $rest'}]
-
-# What to insert between the metadata, default: insert nothing, which you probably do not want.
-separator = ", "
+line_replace = [{regex = '(?P<text>^.*), (?P<subloc>.*), (?P<loc>.*), (?P<province>Mark), , (?P<rest>.*$)', replace = '$text, $subloc ($province), $rest'},
+    {regex = '(?P<text>^.*), (?P<subloc>.*), (?P<loc>.*), (?P<province>.*), (?P<country>Südkorea), (?P<rest>.*$)', replace = '$text, $loc, $province, $country, $rest'},
+    {regex = '(?P<text>^.*), (?P<sublocation>.*), (?P<location>.*), (?P<province>.*), (?P<country>Morocco), (?P<rest>.*$)',replace = '$text, $sublocation, $location, $country, $rest'},
+    #zap empty commas
+    {regex = '^, ', replace = ','},
+    {regex = '\W,+', replace = ''},
+    {regex = '^[ ,]', replace = ''},
+    {regex = ', , ', replace = ', '},
+]
 
 # status line metadata (in this order) as provided by the exiv2 library
 [[status_line]]
