@@ -1,6 +1,6 @@
 [package]
 name = "rahmen"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Moritz Hoffmann <antiguru@gmail.com>", "sys3175 <https://github.com/sys3175>"]
 edition = "2018"
 license = "MIT"
@@ -41,6 +41,10 @@ version = "0.23.12"
 default-features = false
 # Disable jpeg_rayon
 features = ["jpeg"]
+
+[dependencies.pyo3]
+version = "0.13.1"
+features = ["auto-initialize"]
 
 [package.metadata.deb]
 maintainer = "Moritz Hoffmann <antiguru@gmail.com>"

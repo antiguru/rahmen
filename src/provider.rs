@@ -7,6 +7,10 @@ use std::path::Path;
 use convert_case::{Case, Casing};
 use image::{DynamicImage, Pixel};
 use itertools::Itertools;
+use pyo3::{
+    prelude::*,
+    types::{IntoPyDict, PyModule},
+};
 use regex::Regex;
 use rexiv2::Metadata;
 
@@ -244,6 +248,29 @@ impl StatusLineFormatter {
         })
     }
 
+    pub fn postprocess(input: &String, separator: &String) -> Vec<String> {
+        let mut out = vec![];
+        Python::with_gil(|py| {
+            let post = PyModule::from_code(
+                py,
+                r#"
+def getWords(text, sep):
+ #return ''.join((c if c.isalnum() else ' ') for c in text).split()
+ return text.split(sep)
+                "#,
+                "post.py",
+                "post",
+            )
+            .unwrap();
+            out = post
+                .call1("getWords", (input, separator))
+                .unwrap()
+                .extract()
+                .unwrap();
+        });
+        out
+    }
+
     /// Format the meta data from the given path (called as an adaptor to the status line formatter)
     pub fn format<P: AsRef<std::ffi::OsStr>>(
         &self,
@@ -258,7 +285,7 @@ impl StatusLineFormatter {
             .iter()
             // process each metadata section (element) using the associated transformation instructions
             // empty tags (no metadata found): when hide_empty is false,
-            // we will return an empty string to make sure all metatags are
+            // we will return an empty string (instead of None) to make sure all metatags are
             // added to the status line. This way, we can postprocess the status line
             // being sure that parameters stay at their position.
             .flat_map(move |element| {
@@ -291,9 +318,13 @@ impl StatusLineFormatter {
                 .join(&self.line_settings.separator),
             (false, true) => element_iter.unique().join(&self.line_settings.separator),
         };
-        Ok(self
-            .line_transformations
-            .iter()
-            .fold(status_line, |sl, t| t.transform(sl)))
+        Ok(StatusLineFormatter::postprocess(
+            &self
+                .line_transformations
+                .iter()
+                .fold(status_line, |sl, t| t.transform(sl)),
+            &self.line_settings.separator,
+        )
+        .join(&self.line_settings.separator))
     }
 }
