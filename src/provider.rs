@@ -178,7 +178,7 @@ impl TryFrom<Element> for StatusLineElement {
 /// the status line meta data element
 impl StatusLineElement {
     /// this processes each metadata tag and subordinate instructions from the config file
-    fn process(&self, metadata: &Metadata, line_settings: &LineSettings) -> Option<String> {
+    fn process(&self, metadata: &Metadata) -> Option<String> {
         // metadata processor: get the metadata value of the given meta tag (self.tag, from try_from above)
         // so we have three values here, self.tag (the tag), metadata (the data for this tag),
         // and value (the processed and later transformed metadata)
@@ -200,18 +200,7 @@ impl StatusLineElement {
             }
             Some(value)
         } else {
-            // empty tags (no metadata found): when hide_empty is false,
-            // we will return an empty string to make sure all metatags are
-            // added to the status line. This way, we can postprocess the status line
-            // being sure that parameters stay at their position.
-
-            // return None if we do not want to use it further
-            if line_settings.hide_empty {
-                None
-            } else {
-                // return empty string to give the field a value
-                Some("".to_string())
-            }
+            None
         }
     }
 }
@@ -259,7 +248,7 @@ impl StatusLineFormatter {
     pub fn format<P: AsRef<std::ffi::OsStr>>(
         &self,
         path: P,
-        line_settings: &LineSettings,
+        //line_settings: &LineSettings,
     ) -> RahmenResult<String> {
         let metadata = Metadata::new_from_path(path)?;
         // iterate over the tag vector we built in the constructor, but stop when we have an
@@ -268,7 +257,19 @@ impl StatusLineFormatter {
             .elements
             .iter()
             // process each metadata section (element) using the associated transformation instructions
-            .flat_map(move |element| element.process(&metadata, line_settings));
+            // empty tags (no metadata found): when hide_empty is false,
+            // we will return an empty string to make sure all metatags are
+            // added to the status line. This way, we can postprocess the status line
+            // being sure that parameters stay at their position.
+            .flat_map(move |element| {
+                if let Some(v) = element.process(&metadata) {
+                    Some(v)
+                } else if self.line_settings.hide_empty {
+                    Some("".to_string())
+                } else {
+                    None
+                }
+            });
         let status_line = match (
             // hide empty entries
             self.line_settings.hide_empty,

@@ -244,7 +244,7 @@ fn main() -> RahmenResult<()> {
 
         let status_line_stream = img_path_stream
             .ok()
-            .flat_map(move |(p, _img)| status_line_formatter.format(&p, &line_settings).ok())
+            .flat_map(move |(p, _img)| status_line_formatter.format(&p).ok())
             .inspect(|loc| println!("Status line: {}", loc));
 
         let text_img_stream =
