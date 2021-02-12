@@ -44,10 +44,12 @@ pub struct Settings {
     /// to post-process the status line with one or more regular expressions (optional)
     pub line_replacements: Option<Vec<Replacement>>,
     /// the separator that will be inserted between every element (metadata) of the
-    /// status line (optional, but default is to insert nothing)
+    /// status line (optional, but default is to insert ", ")
     pub separator: Option<String>,
     /// should we return duplicate strings? if not, set to true (optional, default: true)
     pub uniquify: Option<bool>,
     /// should we hide empty fields? (optional, default: true)
     pub hide_empty: Option<bool>,
+    /// python code to postprocess the status line
+    pub py_code: Option<String>,
 }

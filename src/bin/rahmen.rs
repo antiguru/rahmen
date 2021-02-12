@@ -167,6 +167,7 @@ fn main() -> RahmenResult<()> {
         separator: settings.separator.unwrap_or(", ".to_string()),
         uniquify: settings.uniquify.unwrap_or(true),
         hide_empty: settings.hide_empty.unwrap_or(true),
+        py_code: settings.py_code,
     };
     // build the status line, using the settings from the config file (first for the individual
     // metadata tags, second for the regex(es) to process the whole status line),

@@ -87,6 +87,8 @@ pub struct LineSettings {
     pub uniquify: bool,
     /// should we hide empty metadata?
     pub hide_empty: bool,
+    /// python code for postprocessing the status line
+    pub py_code: Option<String>,
 }
 
 /// The following are the ops concerning the status line (text being displayed below the image)
@@ -247,23 +249,30 @@ impl StatusLineFormatter {
             line_settings,
         })
     }
-
-    pub fn postprocess(input: &String, separator: &String) -> Vec<String> {
+    /// The postprocess function calls the python code given in the py_code entry in the config file;
+    /// it takes an input (our status line) and also gets our separator to split it into
+    /// the individual items so that they can be postprocessed. The python code can be changed in
+    /// the config file and changes take effect when the program is restarted.
+    /// The python code gets a tuple of (string_to_process, item_separator) and is currently
+    /// expected to return a vector of strings.
+    /// TODO: error handling
+    pub fn postprocess(code: &String, input: &String, separator: &String) -> Vec<String> {
         let mut out = vec![];
         Python::with_gil(|py| {
             let post = PyModule::from_code(
                 py,
-                r#"
-def getWords(text, sep):
- #return ''.join((c if c.isalnum() else ' ') for c in text).split()
- return text.split(sep)
-                "#,
-                "post.py",
-                "post",
+                /*
+                                r#"
+                def postprocess(text, sep):
+                 #return ''.join((c if c.isalnum() else ' ') for c in text).split()
+                 return text.split(sep)
+                                "#,
+                                */
+                code, "post.py", "post",
             )
             .unwrap();
             out = post
-                .call1("getWords", (input, separator))
+                .call1("postprocess", (input, separator))
                 .unwrap()
                 .extract()
                 .unwrap();
@@ -297,7 +306,7 @@ def getWords(text, sep):
                     None
                 }
             });
-        let status_line = match (
+        let mut status_line = match (
             // hide empty entries
             self.line_settings.hide_empty,
             // don't show duplicates
@@ -318,13 +327,20 @@ def getWords(text, sep):
                 .join(&self.line_settings.separator),
             (false, true) => element_iter.unique().join(&self.line_settings.separator),
         };
-        Ok(StatusLineFormatter::postprocess(
-            &self
-                .line_transformations
-                .iter()
-                .fold(status_line, |sl, t| t.transform(sl)),
-            &self.line_settings.separator,
-        )
-        .join(&self.line_settings.separator))
+        // apply the line_transformations to the status line
+        status_line = self
+            .line_transformations
+            .iter()
+            .fold(status_line, |sl, t| t.transform(sl));
+        // postprocess the status line using a python function defined in the config file (if it exists)
+        Ok(if let Some(c) = &self.line_settings.py_code {
+            // postprocess gives Vec<String>, so we have to join again
+            // (we could/should? do this in python, too, we have the separator there after all)
+            // TODO why do I need the prefix here?
+            StatusLineFormatter::postprocess(c, &status_line, &self.line_settings.separator)
+                .join(&self.line_settings.separator)
+        } else {
+            status_line
+        })
     }
 }

@@ -16,6 +16,13 @@ delay = 90
 #Should we hide empty results (default: true)?
 hide_empty = false
 
+py_code= '''
+def postprocess(text, sep):
+ return ''.join((c if c.isalnum() else ' ') for c in text).split()
+ #return text.split(sep)
+'''
+
+
 # Regular expression(s) to apply to the whole line, after all the individual metadata has been processed
 # and joined using the separator.
 line_replacements = [
