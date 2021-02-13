@@ -7,33 +7,90 @@ font_size = 32
 delay = 90
 
 # Parameters to tune the information line below the image.
-# The following are probably only useful when post-processing using the line_replace regex(es).
+# The following are probably only useful when post-processing using the python snippet
+# or the line_replace regex(es).
 
 # What to insert between the metadata, default: insert ", ".
 # separator = "|"
+
+# when there's python code, these will be used only for the input
+# The output will be unconditionally cleaned of empties and uniquified.
+
 # Should we show duplicate strings only once (default: true)?
-#uniquify = false
+uniquify = false
 #Should we hide empty results (default: true)?
-#hide_empty = false
+hide_empty = false
 
 py_code= '''
-def postprocess(text, sep):
- #return ''.join((c if c.isalnum() else ' ') for c in text).split()
-abc
- return text.split(sep)
-'''
+def pp_s_korea(items,i):
+ delx = []
+ if items[items.index(i) - 1] != "Seoul":
+  delx.append(items.index(i) -1)
+ else:
+  delx.append(items.index(i) -2)
 
+ delx.append(items.index(i) -3)
+
+ for x in delx:
+  del items[x]
+
+ return items
+
+def pp_morocco(items,i):
+ delx = []
+ delx.append(items.index(i) -1)
+
+ for x in delx:
+  del items[x]
+
+ return items
+def pp_mark(items,i):
+ delx = []
+ mi = items.index(i)
+ items[mi] = items[mi -2] + ' ' + ''.join(['(', i, ')'])
+ delx.append(mi -1)
+ delx.append(mi -2)
+
+ for x in delx:
+     del items[x]
+
+ return items
+
+def postprocess(text, sep):
+ outitems = []
+ items = text.split(sep)
+ print(items)
+ for i in items:
+  if i == "Südkorea":
+      outitems = pp_s_korea(items,i)
+
+ for i in items:
+  if i == "Mark":
+      outitems = pp_mark(items,i)
+
+ for i in items:
+  if i == "Morocco":
+      outitems = pp_morocco(items,i)
+
+ if not outitems:
+  print("Status line unchanged.")
+  return items
+ else:
+  print("Status line changed to:")
+  print(outitems)
+  return outitems
+'''
 
 # Regular expression(s) to apply to the whole line, after all the individual metadata has been processed
 # and joined using the separator.
 line_replacements = [
-    {regex = '(?P<text>^.*), (?P<subloc>.*), (?P<loc>.*), (?P<province>Mark), (?P<rest>.*$)', replace = '$text, $subloc ($province), $rest'},
-    {regex = '(?P<text>^.*), (?P<subloc>.*), (?P<loc>.*), (?P<province>.*), (?P<country>Südkorea), (?P<rest>.*$)', replace = '$text, $loc, $province, $country, $rest'},
-    {regex = '(?P<text>^.*), (?P<sublocation>.*), (?P<location>.*), (?P<province>.*), (?P<country>Morocco), (?P<rest>.*$)',replace = '$text, $sublocation, $location, $country, $rest'},
+#    {regex = '(?P<text>^.*), (?P<subloc>.*), (?P<loc>.*), (?P<province>Mark), (?P<rest>.*$)', replace = '$text, $subloc ($province), $rest'},
+#    {regex = '(?P<text>^.*), (?P<subloc>.*), (?P<loc>.*), (?P<province>.*), (?P<country>Südkorea), (?P<rest>.*$)', replace = '$text, $loc, $province, $country, $rest'},
+#    {regex = '(?P<text>^.*), (?P<sublocation>.*), (?P<location>.*), (?P<province>.*), (?P<country>Morocco), (?P<rest>.*$)',replace = '$text, $sublocation, $location, $country, $rest'},
     #zap empty commas from the separator
-    {regex = '^, ', replace = ','},
+#    {regex = '^, ', replace = ','},
     #{regex = '\W,+', replace = ''},
-    {regex = '^[ ,]', replace = ''},
+#    {regex = '^[ ,]', replace = ''},
 ]
 
 # status line metadata (in this order) as provided by the exiv2 library

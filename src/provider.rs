@@ -194,7 +194,9 @@ impl StatusLineElement {
             .tags
             .iter()
             // ...check if data present...
-            .filter(|f| metadata.has_tag(f))
+            //.inspect(|x| println!("about to filter: {}", x))
+            //.filter(|f| metadata.has_tag(f))
+            //.inspect(|x| println!("after filter: {}", x))
             // ...get tag as string...
             .map(|f| metadata.get_tag_interpreted_string(f).ok())
             // ...if it is s/th,...
@@ -256,15 +258,14 @@ impl StatusLineFormatter {
     /// the config file and changes take effect when the program is restarted.
     /// The python code gets a tuple of (string_to_process, item_separator) and is currently
     /// expected to return a vector of strings.
-    /// TODO: error handling
+    /// TODO: error handling does not work, still have to unwrap
     pub fn postprocess(
         code: &String,
         input: &String,
         separator: &String,
     ) -> RahmenResult<Vec<String>> {
-        //let mut out = vec![];
         Ok(Python::with_gil(|py| -> PyResult<Vec<String>> {
-            let post = PyModule::from_code(py, code, "post.py", "post")?;
+            let post = PyModule::from_code(py, code, "post.py", "post").unwrap();
             post.call1("postprocess", (input, separator))?.extract()
         })?)
     }
@@ -290,9 +291,9 @@ impl StatusLineFormatter {
                 if let Some(v) = element.process(&metadata) {
                     Some(v)
                 } else if self.line_settings.hide_empty {
-                    Some("".to_string())
-                } else {
                     None
+                } else {
+                    Some("".to_string())
                 }
             });
         let mut status_line = match (
@@ -323,10 +324,13 @@ impl StatusLineFormatter {
             .fold(status_line, |sl, t| t.transform(sl));
         // postprocess the status line using a python function defined in the config file (if it exists)
         Ok(if let Some(c) = &self.line_settings.py_code {
-            // postprocess gives Vec<String>, so we have to join again
-            // (we could/should? do this in python, too, we have the separator there after all)
+            // postprocess gives Vec<String>, so we have to join again, but can process before
             // TODO why do I need the prefix here?
             StatusLineFormatter::postprocess(c, &status_line, &self.line_settings.separator)?
+                .iter()
+                // finally, remove duplicates and empties unconditionally
+                .filter(|x| !x.is_empty())
+                .unique()
                 .join(&self.line_settings.separator)
         } else {
             status_line
