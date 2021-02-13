@@ -18,6 +18,8 @@ pub enum RahmenError {
     ImageError(Arc<image::error::ImageError>),
     /// Parsing a float failed
     ParseFloatError(ParseFloatError),
+    /// Errors form the Python interpreter
+    PythonError(pyo3::prelude::PyErr),
     /// An error originating from regex processing
     RegexError(regex::Error),
     /// Pseudo-error to indicate a retry condition
@@ -39,6 +41,7 @@ impl fmt::Display for RahmenError {
             RahmenError::IoError(err) => err.fmt(f),
             RahmenError::ImageError(err) => err.fmt(f),
             RahmenError::ParseFloatError(err) => err.fmt(f),
+            RahmenError::PythonError(err) => err.fmt(f),
             RahmenError::RegexError(err) => err.fmt(f),
             RahmenError::Retry => write!(f, "Retry"),
             RahmenError::Rexiv2Error(err) => err.fmt(f),
@@ -55,6 +58,7 @@ impl Error for RahmenError {
             RahmenError::IoError(err) => err.source(),
             RahmenError::ImageError(err) => err.source(),
             RahmenError::ParseFloatError(err) => err.source(),
+            RahmenError::PythonError(err) => err.source(),
             RahmenError::RegexError(err) => err.source(),
             RahmenError::Retry => None,
             RahmenError::Rexiv2Error(err) => err.source(),
@@ -84,6 +88,12 @@ impl From<image::error::ImageError> for RahmenError {
 impl From<ParseFloatError> for RahmenError {
     fn from(err: ParseFloatError) -> Self {
         RahmenError::ParseFloatError(err)
+    }
+}
+
+impl From<pyo3::prelude::PyErr> for RahmenError {
+    fn from(err: pyo3::prelude::PyErr) -> Self {
+        RahmenError::PythonError(err)
     }
 }
 

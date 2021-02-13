@@ -14,12 +14,13 @@ delay = 90
 # Should we show duplicate strings only once (default: true)?
 #uniquify = false
 #Should we hide empty results (default: true)?
-hide_empty = false
+#hide_empty = false
 
 py_code= '''
 def postprocess(text, sep):
- return ''.join((c if c.isalnum() else ' ') for c in text).split()
- #return text.split(sep)
+ #return ''.join((c if c.isalnum() else ' ') for c in text).split()
+abc
+ return text.split(sep)
 '''
 
 

@@ -9,7 +9,8 @@ use image::{DynamicImage, Pixel};
 use itertools::Itertools;
 use pyo3::{
     prelude::*,
-    types::{IntoPyDict, PyModule},
+    //    types::{IntoPyDict, PyModule},
+    types::PyModule,
 };
 use regex::Regex;
 use rexiv2::Metadata;
@@ -256,28 +257,16 @@ impl StatusLineFormatter {
     /// The python code gets a tuple of (string_to_process, item_separator) and is currently
     /// expected to return a vector of strings.
     /// TODO: error handling
-    pub fn postprocess(code: &String, input: &String, separator: &String) -> Vec<String> {
-        let mut out = vec![];
-        Python::with_gil(|py| {
-            let post = PyModule::from_code(
-                py,
-                /*
-                                r#"
-                def postprocess(text, sep):
-                 #return ''.join((c if c.isalnum() else ' ') for c in text).split()
-                 return text.split(sep)
-                                "#,
-                                */
-                code, "post.py", "post",
-            )
-            .unwrap();
-            out = post
-                .call1("postprocess", (input, separator))
-                .unwrap()
-                .extract()
-                .unwrap();
-        });
-        out
+    pub fn postprocess(
+        code: &String,
+        input: &String,
+        separator: &String,
+    ) -> RahmenResult<Vec<String>> {
+        //let mut out = vec![];
+        Ok(Python::with_gil(|py| -> PyResult<Vec<String>> {
+            let post = PyModule::from_code(py, code, "post.py", "post")?;
+            post.call1("postprocess", (input, separator))?.extract()
+        })?)
     }
 
     /// Format the meta data from the given path (called as an adaptor to the status line formatter)
@@ -337,7 +326,7 @@ impl StatusLineFormatter {
             // postprocess gives Vec<String>, so we have to join again
             // (we could/should? do this in python, too, we have the separator there after all)
             // TODO why do I need the prefix here?
-            StatusLineFormatter::postprocess(c, &status_line, &self.line_settings.separator)
+            StatusLineFormatter::postprocess(c, &status_line, &self.line_settings.separator)?
                 .join(&self.line_settings.separator)
         } else {
             status_line
