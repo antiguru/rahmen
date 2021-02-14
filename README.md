@@ -53,7 +53,7 @@ If you add a regular expression and a replacement to the ``line_replacements`` i
 it will be applied to the complete line that is the result of the steps shown above. Multiple 
 pairs of regex/replace will be apllied in the order given.
 
-For exmaple, this is useful when you want to globally change or remove something regardless
+For example, this is useful when you want to globally change or remove something regardless
 in which tag it appears (because it can appear in several tags, or you don't remember the exact tag, ...)
 
 #### Processing using Python code
