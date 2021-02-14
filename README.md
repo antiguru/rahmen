@@ -5,28 +5,75 @@ Rah·men [[ˈʁaːmən]](https://de.wiktionary.org/wiki/Rahmen) German: frame
 Rahmen is a lightweight tool to present a slideshow of one or more JPEG images while consuming little resources. It takes a list of files or
 a pattern, and periodically shows the next image. It's work in progress, but the code found here should work.
 
-If you'd prefer a random image order, use the `shuf` command on a file list.
-
 Below the image, some information gathered from the image's metadata will be shown.
 This feature has to be configured in the `rahmen.toml` configuration file. There, you can enter
 one ore more metadata tags name known to the [exiv2](https://exiv2.org/metadata.html) library
 to be displayed in the information line.
 
-Also, you can enter tuples of [regular expressions and replacements](https://docs.rs/regex/) that will be applied to the metadata.
-If you set the capitalize option to `true` then the metadata content will be transformed to Title Case
-before the regular expression(s) (if any) will be applied.
-
-See the example configuration file `rahmen.toml` for some examples.
-
-If the data is not found, per default, nothing is displayed. If the same metadata value is encountered more than once (e.g., when
-City and ProvinceState are identical), it will (per default) be displayed only once to save space. This happens after the data gets
-processed further (e.g. capitalized or transformed by regular expressions).
-
-All the information items will be displayed on one line, with `", "` as (default) separator. If this line is too long for the screen, some text will overflow and
+All the information items will be displayed on one line, with `", "` as (default, but read on)
+separator. If this line is too long for the screen, some text will overflow and
 not be shown at the end of the line. Use a wider screen or a narrower font to reduce the probability that this will
-happen.
+happen. The font size is configurable using the `--font_size` argument or the configuration file.
 
-The font size is configurable using the `--font_size` argument or the configuration file.
+
+Because the data derived from the image's metadata tags is often difficult to read, ``rahmen``
+offers a wide range of tools to process the raw metadata.
+
+###Basic processing
+####Case conversion
+As first step of the metadata processing chain
+it is possible to convert the case. See below, where this setting
+is discussed in the context of the configuration file.
+
+####Regular expressions for individual metadata
+
+For each metadata entry, it's further possible to define pairs of
+[regular expressions and replacements](https://docs.rs/regex/) that will be applied 
+to the metadata for each individual tag. Multiple regular expression and replacements will be
+applied in the given order.
+
+####Controlling output
+
+After this, processing continues. Normally, empty results for metadata tags will be
+dropped, and multiple occurences of the same data will be reduced to one.
+As this may be undesirable if the data should be further processed, it's possible to change
+this behaviour using the ``uniquify`` and ``hide_empty`` entries in the config.file.
+
+After this processing step, the individual metadata items will be concatenated to from the line
+to appear below the image using a separator, the default being ``','``. For special processing,
+this can be changed using the ``separator`` entry in the config file.
+
+After this, the basic processing is finished, and the information line could be shown below the image.
+
+###Advanced processing
+
+####Regular Expressions for the whole line
+
+If you add a regular expression and a replacement to the ``line_replacements`` in the configuration file,
+it will be applied to the complete line that is the result of the steps shown above. Multiple 
+pairs of regex/replace will be apllied in the order given.
+
+####Processing using Python code
+
+As practice has shown the method of applying regular expressions to the whole line to be unwieldy
+and awkward, a more flexible alternative is to process the line using a programming language.
+In the configuration file it is possible to define Python code using the ``py_code`` entry.
+Be sure to enclose the code in three apostrophes, it has to be handed over unchanged.
+
+The main function of the Python code has to be named ``postprocess``. It gets the line string and 
+the separator string as positional arguments (in the order given here), and it is required to return
+a list of strings, representing the processed metadata items.
+
+Other than that, it is possible to flexibly process the incoming string and build the output accordingly.
+We have used a positional approach in our processing, which identifies a certain match in the
+metadata items list and then manipulates items at a postion relative to this match
+(see the configuration file example we have published).
+
+After the items list is returned from the Python code, once more, and this time 
+unconditionally, empties will be dropped, multiples uniquified, and the final output line
+will be concatenated from the items using the separator.
+
+###Resource consumption
 
 Rahmen is designed to run on low-power devices, such as the Raspberry Pi 1 (in fact it was specifically created to 
 build a digital picture frame out of an old monitor and an old Raspberry Pi 1 due to the lack of 
@@ -56,7 +103,12 @@ rahmen [OPTIONS] <input>
 
 ARGS:
 <input>
+```
+The input can either be a filename, a file pattern (`IMGP4*.jpg`), or a file containig a list of file names.
+If you'd like to have a random image order, use the `shuf` command to create a file list
+(see the provided shell script for an example).
 
+```shell
 FLAGS:
 -h, --help       Prints help information
 -V, --version    Prints version information
@@ -150,6 +202,9 @@ entry, and optionally, one
 `replace = [{ regex = 'regex1', replace = 'repl1' }, { regex = '...', replace = '...' }, ... ]` 
 
 entry, where one or more regular expressions and the replacements for the part they match could be supplied.
+
+[The regular expressions and replacements are documented here.](https://docs.rs/regex/)
+
 The regular expression operations will be applied one after the other in the given order.
 For long expressions, or if you wish to comment them, this could also be written like
 ```toml
@@ -166,7 +221,7 @@ This doesn't mean that all these are actually present in your image file. Use [e
 to show you the metadata in your file and see what is available.
 
 Because some of the tags we used were in ALL-CAPS which doesn't look nice, we offer case conversions that you can apply
-to the data before they are processed by the regular expressions described above. The order in the configuration file
+to the data _before_ they are processed by the regular expressions described above. The order in the configuration file
 doesn't matter here. The [available case strings can be found here.](https://github.com/rutrum/convert-case#cases) 
 See the following example. The previous method of setting the `capitalize` variable is also still available.
 ```toml
@@ -183,7 +238,7 @@ uniquify = false
 hide_empty = false
 ```
 That way it's possible to set a custom separator, and to display multiple identical and/or empty tags, too
-(the defaults are `", "` for the separator and `false` for both other values.)
+(the defaults are `", "` for the separator and `true` for both other values.)
 
 Then, you can apply regular expressions to the whole line, in the same way described above for the
 individual tags. But you'll have to take care of removing empty entries (if not set to hide)
@@ -199,11 +254,39 @@ line_replacements = [
     {regex = '^[ ,]', replace = ''},
 ]
 ```
+As this method still proved to be awkward and unwieldy, we introduced a way to use
+Python code that takes the metadata tags, after they have
+been processed using all the individual and per-line regex definitions 
+and have been joined by the separator,
+and processes them accordingly.
 
-The human-readable location tags in the enclosed `rahmen.toml` example file are based on the information
+It is currently required that this will return
+a list of items (strings).
+
+The output will be unconditionally cleaned of empties and uniquified (so you should probably
+set 'uniquify' and 'hide_empty' to false to have consistency in your input).
+
+There must be at least one function and this function has to be named ``postprocess``.
+It gets two positional arguments, the first is the text string to process, the second is
+the separator string. The return has to be a list of strings.
+So the simplest code, which takes the input, splits it using the
+separator and returns the list, would be
+
+```python
+py_code= '''
+def postprocess(text,sep):
+    return text.split(sep)
+'''
+```
+Be aware that this might seem to do effectively nothing, because the returned list will again be joined
+using the separator. If the input should nevertheless differ from the output, that will be the result of the
+unconditional deduplication and removal of empty items that the returned list undergoes
+before it is joined to the final output line.
+
+#####How to get the tags
+
+The human-readable location tags we use in the enclosed `rahmen.toml` example file are based on the information
 you can tell Adobe Lightroom to add when it finds a GPS location in the image metadata.
-
-[The regular expressions and replacements are documented here.](https://docs.rs/regex/) 
 
 ##Bugs, Issues, Desiderata
 

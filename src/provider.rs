@@ -259,11 +259,7 @@ impl StatusLineFormatter {
     /// The python code gets a tuple of (string_to_process, item_separator) and is currently
     /// expected to return a vector of strings.
     /// TODO: error handling does not work, still have to unwrap
-    pub fn postprocess(
-        code: &String,
-        input: &String,
-        separator: &String,
-    ) -> RahmenResult<Vec<String>> {
+    pub fn postprocess(code: &str, input: &str, separator: &str) -> RahmenResult<Vec<String>> {
         Ok(Python::with_gil(|py| -> PyResult<Vec<String>> {
             let post = PyModule::from_code(py, code, "post.py", "post").unwrap();
             post.call1("postprocess", (input, separator))?.extract()

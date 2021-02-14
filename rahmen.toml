@@ -11,79 +11,89 @@ delay = 90
 # or the line_replace regex(es).
 
 # What to insert between the metadata, default: insert ", ".
-# separator = "|"
+    # separator = "|"
 
-# when there's python code, these will be used only for the input
-# The output will be unconditionally cleaned of empties and uniquified.
+# when there's python code, these will be used only for the input (and should be set false, see below)
+    # Should we show duplicate strings only once (default: true)?
+    uniquify = false
+    #Should we hide empty results (default: true)?
+    hide_empty = false
 
-# Should we show duplicate strings only once (default: true)?
-uniquify = false
-#Should we hide empty results (default: true)?
-hide_empty = false
+# python code that takes the metadata tags, after they have
+# been processed using the regex definitions and been joined by the separator,
+# and processes them accordingly. It is currently required that this will return
+# a list of items (strings).
+#
+# The output will be unconditionally cleaned of empties and uniquified (so you should probably
+# set 'uniquify' and 'hide_empty' to false to have consistency in your input).
+#
+# There must be at least one function and this function has to be named 'postprocess'.
+# It has two positional arguments, the first is the text string to process, the second is
+# the separator string. The return has to be a list of strings.
+# So the simplest code, which takes the input, splits it and returns the list, would be
+#
+# def postprocess(text,sep):
+#   return text.split(sep)
+#
+# Be aware that this might seem to do effectively nothing, because the returned list will be joined
+# using the separator. If the input should differ from the output, that will be the result of the
+# unconditional deduplication and removal of empty items that the returned list undergoes
+# before it is joined to the final output line.
 
 py_code= '''
+delx = []
 def pp_s_korea(items,i):
- delx = []
- if items[items.index(i) - 1] != "Seoul":
-  delx.append(items.index(i) -1)
- else:
-  delx.append(items.index(i) -2)
+    if items[items.index(i) - 1] != "Seoul":
+        delx.append(items.index(i) -1)
+    else:
+        delx.append(items.index(i) -2)
 
- delx.append(items.index(i) -3)
-
- for x in delx:
-  del items[x]
-
- return items
+    delx.append(items.index(i) -3)
+    return items
 
 def pp_morocco(items,i):
- delx = []
- delx.append(items.index(i) -1)
+    delx.append(items.index(i) -1)
+    return items
 
- for x in delx:
-  del items[x]
-
- return items
 def pp_mark(items,i):
- delx = []
- mi = items.index(i)
- items[mi] = items[mi -2] + ' ' + ''.join(['(', i, ')'])
- delx.append(mi -1)
- delx.append(mi -2)
+    mi = items.index(i)
+    if not items[mi-2]:
+        loc = items[mi-1]
+    else:
+        loc = items[mi-2]
 
- for x in delx:
-     del items[x]
-
- return items
+    items[mi] = loc + ' ' + ''.join(['(', i, ')'])
+    delx.append(mi -1)
+    delx.append(mi -2)
+    return items
 
 def postprocess(text, sep):
- outitems = []
- items = text.split(sep)
- print(items)
- for i in items:
-  if i == "Südkorea":
-      outitems = pp_s_korea(items,i)
+    outitems = []
+    items = text.split(sep)
+    print(items)
+    for i in items:
+        if i == "Südkorea":
+            outitems = pp_s_korea(items,i)
+        if i == "Mark":
+            outitems = pp_mark(items,i)
+        if i == "Marokko":
+            outitems = pp_morocco(items,i)
 
- for i in items:
-  if i == "Mark":
-      outitems = pp_mark(items,i)
-
- for i in items:
-  if i == "Morocco":
-      outitems = pp_morocco(items,i)
-
- if not outitems:
-  print("Status line unchanged.")
-  return items
- else:
-  print("Status line changed to:")
-  print(outitems)
-  return outitems
+    print(outitems)
+    if not outitems:
+        print("Status line unchanged.")
+        return items
+    else:
+        for x in delx:
+            del outitems[x]
+        print("Status line changed to:")
+        print(outitems)
+        return outitems
 '''
 
 # Regular expression(s) to apply to the whole line, after all the individual metadata has been processed
 # and joined using the separator.
-line_replacements = [
+#line_replacements = [
 #    {regex = '(?P<text>^.*), (?P<subloc>.*), (?P<loc>.*), (?P<province>Mark), (?P<rest>.*$)', replace = '$text, $subloc ($province), $rest'},
 #    {regex = '(?P<text>^.*), (?P<subloc>.*), (?P<loc>.*), (?P<province>.*), (?P<country>Südkorea), (?P<rest>.*$)', replace = '$text, $loc, $province, $country, $rest'},
 #    {regex = '(?P<text>^.*), (?P<sublocation>.*), (?P<location>.*), (?P<province>.*), (?P<country>Morocco), (?P<rest>.*$)',replace = '$text, $sublocation, $location, $country, $rest'},
@@ -91,45 +101,47 @@ line_replacements = [
 #    {regex = '^, ', replace = ','},
     #{regex = '\W,+', replace = ''},
 #    {regex = '^[ ,]', replace = ''},
-]
+#]
 
 # status line metadata (in this order) as provided by the exiv2 library
 [[status_line]]
-exif_tags = ["Iptc.Application2.ObjectName"]
+    exif_tags = ["Iptc.Application2.ObjectName"]
 
 [[status_line]]
-exif_tags = ["Iptc.Application2.SubLocation"]
+    exif_tags = ["Iptc.Application2.SubLocation"]
 
 [[status_line]]
-exif_tags = ["Iptc.Application2.City"]
+    exif_tags = ["Iptc.Application2.City"]
 
 [[status_line]]
-exif_tags = ["Iptc.Application2.ProvinceState"]
-replace = [{ regex = '(?i)Mecklenburg-Western\sPomerania', replace = 'MV' }, {regex = 'Brandenburg', replace = 'Mark'}]
+    exif_tags = ["Iptc.Application2.ProvinceState"]
+    replace = [{ regex = '(?i)Mecklenburg-Western\sPomerania', replace = 'MV' }, {regex = 'Brandenburg', replace = 'Mark'}]
 
 [[status_line]]
-exif_tags = ["Iptc.Application2.CountryName"]
-replace = [{ regex = 'South\sKorea', replace = 'Südkorea' }, { regex = '(?i)United\sStates\sOf\sAmerica', replace = 'USA' }, { regex = 'Germany', replace = ''}]
+    exif_tags = ["Iptc.Application2.CountryName"]
+    replace = [{ regex = 'South\sKorea', replace = 'Südkorea' },
+        { regex = '(?i)United\sStates\sOf\sAmerica', replace = 'USA' },
+        { regex = 'Germany', replace = ''},
+        { regex = 'Morocco', replace = 'Marokko'}]
 
 [[status_line]]
-exif_tags = ["Exif.Photo.DateTimeOriginal"]
+    exif_tags = ["Exif.Photo.DateTimeOriginal"]
 
 # convert date to German format
 [[status_line.replace]]
-regex = '(?P<y>\d{4})[-:]0*(?P<M>\d+)[-:]0*(?P<d>\d+)\s+0*(?P<h>\d+:)0*(?P<m>\d+):(?P<s>\d{2})'
-# e.g. with time:  replace = '$d.$M.$y, $h$m'
-replace = '$d.$M.$y'
+    regex = '(?P<y>\d{4})[-:]0*(?P<M>\d+)[-:]0*(?P<d>\d+)\s+0*(?P<h>\d+:)0*(?P<m>\d+):(?P<s>\d{2})'
+    # e.g. with time:  replace = '$d.$M.$y, $h$m'
+    replace = '$d.$M.$y'
 
 [[status_line]]
-exif_tags = ["Xmp.dc.creator"]
+    exif_tags = ["Xmp.dc.creator"]
+    # convert input from UPPER CASE to Title Case (there's also the more powerful case_conversion instruction)
+    #capitalize = true
 
-# convert input from UPPER CASE to Title Case (there's also the more powerful case_conversion instruction)
-#capitalize = true
+    # convert input from case to case (see https://github.com/rutrum/convert-case#cases)
+    case_conversion = {from = 'Upper', to = 'Title'}
 
-# convert input from case to case (see https://github.com/rutrum/convert-case#cases)
-case_conversion = {from = 'Upper', to = 'Title'}
-
-# remove everything after the first word, add s/th before name
-replace = [{ regex = '\s.*$', replace = '' }, { regex = '(?P<a>^.*$)', replace = 'von $a' }]
+    # remove everything after the first word, add s/th before name
+    replace = [{ regex = '\s.*$', replace = '' }, { regex = '(?P<a>^.*$)', replace = 'von $a' }]
 
 

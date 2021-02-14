@@ -1,4 +1,3 @@
-use std::convert::identity;
 use std::fs::File;
 use std::io::BufReader;
 use std::str::FromStr;
@@ -141,7 +140,7 @@ fn main() -> RahmenResult<()> {
     let settings: Settings = if let Some(path) = matches
         .value_of("config")
         .map(Into::into)
-        .or(dirs.find_config_file("rahmen.toml"))
+        .or_else(|| dirs.find_config_file("rahmen.toml"))
         .or_else(|| {
             #[cfg(unix)]
             if std::fs::metadata(SYSTEM_CONFIG_PATH).is_ok() {
@@ -164,7 +163,7 @@ fn main() -> RahmenResult<()> {
     // for the metadata separator, and for deduplication and hiding of empty tags;
     // both of these are enabled by default
     let line_settings: LineSettings = LineSettings {
-        separator: settings.separator.unwrap_or(", ".to_string()),
+        separator: settings.separator.unwrap_or_else(|| ", ".to_string()),
         uniquify: settings.uniquify.unwrap_or(true),
         hide_empty: settings.hide_empty.unwrap_or(true),
         py_code: settings.py_code,
@@ -175,12 +174,8 @@ fn main() -> RahmenResult<()> {
     // default value (see above) if no separator is given there)
     let status_line_formatter = StatusLineFormatter::new(
         settings.status_line.iter().cloned(),
-        settings
-            .line_replacements
-            .iter()
-            .flat_map(identity)
-            .cloned(),
-        line_settings.clone(),
+        settings.line_replacements.iter().flatten().cloned(),
+        line_settings,
     )?;
 
     let buffer_max_size: usize = matches

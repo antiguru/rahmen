@@ -26,8 +26,6 @@ pub enum Configuration {
     FontSize(f32),
     /// factor by which font canvas is higher than font
     FontCanvasVStretch(f32),
-    /// show time in status bar or don't
-    ShowTime(bool),
     /// Update the screen dimensions
     ScreenDimensions(u32, u32),
     /// Show a new image
