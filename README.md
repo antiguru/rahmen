@@ -19,20 +19,20 @@ happen. The font size is configurable using the `--font_size` argument or the co
 Because the data derived from the image's metadata tags is often difficult to read, ``rahmen``
 offers a wide range of tools to process the raw metadata.
 
-###Basic processing
-####Case conversion
+### Basic processing
+#### Case conversion
 As first step of the metadata processing chain
 it is possible to convert the case. See below, where this setting
 is discussed in the context of the configuration file.
 
-####Regular expressions for individual metadata
+#### Regular expressions for individual metadata
 
 For each metadata entry, it's further possible to define pairs of
 [regular expressions and replacements](https://docs.rs/regex/) that will be applied 
 to the metadata for each individual tag. Multiple regular expression and replacements will be
 applied in the given order.
 
-####Controlling output
+#### Controlling output
 
 After this, processing continues. Normally, empty results for metadata tags will be
 dropped, and multiple occurences of the same data will be reduced to one.
@@ -45,18 +45,21 @@ this can be changed using the ``separator`` entry in the config file.
 
 After this, the basic processing is finished, and the information line could be shown below the image.
 
-###Advanced processing
+### Advanced processing
 
-####Regular Expressions for the whole line
+#### Regular Expressions for the whole line
 
 If you add a regular expression and a replacement to the ``line_replacements`` in the configuration file,
 it will be applied to the complete line that is the result of the steps shown above. Multiple 
 pairs of regex/replace will be apllied in the order given.
 
-####Processing using Python code
+For exmaple, this is useful when you want to globally change or remove something regardless
+in which tag it appears (because it can appear in several tags, or you don't remember the exact tag, ...)
 
-As practice has shown the method of applying regular expressions to the whole line to be unwieldy
-and awkward, a more flexible alternative is to process the line using a programming language.
+#### Processing using Python code
+
+As practice has shown the method of applying regular expressions to the whole line to be quickly resulting
+in unwieldy and awkward code, a more flexible alternative is to process the line using a programming language.
 In the configuration file it is possible to define Python code using the ``py_code`` entry.
 Be sure to enclose the code in three apostrophes, it has to be handed over unchanged.
 
@@ -66,14 +69,14 @@ a list of strings, representing the processed metadata items.
 
 Other than that, it is possible to flexibly process the incoming string and build the output accordingly.
 We have used a positional approach in our processing, which identifies a certain match in the
-metadata items list and then manipulates items at a postion relative to this match
+metadata items list and then manipulates items at a position relative to this match
 (see the configuration file example we have published).
 
 After the items list is returned from the Python code, once more, and this time 
 unconditionally, empties will be dropped, multiples uniquified, and the final output line
 will be concatenated from the items using the separator.
 
-###Resource consumption
+### Resource consumption
 
 Rahmen is designed to run on low-power devices, such as the Raspberry Pi 1 (in fact it was specifically created to 
 build a digital picture frame out of an old monitor and an old Raspberry Pi 1 due to the lack of 

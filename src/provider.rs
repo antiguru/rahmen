@@ -310,7 +310,9 @@ impl StatusLineFormatter {
         Ok(if let Some(c) = &self.line_settings.py_code {
             // postprocess gives Vec<String>, so we have to join again, but can process before
             // TODO why do I need the prefix here?
-            StatusLineFormatter::postprocess(c, &status_line, &self.line_settings.separator)?
+            StatusLineFormatter::postprocess(c, &status_line, &self.line_settings.separator)
+                // TODO why does using a ? here gobble the error and keeps running?
+                .unwrap()
                 .iter()
                 // finally, remove duplicates and empties unconditionally
                 .filter(|x| !x.is_empty())
