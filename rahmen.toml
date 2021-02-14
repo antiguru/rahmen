@@ -43,12 +43,12 @@ delay = 90
 py_code= '''
 delx = []
 def pp_s_korea(items,i):
-    if items[items.index(i) - 1] != "Seoul":
-        delx.append(items.index(i) -1)
-    else:
+    if items[items.index(i) - 1] in ["Seoul","Busan"]:
         delx.append(items.index(i) -2)
-
-    delx.append(items.index(i) -3)
+    else:
+        delx.append(items.index(i) -1)
+    if items[items.index(i) - 1] != "Jeju":
+        delx.append(items.index(i) -3)
     return items
 
 def pp_morocco(items,i):
@@ -59,12 +59,12 @@ def pp_mark(items,i):
     mi = items.index(i)
     if not items[mi-2]:
         loc = items[mi-1]
+        delx.append(mi -1)
     else:
         loc = items[mi-2]
+        delx.append(mi -2)
 
     items[mi] = loc + ' ' + ''.join(['(', i, ')'])
-    delx.append(mi -1)
-    delx.append(mi -2)
     return items
 
 def postprocess(text, sep):
@@ -111,10 +111,11 @@ def postprocess(text, sep):
 
 [[status_line]]
     exif_tags = ["Iptc.Application2.City"]
+    replace =[{regex= ' City', replace = ''}, {regex = '-si', replace = ''}]
 
 [[status_line]]
     exif_tags = ["Iptc.Application2.ProvinceState"]
-    replace = [{ regex = '(?i)Mecklenburg-Western\sPomerania', replace = 'MV' }, {regex = 'Brandenburg', replace = 'Mark'}]
+    replace = [{ regex = '(?i)Mecklenburg-Western\sPomerania', replace = 'MV' }, {regex = 'Brandenburg', replace = 'Mark'},{ regex = '-do', replace = ''}]
 
 [[status_line]]
     exif_tags = ["Iptc.Application2.CountryName"]

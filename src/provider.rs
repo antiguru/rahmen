@@ -7,11 +7,7 @@ use std::path::Path;
 use convert_case::{Case, Casing};
 use image::{DynamicImage, Pixel};
 use itertools::Itertools;
-use pyo3::{
-    prelude::*,
-    //    types::{IntoPyDict, PyModule},
-    types::PyModule,
-};
+use pyo3::{prelude::*, types::PyModule};
 use regex::Regex;
 use rexiv2::Metadata;
 
@@ -193,10 +189,6 @@ impl StatusLineElement {
         if let Some(mut value) = self
             .tags
             .iter()
-            // ...check if data present...
-            //.inspect(|x| println!("about to filter: {}", x))
-            //.filter(|f| metadata.has_tag(f))
-            //.inspect(|x| println!("after filter: {}", x))
             // ...get tag as string...
             .map(|f| metadata.get_tag_interpreted_string(f).ok())
             // ...if it is s/th,...
@@ -267,11 +259,7 @@ impl StatusLineFormatter {
     }
 
     /// Format the meta data from the given path (called as an adaptor to the status line formatter)
-    pub fn format<P: AsRef<std::ffi::OsStr>>(
-        &self,
-        path: P,
-        //line_settings: &LineSettings,
-    ) -> RahmenResult<String> {
+    pub fn format<P: AsRef<std::ffi::OsStr>>(&self, path: P) -> RahmenResult<String> {
         let metadata = Metadata::new_from_path(path)?;
         // iterate over the tag vector we built in the constructor, but stop when we have an
         // iterator of strings
