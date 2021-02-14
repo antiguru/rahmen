@@ -79,7 +79,6 @@ def postprocess(text, sep):
         if i == "Marokko":
             outitems = pp_morocco(items,i)
 
-    print(outitems)
     if not outitems:
         print("Status line unchanged.")
         return items
