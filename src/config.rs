@@ -51,5 +51,7 @@ pub struct Settings {
     /// should we hide empty fields? (optional, default: true)
     pub hide_empty: Option<bool>,
     /// python code to postprocess the status line
-    pub py_code: Option<String>,
+    pub py_postprocess: Option<String>,
+    /// Python module paths
+    pub py_path: Option<Vec<String>>,
 }
