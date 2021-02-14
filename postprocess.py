@@ -21,58 +21,65 @@
 
 delx = []
 
-
-def pp_s_korea(items, i):
-    if items[items.index(i) - 1] in ["Seoul", "Busan"]:
+def pp_s_korea(items,i):
+    if items[items.index(i) - 1] in [ "Seoul", "Busan" ]:
         delx.append(items.index(i) - 2)
     else:
-        delx.append(items.index(i) - 1)
-    if items[items.index(i) - 1] != "Jeju":
-        delx.append(items.index(i) - 3)
+        delx.append(items.index(i) -1)
+    if items[items.index(i) -1] != "Jeju":
+        delx.append(items.index(i) -3)
     return items
 
-
-def pp_morocco(items, i):
-    delx.append(items.index(i) - 1)
+def pp_morocco(items,i):
+    delx.append(items.index(i) -1)
     return items
 
-
-def pp_mark(items, i):
+def pp_ch(items,i):
     mi = items.index(i)
-    if not items[mi - 2]:
-        loc = items[mi - 1]
-        delx.append(mi - 1)
-    else:
-        loc = items[mi - 2]
-        delx.append(mi - 2)
+    if items[mi-1] == "Kanton Zürich":
+        items[mi-1] = items[mi-2] + ' ZH'
+        delx.append(mi-2)
+    return items
 
+def pp_mark(items,i):
+    mi = items.index(i)
+    loc = items[mi-1]
+    delx.append(mi-1)
     items[mi] = loc + ' ' + ''.join(['(', i, ')'])
     return items
 
 
 def postprocess(text, sep):
     outitems = []
-    delx = []
     items = text.split(sep)
     print(items)
     for i in items:
         if i == "Südkorea":
-            outitems = pp_s_korea(items, i)
+            outitems = pp_s_korea(items,i)
         if i == "Mark":
-            outitems = pp_mark(items, i)
+            outitems = pp_mark(items,i)
         if i == "Marokko":
-            outitems = pp_morocco(items, i)
+            outitems = pp_morocco(items,i)
+        if i == "Schweiz":
+            outitems = pp_ch(items,i)
+    for x in delx:
+        if x >= 0:
+            del items[x]
+    delx.clear()
+
+
+
+
+
+
 
     if not outitems:
         print("Status line unchanged.")
         return items
     else:
-        for x in delx:
-            del outitems[x]
         print("Status line changed to:")
         print(outitems)
         return outitems
-
 
 def export():
     return postprocess
