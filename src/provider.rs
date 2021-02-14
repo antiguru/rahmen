@@ -7,7 +7,7 @@ use std::path::Path;
 use convert_case::{Case, Casing};
 use image::{DynamicImage, Pixel};
 use itertools::Itertools;
-use pyo3::{prelude::*, types::PyModule};
+use pyo3::prelude::*;
 use regex::Regex;
 use rexiv2::Metadata;
 
@@ -84,8 +84,6 @@ pub struct LineSettings {
     pub uniquify: bool,
     /// should we hide empty metadata?
     pub hide_empty: bool,
-    /// python code for postprocessing the status line
-    pub py_code: Option<String>,
 }
 
 /// The following are the ops concerning the status line (text being displayed below the image)
@@ -216,6 +214,7 @@ pub struct StatusLineFormatter {
     line_transformations: Vec<StatusLineTransformation>,
     // the separator to use for the join op
     line_settings: LineSettings,
+    py_postprocess_fn: Option<Py<PyAny>>,
 }
 
 impl StatusLineFormatter {
@@ -224,6 +223,7 @@ impl StatusLineFormatter {
         // we get the arguments when we're called
         statusline_elements_iter: I,
         line_transformations_iter: J,
+        py_postprocess: Option<String>,
         line_settings: LineSettings,
     ) -> RahmenResult<Self> {
         // read the metadata config entries and store them to the elements vector
@@ -237,11 +237,21 @@ impl StatusLineFormatter {
             line_transformations.push(line_transform.try_into()?);
         }
 
+        let py_postprocess_fn = if let Some(postprocess_path) = py_postprocess {
+            Some(Python::with_gil(|py| {
+                let module = py.import(postprocess_path.as_ref())?;
+                module.call0("export").map(|obj| obj.into_py(py))
+            })?)
+        } else {
+            None
+        };
+
         // return the vector(s)
         Ok(Self {
             elements,
             line_transformations,
             line_settings,
+            py_postprocess_fn,
         })
     }
     /// The postprocess function calls the python code given in the py_code entry in the config file;
@@ -251,10 +261,13 @@ impl StatusLineFormatter {
     /// The python code gets a tuple of (string_to_process, item_separator) and is currently
     /// expected to return a vector of strings.
     /// TODO: error handling does not work, still have to unwrap
-    pub fn postprocess(code: &str, input: &str, separator: &str) -> RahmenResult<Vec<String>> {
+    pub fn postprocess(
+        code: &Py<PyAny>,
+        input: &str,
+        separator: &str,
+    ) -> RahmenResult<Vec<String>> {
         Ok(Python::with_gil(|py| -> PyResult<Vec<String>> {
-            let post = PyModule::from_code(py, code, "post.py", "post").unwrap();
-            post.call1("postprocess", (input, separator))?.extract()
+            code.call1(py, (input, separator))?.extract(py)
         })?)
     }
 
@@ -307,7 +320,7 @@ impl StatusLineFormatter {
             .iter()
             .fold(status_line, |sl, t| t.transform(sl));
         // postprocess the status line using a python function defined in the config file (if it exists)
-        Ok(if let Some(c) = &self.line_settings.py_code {
+        Ok(if let Some(c) = &self.py_postprocess_fn {
             // postprocess gives Vec<String>, so we have to join again, but can process before
             // TODO why do I need the prefix here?
             StatusLineFormatter::postprocess(c, &status_line, &self.line_settings.separator)

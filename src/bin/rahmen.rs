@@ -15,6 +15,8 @@ use timely::dataflow::{InputHandle, ProbeHandle, Scope};
 use timely::order::Product;
 use timely::worker::Config;
 
+use pyo3::{types::PyList, PyTryInto, Python};
+
 use rahmen::config::Settings;
 use rahmen::dataflow::{ComposeImage, Configuration, FormatText, ResizeImage};
 use rahmen::display::Display;
@@ -162,6 +164,21 @@ fn main() -> RahmenResult<()> {
         Default::default()
     };
 
+    if let Some(python_paths) = settings.py_path {
+        Python::with_gil(|py| {
+            let syspath: &PyList = py
+                .import("sys")
+                .unwrap()
+                .get("path")
+                .unwrap()
+                .try_into()
+                .unwrap();
+            for path in &python_paths {
+                syspath.insert(0, path).unwrap();
+            }
+        });
+    }
+
     // if no entries are present in the config file, we set default values
     // for the metadata separator, and for deduplication and hiding of empty tags;
     // both of these are enabled by default
@@ -169,7 +186,6 @@ fn main() -> RahmenResult<()> {
         separator: settings.separator.unwrap_or_else(|| ", ".to_string()),
         uniquify: settings.uniquify.unwrap_or(true),
         hide_empty: settings.hide_empty.unwrap_or(true),
-        py_code: settings.py_code,
     };
     // build the status line, using the settings from the config file (first for the individual
     // metadata tags, second for the regex(es) to process the whole status line),
@@ -178,6 +194,7 @@ fn main() -> RahmenResult<()> {
     let status_line_formatter = StatusLineFormatter::new(
         settings.status_line.iter().cloned(),
         settings.line_replacements.iter().flatten().cloned(),
+        settings.py_postprocess,
         line_settings,
     )?;
 
