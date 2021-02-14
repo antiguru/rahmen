@@ -26,8 +26,6 @@ pub enum Configuration {
     FontSize(f32),
     /// factor by which font canvas is higher than font
     FontCanvasVStretch(f32),
-    /// show time in status bar or don't
-    ShowTime(bool),
     /// Update the screen dimensions
     ScreenDimensions(u32, u32),
     /// Show a new image
@@ -57,7 +55,6 @@ impl<S: Scope> FormatText<S> for Stream<S, String> {
         let mut current_screen_dimension = None;
         let mut current_font_size = None;
         let mut current_font_canvas_vstretch = None;
-        let mut current_show_time = None;
         let mut current_text = None;
         let mut in_buffer1 = vec![];
         let mut in_buffer2 = vec![];
@@ -95,9 +92,6 @@ impl<S: Scope> FormatText<S> for Stream<S, String> {
                                 }
                                 Configuration::FontCanvasVStretch(font_canvas_vstretch) => {
                                     current_font_canvas_vstretch = Some(font_canvas_vstretch)
-                                }
-                                Configuration::ShowTime(show_time) => {
-                                    current_show_time = Some(show_time)
                                 }
                                 Configuration::ScreenDimensions(width, height) => {
                                     current_screen_dimension = Some((width, height))

@@ -23,7 +23,7 @@ use rahmen::display_fltk::FltkDisplay;
 use rahmen::display_framebuffer::FramebufferDisplay;
 use rahmen::errors::{RahmenError, RahmenResult};
 use rahmen::font::FontRenderer;
-use rahmen::provider::{load_image_from_path, Provider, StatusLineFormatter};
+use rahmen::provider::{load_image_from_path, LineSettings, Provider, StatusLineFormatter};
 use rahmen::provider_list::ListProvider;
 
 /// dataflow control, this is used as result R part
@@ -140,7 +140,7 @@ fn main() -> RahmenResult<()> {
     let settings: Settings = if let Some(path) = matches
         .value_of("config")
         .map(Into::into)
-        .or(dirs.find_config_file("rahmen.toml"))
+        .or_else(|| dirs.find_config_file("rahmen.toml"))
         .or_else(|| {
             #[cfg(unix)]
             if std::fs::metadata(SYSTEM_CONFIG_PATH).is_ok() {
@@ -158,7 +158,25 @@ fn main() -> RahmenResult<()> {
         eprintln!("Config file not found, continuing with default settings");
         Default::default()
     };
-    let status_line_formatter = StatusLineFormatter::new(settings.status_line.iter().cloned())?;
+
+    // if no entries are present in the config file, we set default values
+    // for the metadata separator, and for deduplication and hiding of empty tags;
+    // both of these are enabled by default
+    let line_settings: LineSettings = LineSettings {
+        separator: settings.separator.unwrap_or_else(|| ", ".to_string()),
+        uniquify: settings.uniquify.unwrap_or(true),
+        hide_empty: settings.hide_empty.unwrap_or(true),
+        py_code: settings.py_code,
+    };
+    // build the status line, using the settings from the config file (first for the individual
+    // metadata tags, second for the regex(es) to process the whole status line),
+    // the metadata items being joined using the separator from the config file (or with the
+    // default value (see above) if no separator is given there)
+    let status_line_formatter = StatusLineFormatter::new(
+        settings.status_line.iter().cloned(),
+        settings.line_replacements.iter().flatten().cloned(),
+        line_settings,
+    )?;
 
     let buffer_max_size: usize = matches
         .value_of("buffer_max_size")
@@ -273,10 +291,9 @@ fn main() -> RahmenResult<()> {
     let mut dimensions = None;
 
     input_configuration.send(Configuration::FontSize(font_size_f));
-    // enlarge font canvas vertically by this factor (default given here: 1.5)
-    input_configuration.send(Configuration::FontCanvasVStretch(1.5));
+    // enlarge font canvas vertically by this factor (default given here: 1.4)
+    input_configuration.send(Configuration::FontCanvasVStretch(1.4));
     // show time in status line or don't
-    input_configuration.send(Configuration::ShowTime(true));
 
     let mut next_image_at = start_time.elapsed();
 
