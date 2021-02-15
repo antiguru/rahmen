@@ -59,11 +59,10 @@ def pp_mark(items, i, ix):
 
 
 # main filter
-def postprocess(text, sep):
+def postprocess(items: [str], sep: str) -> str:
     outitems = []
     # clear the drop list
     delx.clear()
-    items = text.split(sep)
     print(items)
     for ix, it in enumerate(items):
         if it == "Südkorea":
@@ -77,7 +76,6 @@ def postprocess(text, sep):
 
     if not outitems:
         print("Status line unchanged.")
-        return items
     else:
         # only now, we remove the dropped items
         for x in delx:
@@ -85,7 +83,9 @@ def postprocess(text, sep):
                 del outitems[x]
         print("Status line changed to:")
         print(outitems)
-        return outitems
+        items = outitems
+
+    return sep.join(filter(lambda x: len(x) > 0, items))
 
 
 def export():
