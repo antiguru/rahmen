@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 use clap::{App, Arg};
 use font_kit::loaders::freetype::Font;
+use pyo3::{types::PyList, PyTryInto, Python};
 use timely::dataflow::operators::capture::Event;
 use timely::dataflow::operators::{
     Branch, Capture, Concat, ConnectLoop, Enter, Filter, Inspect, Leave, LoopVariable, Map, Probe,
@@ -14,8 +15,6 @@ use timely::dataflow::operators::{
 use timely::dataflow::{InputHandle, ProbeHandle, Scope};
 use timely::order::Product;
 use timely::worker::Config;
-
-use pyo3::{types::PyList, PyTryInto, Python};
 
 use rahmen::config::Settings;
 use rahmen::dataflow::{ComposeImage, Configuration, FormatText, ResizeImage};
