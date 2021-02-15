@@ -20,7 +20,7 @@ offers a wide range of tools to process the raw metadata.
 
 Rahmen is not a soup.
 
-### Basic processing
+### Basic mretadata processing
 
 #### Case conversion
 
@@ -43,9 +43,6 @@ After this processing step, the individual metadata items will be concatenated t
 image using a separator, the default being ``','``. For special processing, this can be changed using the ``separator``
 entry in the config file.
 
-After this, the basic processing is finished, and the information line could be shown below the image.
-
-### Advanced processing
 
 #### Regular Expressions for the whole line
 
@@ -56,7 +53,9 @@ apllied in the order given.
 For example, this is useful when you want to globally change or remove something regardless in which tag it appears (
 because it can appear in several tags, or you don't remember the exact tag, ...)
 
-#### Processing using Python code
+After this, the basic processing is finished, and the information line could be shown below the image.
+
+### Advanced processing using Python code
 
 As practice has shown the method of applying regular expressions to the whole line to be quickly resulting in unwieldy
 and awkward code, a more flexible alternative is to process the line using a programming language. It is possible to
