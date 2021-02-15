@@ -83,9 +83,6 @@ positional approach in our processing, which identifies a certain match in the m
 items at a position relative to this match
 (see the ``postprocess.py`` example we have published).
 
-After the items list is returned from the Python code, once more, and this time unconditionally, empties will be
-dropped, multiples uniquified, and the final output line will be concatenated from the items using the separator. If you
-really want to circumvent this, just pass a list with a single string.
 
 ### Resource consumption
 
@@ -315,12 +312,6 @@ We provide an example script (``postprocess.py``) where some processing is done 
 processing, we used ``pytest``. We provide a test script (``test.py``) matching the processing rules in the example script.
 On our Debian system, invoking it with ``pytest-3 test.py`` runs the tests. It is strongly recommended to create a test
 for every processing rule you create to ensure it is properly working.
-
-##### Final processing step (only when Python code was invoked)
-
-The Python output will be unconditionally cleaned of empties and uniquified (so you should probably set 'uniquify' and '
-hide_empty' to false to have consistency in your input). To circumvent this final stage of output processing, you could
-return a list containing a single string.
 
 ##### How to get the tags
 
