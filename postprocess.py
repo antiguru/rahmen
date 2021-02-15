@@ -51,6 +51,7 @@ def pp_mark(items,i):
 
 def postprocess(text, sep):
     outitems = []
+    delx.clear()
     items = text.split(sep)
     print(items)
     for i in items:
@@ -62,21 +63,14 @@ def postprocess(text, sep):
             outitems = pp_morocco(items,i)
         if i == "Schweiz":
             outitems = pp_ch(items,i)
-    for x in delx:
-        if x >= 0:
-            del items[x]
-    delx.clear()
-
-
-
-
-
-
 
     if not outitems:
         print("Status line unchanged.")
         return items
     else:
+        for x in delx:
+            if x >= 0:
+                del outitems[x]
         print("Status line changed to:")
         print(outitems)
         return outitems
