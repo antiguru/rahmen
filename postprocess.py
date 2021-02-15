@@ -21,30 +21,32 @@
 
 delx = []
 
-def pp_s_korea(items,i):
-    if items[items.index(i) - 1] in [ "Seoul", "Busan" ]:
-        delx.append(items.index(i) - 2)
+
+def pp_s_korea(items, it, ix):
+    if items[ix - 1] in ["Seoul", "Busan"]:
+        delx.append(ix - 2)
     else:
-        delx.append(items.index(i) -1)
-    if items[items.index(i) -1] != "Jeju":
-        delx.append(items.index(i) -3)
+        delx.append(ix - 1)
+    if items[ix - 1] != "Jeju":
+        delx.append(ix - 3)
     return items
 
-def pp_morocco(items,i):
-    delx.append(items.index(i) -1)
+
+def pp_morocco(items, it, ix):
+    delx.append(ix - 1)
     return items
 
-def pp_ch(items,i):
-    mi = items.index(i)
-    if items[mi-1] == "Kanton Zürich":
-        items[mi-1] = items[mi-2] + ' ZH'
-        delx.append(mi-2)
+
+def pp_ch(items, it, mi):
+    if items[mi - 1] == "Kanton Zürich":
+        items[mi - 1] = items[mi - 2] + ' ZH'
+        delx.append(mi - 2)
     return items
 
-def pp_mark(items,i):
-    mi = items.index(i)
-    loc = items[mi-1]
-    delx.append(mi-1)
+
+def pp_mark(items, i, mi):
+    loc = items[mi - 1]
+    delx.append(mi - 1)
     items[mi] = loc + ' ' + ''.join(['(', i, ')'])
     return items
 
@@ -54,15 +56,15 @@ def postprocess(text, sep):
     delx.clear()
     items = text.split(sep)
     print(items)
-    for i in items:
-        if i == "Südkorea":
-            outitems = pp_s_korea(items,i)
-        if i == "Mark":
-            outitems = pp_mark(items,i)
-        if i == "Marokko":
-            outitems = pp_morocco(items,i)
-        if i == "Schweiz":
-            outitems = pp_ch(items,i)
+    for ix, it in enumerate(items):
+        if it == "Südkorea":
+            outitems = pp_s_korea(items, it, ix)
+        if it == "Mark":
+            outitems = pp_mark(items, it, ix)
+        if it == "Marokko":
+            outitems = pp_morocco(items, it, ix)
+        if it == "Schweiz":
+            outitems = pp_ch(items, it, ix)
 
     if not outitems:
         print("Status line unchanged.")
@@ -74,6 +76,7 @@ def postprocess(text, sep):
         print("Status line changed to:")
         print(outitems)
         return outitems
+
 
 def export():
     return postprocess

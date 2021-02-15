@@ -49,14 +49,17 @@ line_replacements = [
 
 [[status_line]]
     exif_tags = ["Iptc.Application2.ProvinceState"]
-    replace = [{ regex = '(?i)Mecklenburg-Western\sPomerania', replace = 'MV' }, {regex = 'Brandenburg', replace = 'Mark'},{ regex = '-do', replace = ''}]
+    replace = [{regex = '(?i)Mecklenburg-Western\sPomerania', replace = 'MV' },
+        {regex = 'Brandenburg', replace = 'Mark'},
+        {regex = '-do', replace = ''},
+        {regex= '(?i)West Pomeranian Voivodeship', replace = ''}]
 
 [[status_line]]
     exif_tags = ["Iptc.Application2.CountryName"]
-    replace = [{ regex = 'South\sKorea', replace = 'Südkorea' },
-        { regex = '(?i)United\sStates\sOf\sAmerica', replace = 'USA' },
-        { regex = 'Germany', replace = ''},
-        { regex = 'Morocco', replace = 'Marokko'}]
+    replace = [{regex = 'South\sKorea', replace = 'Südkorea' },
+        {regex = '(?i)United\sStates\sOf\sAmerica', replace = 'USA' },
+        {regex = 'Germany', replace = ''},
+        {regex = 'Morocco', replace = 'Marokko'}]
 
 [[status_line]]
     exif_tags = ["Exif.Photo.DateTimeOriginal"]

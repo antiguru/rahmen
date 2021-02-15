@@ -60,21 +60,32 @@ in which tag it appears (because it can appear in several tags, or you don't rem
 
 As practice has shown the method of applying regular expressions to the whole line to be quickly resulting
 in unwieldy and awkward code, a more flexible alternative is to process the line using a programming language.
-In the configuration file it is possible to define Python code using the ``py_code`` entry.
-Be sure to enclose the code in three apostrophes, it has to be handed over unchanged.
+It is possible to include a Python script to process the string produced by the steps described above.
 
-The main function of the Python code has to be named ``postprocess``. It gets the line string and 
-the separator string as positional arguments (in the order given here), and it is required to return
+Add the following to the configuration file to call a script named ``postprocess.py`` in the same directory as
+``rahmen``:
+```toml
+py_postprocess =  "postprocess"
+py_path = ["."]
+```
+The Python code will be loaded once and executed for each new image. Be aware that this means that variables
+will be kept between images.
+
+This Python codet gets the line string and the separator string as positional arguments
+(in the order given here).
+
+The main function of the Python code has to be named ``export``. It is required to return
 a list of strings, representing the processed metadata items.
 
 Other than that, it is possible to flexibly process the incoming string and build the output accordingly.
 We have used a positional approach in our processing, which identifies a certain match in the
 metadata items list and then manipulates items at a position relative to this match
-(see the configuration file example we have published).
+(see the ``postprocess.py`` example we have published).
 
 After the items list is returned from the Python code, once more, and this time 
 unconditionally, empties will be dropped, multiples uniquified, and the final output line
-will be concatenated from the items using the separator.
+will be concatenated from the items using the separator. If you really want to circumvent this,
+just pass a list with a single string.
 
 ### Resource consumption
 
@@ -98,7 +109,7 @@ Rahmen will run if there's no configuration file, but will use minimal defaults 
 ## Running
 
 ```shell
-./rahmen --help`
+./rahmen --help
 Rahmen client
 
 USAGE:
@@ -293,6 +304,7 @@ you can tell Adobe Lightroom to add when it finds a GPS location in the image me
 
 ##Bugs, Issues, Desiderata
 
+- Allow reacting to configuration file changes while running
 - The font rendering is not really beautiful and sometimes, glyphs overlap.
 - The overflowing text is just not displayed.
 - The text bar might look better centered.
