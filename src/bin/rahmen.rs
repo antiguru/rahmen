@@ -67,6 +67,7 @@ type RunResult<T> = Result<T, RunControl>;
 const SYSTEM_CONFIG_PATH: &str = "/etc/rahmen.toml";
 
 fn main() -> RahmenResult<()> {
+    // read command line args
     let matches = App::new("Rahmen client")
         .arg(
             Arg::new("display")
@@ -125,6 +126,7 @@ fn main() -> RahmenResult<()> {
         )
         .get_matches();
 
+    // evaluate input arg
     let input = matches.value_of("input").expect("Input missing");
     // box is used bec of dynamic typing for provider
     let mut provider: Box<dyn Provider<_>> = if input.eq("-") {
@@ -138,6 +140,7 @@ fn main() -> RahmenResult<()> {
         Box::new(rahmen::provider_glob::create(input)?)
     };
 
+    // look for config file
     let dirs = xdg::BaseDirectories::new().unwrap();
     let settings: Settings = if let Some(path) = matches
         .value_of("config")
@@ -160,7 +163,9 @@ fn main() -> RahmenResult<()> {
         eprintln!("Config file not found, continuing with default settings");
         Default::default()
     };
-
+    // Python search path: use the Python system path, and prepend the value(s) from the config file
+    // Note: contrary to the documentation, the Python system path will nor contain the directory from which we're called,
+    // so this has to be indicated in the configuration file
     if let Some(python_paths) = settings.py_path {
         Python::with_gil(|py| {
             let syspath: &PyList = py
@@ -195,6 +200,7 @@ fn main() -> RahmenResult<()> {
         line_settings,
     )?;
 
+    // continue evaluating the command line args
     let buffer_max_size: usize = matches
         .value_of("buffer_max_size")
         .expect("Missing buffer_max_size")

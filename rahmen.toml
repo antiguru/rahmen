@@ -24,15 +24,17 @@ py_path = ["."]
 
 # Regular expression(s) to apply to the whole line, after all the individual metadata has been processed
 # and joined using the separator.
-#line_replacements = [
+line_replacements = [
 #    {regex = '(?P<text>^.*), (?P<subloc>.*), (?P<loc>.*), (?P<province>Mark), (?P<rest>.*$)', replace = '$text, $subloc ($province), $rest'},
 #    {regex = '(?P<text>^.*), (?P<subloc>.*), (?P<loc>.*), (?P<province>.*), (?P<country>Südkorea), (?P<rest>.*$)', replace = '$text, $loc, $province, $country, $rest'},
 #    {regex = '(?P<text>^.*), (?P<sublocation>.*), (?P<location>.*), (?P<province>.*), (?P<country>Morocco), (?P<rest>.*$)',replace = '$text, $sublocation, $location, $country, $rest'},
     #zap empty commas from the separator
 #    {regex = '^, ', replace = ','},
     #{regex = '\W,+', replace = ''},
-#    {regex = '^[ ,]', replace = ''},
-#]
+    {regex = 'Zurich', replace = 'Zürich'},
+    {regex = ' Township', replace = ''},
+    {regex = ' Province', replace = ''},
+]
 
 # status line metadata (in this order) as provided by the exiv2 library
 [[status_line]]
@@ -47,14 +49,17 @@ py_path = ["."]
 
 [[status_line]]
     exif_tags = ["Iptc.Application2.ProvinceState"]
-    replace = [{ regex = '(?i)Mecklenburg-Western\sPomerania', replace = 'MV' }, {regex = 'Brandenburg', replace = 'Mark'},{ regex = '-do', replace = ''}]
+    replace = [{regex = '(?i)Mecklenburg-Western\sPomerania', replace = 'MV' },
+        {regex = 'Brandenburg', replace = 'Mark'},
+        {regex = '-do', replace = ''},
+        {regex= '(?i)West Pomeranian Voivodeship', replace = ''}]
 
 [[status_line]]
     exif_tags = ["Iptc.Application2.CountryName"]
-    replace = [{ regex = 'South\sKorea', replace = 'Südkorea' },
-        { regex = '(?i)United\sStates\sOf\sAmerica', replace = 'USA' },
-        { regex = 'Germany', replace = ''},
-        { regex = 'Morocco', replace = 'Marokko'}]
+    replace = [{regex = 'South\sKorea', replace = 'Südkorea' },
+        {regex = '(?i)United\sStates\sOf\sAmerica', replace = 'USA' },
+        {regex = 'Germany', replace = ''},
+        {regex = 'Morocco', replace = 'Marokko'}]
 
 [[status_line]]
     exif_tags = ["Exif.Photo.DateTimeOriginal"]

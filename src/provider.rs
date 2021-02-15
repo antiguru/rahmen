@@ -254,13 +254,11 @@ impl StatusLineFormatter {
             py_postprocess_fn,
         })
     }
-    /// The postprocess function calls the python code given in the py_code entry in the config file;
+    /// The postprocess function calls the python script given in the py_postprocess entry in the config file;
     /// it takes an input (our status line) and also gets our separator to split it into
-    /// the individual items so that they can be postprocessed. The python code can be changed in
-    /// the config file and changes take effect when the program is restarted.
+    /// the individual items so that they can be postprocessed. Changes to the python code take effect when the program is restarted.
     /// The python code gets a tuple of (string_to_process, item_separator) and is currently
     /// expected to return a vector of strings.
-    /// TODO: error handling does not work, still have to unwrap
     pub fn postprocess(
         code: &Py<PyAny>,
         input: &str,
