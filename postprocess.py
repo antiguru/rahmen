@@ -47,14 +47,14 @@ def pp_ch(items, it, ix):
     return items
 
 
-def pp_mark(items, i, ix):
+def pp_mark(items, it, ix):
     # Someplace, Mark, => Someplace (Mark),
     # get location
     loc = items[ix - 1]
     # drop it
     delx.append(ix - 1)
     # assign new content to province item
-    items[ix] = loc + ' ' + ''.join(['(', i, ')'])
+    items[ix] = loc + ' ' + ''.join(['(', it, ')'])
     return items
 
 
