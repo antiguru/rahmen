@@ -284,9 +284,14 @@ line_replacements = [
 ]
 ```
 
-As this method proved to quickly lead to awkward and unwieldy code, we introduced a way to use Python code that takes
-the metadata tags, after they have been processed using all the individual and per-line regex definitions and have been
-joined by the separator, and processes them accordingly.
+This ends the basic processing of the metadata. The information line produced by the rules given will show below the
+image, unless you decide to go further and process it using Python, which is described next.
+
+#### Advanced metadata processing using Python
+
+As the regex ``line_replacements`` method proved to quickly lead to awkward and unwieldy code, we introduced a way to
+use Python code that takes the metadata tags, after they have been processed using all the individual and per-line regex
+definitions and have been joined by the separator, and processes them accordingly.
 
 Add the following to the configuration file to call a script named ``postprocess.py`` in the same directory as
 ``rahmen`` (the extension ``.py`` being quietly assumed):
@@ -304,6 +309,15 @@ the [standard Python search path](https://docs.python.org/3/library/sys.html#sys
 described there does not apply, because no regular script is called. To search the current directory, use ``"."``. Note:
 if you omit this entry and your script can be found neither via the ``$PYTHONPATH`` environment nor as a system module,
 it will not be possible to find the script, and the program will abort.
+
+##### Example script and test suite
+
+We provide an example script (``postprocess.py``) where some processing is done for certain filters. To check the
+processing, we used ``pytest``. We provide a test script (``test.py``) matching the processing rules in the example script.
+On our Debian system, invoking it with ``pytest-3 test.py`` runs the tests. It is strongly recommended to create a test
+for every processing rule you create to ensure it is properly working.
+
+##### Final processing step (only when Python code was invoked)
 
 The Python output will be unconditionally cleaned of empties and uniquified (so you should probably set 'uniquify' and '
 hide_empty' to false to have consistency in your input). To circumvent this final stage of output processing, you could

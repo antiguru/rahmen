@@ -6,53 +6,62 @@
 # The output will be unconditionally cleaned of empties and uniquified (so you should probably
 # set 'uniquify' and 'hide_empty' to false to have consistency in your input).
 #
-# There must be at least one function and this function has to be named 'postprocess'.
-# It has two positional arguments, the first is the text string to process, the second is
-# the separator string. The return has to be a list of strings.
-# So the simplest code, which takes the input, splits it and returns the list, would be
-#
-# def postprocess(text,sep):
-#   return text.split(sep)
-#
-# Be aware that this might seem to do effectively nothing, because the returned list will be joined
-# using the separator. If the input should differ from the output, that will be the result of the
-# unconditional deduplication and removal of empty items that the returned list undergoes
-# before it is joined to the final output line.
-
+# this holds the item postions we want to drop
+# dropping cannot be done ad hoc because it would shift the positions
 delx = []
 
 
 def pp_s_korea(items, it, ix):
-    if items[ix - 1] in ["Seoul", "Busan"]:
-        delx.append(ix - 2)
-    else:
-        delx.append(ix - 1)
+    # look for the item before the country ('Südkorea'), it's ProvinceState
+    # the structure is then Info, Quarter, District_or_City, Province, Südkorea, Date, Creator
+    # the offsets:                ^^^-3    ^^^-2             ^^^-1     ^^^we start here
+    # the following assumes that the province suffix '-do' has already been regexed away
+    #
+    # except in the case of Jeju, do this:
     if items[ix - 1] != "Jeju":
-        delx.append(ix - 3)
+        # ...in the big cities, the name of the province is the well-known city name, so keep it
+        if items[ix - 1] in ["Seoul", "Busan"]:
+            # ...but drop the city district
+            delx.append(ix - 2)
+        else:
+            # ...otherwise drop the province
+            delx.append(ix - 1)
+    # always drop the district quarter
+    delx.append(ix - 3)
     return items
 
 
 def pp_morocco(items, it, ix):
+    # drop the province
     delx.append(ix - 1)
     return items
 
 
-def pp_ch(items, it, mi):
-    if items[mi - 1] == "Kanton Zürich":
-        items[mi - 1] = items[mi - 2] + ' ZH'
-        delx.append(mi - 2)
+def pp_ch(items, it, ix):
+    # Someplace, Kanton Zürich, => Someplace ZH,
+    if items[ix - 1] == "Kanton Zürich":
+        # we assign the ne content to the province item
+        items[ix - 1] = items[ix - 2] + ' ZH'
+        # and we drop the location item
+        delx.append(ix - 2)
     return items
 
 
-def pp_mark(items, i, mi):
-    loc = items[mi - 1]
-    delx.append(mi - 1)
-    items[mi] = loc + ' ' + ''.join(['(', i, ')'])
+def pp_mark(items, i, ix):
+    # Someplace, Mark, => Someplace (Mark),
+    # get location
+    loc = items[ix - 1]
+    # drop it
+    delx.append(ix - 1)
+    # assign new content to province item
+    items[ix] = loc + ' ' + ''.join(['(', i, ')'])
     return items
 
 
+# main filter
 def postprocess(text, sep):
     outitems = []
+    # clear the drop list
     delx.clear()
     items = text.split(sep)
     print(items)
@@ -70,6 +79,7 @@ def postprocess(text, sep):
         print("Status line unchanged.")
         return items
     else:
+        # only now, we remove the dropped items
         for x in delx:
             if x >= 0:
                 del outitems[x]
@@ -79,4 +89,5 @@ def postprocess(text, sep):
 
 
 def export():
+    # return callable to Rust code
     return postprocess
