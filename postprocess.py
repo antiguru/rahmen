@@ -13,7 +13,7 @@ delx = []
 
 def pp_s_korea(items, it, ix):
     # look for the item before the country ('Südkorea'), it's ProvinceState
-    # the structure is then Info, Quarter, District_or_City, Province, Südkorea, Date, Creator
+    # the structure is then Info, Quarter, District_or_City, ProvinceState, Südkorea, Date, Creator
     # the offsets:                ^^^-3    ^^^-2             ^^^-1     ^^^we start here
     # the following assumes that the province suffix '-do' has already been regexed away
     #
@@ -40,7 +40,7 @@ def pp_morocco(items, it, ix):
 def pp_ch(items, it, ix):
     # Someplace, Kanton Zürich, => Someplace ZH,
     if items[ix - 1] == "Kanton Zürich":
-        # we assign the ne content to the province item
+        # we assign the new content to the province item
         items[ix - 1] = items[ix - 2] + ' ZH'
         # and we drop the location item
         delx.append(ix - 2)
@@ -82,7 +82,8 @@ def postprocess(text, sep):
         # only now, we remove the dropped items
         for x in delx:
             if x >= 0:
-                del outitems[x]
+                if outitems[x]:
+                    del outitems[x]
         print("Status line changed to:")
         print(outitems)
         return outitems
