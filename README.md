@@ -18,6 +18,8 @@ the `--font_size` argument or the configuration file.
 Because the data derived from the image's metadata tags is often difficult to read, ``rahmen``
 offers a wide range of tools to process the raw metadata.
 
+Rahmen is not a soup.
+
 ### Basic processing
 
 #### Case conversion
@@ -276,6 +278,7 @@ but this can be achieved more easliy and flexibly using a Python program (see be
 Nevertheless, this still is useful if you want to change things globally.
 
 ```toml
+# this will be applied to each metadata item
 line_replacements = [
     { regex = 'Zurich', replace = 'Zürich' },
 ]
@@ -294,12 +297,18 @@ py_path = ["."]
 ```
 
 The main function of the Python code has to be named ``export``. It is required to return a callable taking the line
-string and the separator string and returning list of strings, representing the processed metadata items.
+string and the separator string and returning a list of strings, representing the processed metadata items.
 
 ``py_path`` defines where to look for the Python script. The value given here is prepended to
-the [standard Python search path](https://docs.python.org/3/library/sys.html#sys.path).
+the [standard Python search path](https://docs.python.org/3/library/sys.html#sys.path),
+although the default search path described there does not apply, because no regular script is called. To search
+the current directory, use ``"."``.
+Note: if
+you omit this entry and your script can be found neither via the ``$PYTHONPATH`` environment nor
+as a system module, it will not be possible to find the script, and the progam will abort.
 
-The output will be unconditionally cleaned of empties and uniquified (so you should probably set 'uniquify' and '
+
+The Python output will be unconditionally cleaned of empties and uniquified (so you should probably set 'uniquify' and '
 hide_empty' to false to have consistency in your input). To circumvent this final stage of output processing, you could
 return a list containing a single string.
 
@@ -315,12 +324,22 @@ tell Adobe Lightroom to add when it finds a GPS location in the image metadata.
 - The overflowing text is just not displayed.
 - The text bar might look better centered.
 
-## Cross-compiling for the Raspberry Pi 1
+## Compiling for the Raspberry Pi 1
 
-Cross-compilation is a mess. The instructions below wokred until we decided to include a dependency on `libgexiv2` to
-extract image metadata. It has some trouble cross-compiling and eventually, we gave up on it. Currently, we build Rahmen
-on a Raspberry Pi 4, and cross-compile to ARMv6 on this platform---it works, although it's still a hack. At least
+Because some of the include C libraries wouldn't readily cross-compile, at this time we do not know of a way to
+cross-compile for the Raspberry Pi 1. Currently, we build Rahmen
+on a Raspberry Pi 4, and cross-compile to ARMv6 on this platform- it works, although it's still a hack. At least
 compilation times are less than "a night."
+
+Of course, building natively on a Pi 1 also works, but the term "nightly build" will have to be taken literally,
+especially for the first run.
+Small changes to this source code only without the need to rebuild stuff depending on it
+(no new dependencies added) will take approximately 90...100 minutes.
+
+### Previous attempts to cross-compile
+
+Cross-compilation is a mess. The instructions below worked until we decided to include a dependency on `libgexiv2` to
+extract image metadata. This has some trouble cross-compiling and eventually, we decided not to spend more time on it.
 
 Preparation:
 

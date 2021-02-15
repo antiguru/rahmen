@@ -163,7 +163,9 @@ fn main() -> RahmenResult<()> {
         eprintln!("Config file not found, continuing with default settings");
         Default::default()
     };
-
+    // Python search path: use the Python system path, and prepend the value(s) from the config file
+    // Note: contrary to the documentation, the Python system path will nor contain the directory from which we're called,
+    // so this has to be indicated in the configuration file
     if let Some(python_paths) = settings.py_path {
         Python::with_gil(|py| {
             let syspath: &PyList = py
