@@ -20,7 +20,7 @@ offers a wide range of tools to process the raw metadata.
 
 Rahmen is not a soup.
 
-### Basic mretadata processing
+### Basic metadata processing
 
 #### Case conversion
 
