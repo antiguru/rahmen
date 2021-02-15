@@ -8,6 +8,7 @@ use convert_case::{Case, Casing};
 use image::{DynamicImage, Pixel};
 use itertools::Itertools;
 use pyo3::prelude::*;
+use pyo3::types::PyList;
 use regex::Regex;
 use rexiv2::Metadata;
 
@@ -246,7 +247,6 @@ impl StatusLineFormatter {
             None
         };
 
-        // return the vector(s)
         Ok(Self {
             elements,
             line_transformations,
@@ -254,27 +254,13 @@ impl StatusLineFormatter {
             py_postprocess_fn,
         })
     }
-    /// The postprocess function calls the python script given in the py_postprocess entry in the config file;
-    /// it takes an input (our status line) and also gets our separator to split it into
-    /// the individual items so that they can be postprocessed. Changes to the python code take effect when the program is restarted.
-    /// The python code gets a tuple of (string_to_process, item_separator) and is currently
-    /// expected to return a vector of strings.
-    pub fn postprocess(
-        code: &Py<PyAny>,
-        input: &str,
-        separator: &str,
-    ) -> RahmenResult<Vec<String>> {
-        Ok(Python::with_gil(|py| -> PyResult<Vec<String>> {
-            code.call1(py, (input, separator))?.extract(py)
-        })?)
-    }
 
     /// Format the meta data from the given path (called as an adaptor to the status line formatter)
     pub fn format<P: AsRef<std::ffi::OsStr>>(&self, path: P) -> RahmenResult<String> {
         let metadata = Metadata::new_from_path(path)?;
         // iterate over the tag vector we built in the constructor, but stop when we have an
         // iterator of strings
-        let mut element_iter = self
+        let elements_iter = self
             .elements
             .iter()
             // process each metadata section (element) using the associated transformation instructions
@@ -290,45 +276,35 @@ impl StatusLineFormatter {
                 } else {
                     Some("".to_string())
                 }
-            });
-        let mut status_line = match (
+            })
             // hide empty entries
-            self.line_settings.hide_empty,
-            // don't show duplicates
-            self.line_settings.uniquify,
-        ) {
-            (true, true) => element_iter
-                // remove empty strings (which may be the result of a transformation regex replacement)
-                .filter(|x| !x.is_empty())
-                // ...remove multiples (e.g. if City and  ProvinceState are the same) and
-                .unique()
-                // join the strings using the separator
-                .join(&self.line_settings.separator),
-            (false, false) => element_iter.join(&self.line_settings.separator),
-            (true, false) => element_iter
-                // remove empty strings (which may be the result of a transformation regex replacement)
-                .filter(|x| !x.is_empty())
-                // join the strings using the separator
-                .join(&self.line_settings.separator),
-            (false, true) => element_iter.unique().join(&self.line_settings.separator),
-        };
-        // apply the line_transformations to the status line
-        status_line = self
-            .line_transformations
-            .iter()
-            .fold(status_line, |sl, t| t.transform(sl));
-        // postprocess the status line using a python function defined in the config file (if it exists)
-        Ok(if let Some(c) = &self.py_postprocess_fn {
-            // postprocess gives Vec<String>, so we have to join again, but can process before
-            // TODO why do I need the prefix here?
-            StatusLineFormatter::postprocess(c, &status_line, &self.line_settings.separator)?
-                .iter()
-                // finally, remove duplicates and empties unconditionally
-                .filter(|x| !x.is_empty())
-                .unique()
-                .join(&self.line_settings.separator)
+            .filter(|x| !self.line_settings.hide_empty || !x.is_empty());
+
+        fn combine_line<I: Iterator<Item = String>>(
+            formatter: &StatusLineFormatter,
+            mut elements: I,
+        ) -> RahmenResult<String> {
+            // apply the line_transformations to the status line
+            // postprocess the status line using a python function defined in the config file (if it exists)
+            Ok(if let Some(code) = &formatter.py_postprocess_fn {
+                Python::with_gil(|py| -> PyResult<String> {
+                    let tags = PyList::new(py, &elements.collect::<Vec<_>>());
+                    code.call1(py, (tags, &formatter.line_settings.separator))?
+                        .extract(py)
+                })?
+            } else {
+                let string = elements.join(&formatter.line_settings.separator);
+                formatter
+                    .line_transformations
+                    .iter()
+                    .fold(string, |sl, t| t.transform(sl))
+            })
+        }
+
+        if self.line_settings.uniquify {
+            combine_line(self, elements_iter.unique())
         } else {
-            status_line
-        })
+            combine_line(self, elements_iter)
+        }
     }
 }
