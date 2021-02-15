@@ -120,7 +120,7 @@ ARGS:
 <input>
 ```
 
-The input can either be a filename, a file pattern (`IMGP4*.jpg`), or a file containig a list of file names. If you'd
+The input can either be a filename, a file pattern (`IMGP4*.jpg`), or a file containing a list of file names. If you'd
 like to have a random image order, use the `shuf` command to create a file list
 (see the provided shell script for an example).
 
@@ -300,13 +300,10 @@ The main function of the Python code has to be named ``export``. It is required 
 string and the separator string and returning a list of strings, representing the processed metadata items.
 
 ``py_path`` defines where to look for the Python script. The value given here is prepended to
-the [standard Python search path](https://docs.python.org/3/library/sys.html#sys.path),
-although the default search path described there does not apply, because no regular script is called. To search
-the current directory, use ``"."``.
-Note: if
-you omit this entry and your script can be found neither via the ``$PYTHONPATH`` environment nor
-as a system module, it will not be possible to find the script, and the progam will abort.
-
+the [standard Python search path](https://docs.python.org/3/library/sys.html#sys.path), although the default search path
+described there does not apply, because no regular script is called. To search the current directory, use ``"."``. Note:
+if you omit this entry and your script can be found neither via the ``$PYTHONPATH`` environment nor as a system module,
+it will not be possible to find the script, and the program will abort.
 
 The Python output will be unconditionally cleaned of empties and uniquified (so you should probably set 'uniquify' and '
 hide_empty' to false to have consistency in your input). To circumvent this final stage of output processing, you could
@@ -327,13 +324,11 @@ tell Adobe Lightroom to add when it finds a GPS location in the image metadata.
 ## Compiling for the Raspberry Pi 1
 
 Because some of the include C libraries wouldn't readily cross-compile, at this time we do not know of a way to
-cross-compile for the Raspberry Pi 1. Currently, we build Rahmen
-on a Raspberry Pi 4, and cross-compile to ARMv6 on this platform- it works, although it's still a hack. At least
-compilation times are less than "a night."
+cross-compile for the Raspberry Pi 1. Currently, we build Rahmen on a Raspberry Pi 4, and cross-compile to ARMv6 on this
+platform- it works, although it's still a hack. At least compilation times are less than "a night."
 
 Of course, building natively on a Pi 1 also works, but the term "nightly build" will have to be taken literally,
-especially for the first run.
-Small changes to this source code only without the need to rebuild stuff depending on it
+especially for the first run. Small changes to this source code only without the need to rebuild stuff depending on it
 (no new dependencies added) will take approximately 90...100 minutes.
 
 ### Previous attempts to cross-compile
