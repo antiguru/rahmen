@@ -35,15 +35,16 @@ tag. Multiple regular expression and replacements will be applied in the given o
 
 #### Controlling output
 
-After this, processing continues. Normally, empty results for metadata tags will be dropped, and multiple occurences of
+After this, the result will either be handed over to the final processing step, or, if defined, undergo the
+advanced processing step
+. Normally, empty results for metadata tags will be dropped, and multiple occurences of
 the same data will be reduced to one. As this may be undesirable if the data should be further processed, it's possible
 to change this behaviour using the ``uniquify`` and ``hide_empty`` entries in the config.file.
-
 After this processing step, the individual metadata items will be concatenated to from the line to appear below the
 image using a separator, the default being ``','``. For special processing, this can be changed using the ``separator``
 entry in the config file.
 
-
+### Advanced processing
 #### Regular Expressions for the whole line
 
 If you add a regular expression and a replacement to the ``line_replacements`` in the configuration file, it will be
@@ -52,8 +53,6 @@ apllied in the order given.
 
 For example, this is useful when you want to globally change or remove something regardless in which tag it appears (
 because it can appear in several tags, or you don't remember the exact tag, ...)
-
-After this, the basic processing is finished, and the information line could be shown below the image.
 
 ### Advanced processing using Python code
 
