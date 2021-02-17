@@ -16,24 +16,24 @@ def test_nochange():
 
 
 def test_glob1():
-    # test for global replacements
+    # test for global replacements (Zurich should be replaced by Zürich)
     input = "Name|SubLocation|Location|Zurich|Country|Date|Creator"
     assert put_out(input) == "Name|SubLocation|Location|Zürich|Country|Date|Creator"
 
 
 def test_glob2():
-    # test for global replacements
+    # test for global replacements (Zurich should be replaced by Zürich)
     input = "Name|SubLocation|Zurich|Zurich|Country|Date|Creator"
     assert put_out(input) == "Name|SubLocation|Zürich|Zürich|Country|Date|Creator"
 
 
 def test_glob3():
-    # test for global replacements
+    # test for global replacements (Zurich should be replaced by Zürich)
     input = "Zurich|SubLocation|Zurich|Zurich|Country|Date|Creator"
     assert put_out(input) == "Zürich|SubLocation|Zürich|Zürich|Country|Date|Creator"
 
 def test_glob4():
-    # test for global replacements
+    # test for global replacements (Zurich should be replaced by Zürich, ' Township', ' City', ' Province' should be removed)
     input = "Zurich Township|SubLocation Township|Location City|Zurich Province|Country|Date|Creator"
     assert put_out(input) == "Zürich|SubLocation|Location|Zürich|Country|Date|Creator"
 
@@ -100,6 +100,6 @@ def test_ch2():
     assert put_out(input) == "Name|SubLocation|Location ZH|Schweiz|Date|Creator"
 
 def test_ch3():
-    # same as 2, but with glob replacement
-    input = "Name|SubLocation|Location|Kanton Zurich|Schweiz|Date|Creator"
+    # same as 2, but with glob replacement ('Zurich Province'-> 'Zürich' and then as in #2 above)
+    input = "Name|SubLocation|Location|Kanton Zurich Province|Schweiz|Date|Creator"
     assert put_out(input) == "Name|SubLocation|Location ZH|Schweiz|Date|Creator"
