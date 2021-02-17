@@ -252,7 +252,7 @@ impl StatusLineFormatter {
             .elements
             .iter()
             // process each metadata section (element) using the associated transformation instructions
-            // empty tags (no metadata found): we will return an empty string to make sure all metatags are
+            // empty tags (no metadata found): we will return an empty string to make sure all meta tags are
             // added to the status line. This way, we can postprocess the status line
             // being sure that parameters stay at their position.
             // This produces a Vec<String> of all the metadata found (empty strings if no data).
@@ -276,6 +276,7 @@ impl StatusLineFormatter {
                     .extract(py)
             })?
         } else {
+            // do nothing when there's no Python code
             line_elements
         };
 
