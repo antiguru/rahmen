@@ -58,11 +58,28 @@ def pp_mark(items, it, ix):
     return items
 
 
+# primitive global replacements: the dictionary has keys (to look up) and replacement values.
+# these will be replaced wherever they occur
+# only literal keys are allowed, no regular expressions.
+def pp_glob(items):
+    # value/replacement dictionary
+    glob_replacements = {'Zurich': 'Zürich', ' City': '', ' Township': '', ' Province': ''}
+    for i, it in enumerate(items):
+        for k in glob_replacements.keys():
+            # update the working value to prevent regressions when multiple matches occur
+            it = it.replace(k, glob_replacements.get(k))
+            items[i] = it
+    return items
+
+
 # main filter
 def postprocess(items: [str], sep: str) -> str:
     outitems = []
     # clear the drop list
     delx.clear()
+    print(items)
+    # first, replace the global stuff
+    items = pp_glob(items)
     print(items)
     for ix, it in enumerate(items):
         if it == "Südkorea":
@@ -75,7 +92,7 @@ def postprocess(items: [str], sep: str) -> str:
             outitems = pp_ch(items, it, ix)
 
     if not outitems:
-        print("Status line unchanged.")
+        print("Status line unfiltered.")
     else:
         # only now, we remove the dropped items
         for x in delx:
@@ -86,7 +103,14 @@ def postprocess(items: [str], sep: str) -> str:
         print(outitems)
         items = outitems
 
-    return sep.join(filter(lambda x: len(x) > 0, items))
+    # if you return a list of items, the final processing will cause empties to be filtered out (unconditionally),
+    # multiple items to be returned only once (if so configured), and finally join them to a line using the
+    # separator string.
+    return items
+    # if you return a list of only one item, the final processing step will see this as a non-empty, unique, single item
+    # and will return it unmodified. This way, you can define the final processing step here. The example drops
+    # empty items and joins them with the separator, but does not remove multiples.
+    # return [sep.join(filter(lambda x: len(x) > 0, items))]
 
 
 def export():

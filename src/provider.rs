@@ -83,8 +83,6 @@ pub struct LineSettings {
     pub separator: String,
     /// should we deduplicate metadata?
     pub uniquify: bool,
-    /// should we hide empty metadata?
-    pub hide_empty: bool,
 }
 
 /// The following are the ops concerning the status line (text being displayed below the image)
@@ -211,19 +209,17 @@ impl StatusLineElement {
 pub struct StatusLineFormatter {
     // these are the meta tag entries in the config file
     elements: Vec<StatusLineElement>,
-    // these are the instructions to process the whole line
-    line_transformations: Vec<StatusLineTransformation>,
-    // the separator to use for the join op
+    // the settings controlling the line output
     line_settings: LineSettings,
+    // the Python code used to postprocess the metadata items
     py_postprocess_fn: Option<Py<PyAny>>,
 }
 
 impl StatusLineFormatter {
     /// Construct a new `StatusLineFormatter` from a collection of elements
-    pub fn new<I: Iterator<Item = Element>, J: Iterator<Item = Replacement>>(
+    pub fn new<I: Iterator<Item = Element>>(
         // we get the arguments when we're called
         statusline_elements_iter: I,
-        line_transformations_iter: J,
         py_postprocess: Option<String>,
         line_settings: LineSettings,
     ) -> RahmenResult<Self> {
@@ -232,12 +228,7 @@ impl StatusLineFormatter {
         for element in statusline_elements_iter {
             elements.push(element.try_into()?);
         }
-        // read the postprocessing regexes and store them to the line_transformations vector
-        let mut line_transformations = vec![];
-        for line_transform in line_transformations_iter {
-            line_transformations.push(line_transform.try_into()?);
-        }
-
+        // read and store the Python code (if it exists)
         let py_postprocess_fn = if let Some(postprocess_path) = py_postprocess {
             Some(Python::with_gil(|py| {
                 let module = py.import(postprocess_path.as_ref())?;
@@ -249,7 +240,6 @@ impl StatusLineFormatter {
 
         Ok(Self {
             elements,
-            line_transformations,
             line_settings,
             py_postprocess_fn,
         })
@@ -258,53 +248,51 @@ impl StatusLineFormatter {
     /// Format the meta data from the given path (called as an adaptor to the status line formatter)
     pub fn format<P: AsRef<std::ffi::OsStr>>(&self, path: P) -> RahmenResult<String> {
         let metadata = Metadata::new_from_path(path)?;
-        // iterate over the tag vector we built in the constructor, but stop when we have an
-        // iterator of strings
-        let elements_iter = self
+        let mut line_elements = self
             .elements
             .iter()
             // process each metadata section (element) using the associated transformation instructions
-            // empty tags (no metadata found): when hide_empty is false,
-            // we will return an empty string (instead of None) to make sure all metatags are
+            // empty tags (no metadata found): we will return an empty string to make sure all metatags are
             // added to the status line. This way, we can postprocess the status line
             // being sure that parameters stay at their position.
+            // This produces a Vec<String> of all the metadata found (empty strings if no data).
             .flat_map(move |element| {
                 if let Some(v) = element.process(&metadata) {
                     Some(v)
-                } else if self.line_settings.hide_empty {
-                    None
                 } else {
                     Some("".to_string())
                 }
             })
-            // hide empty entries
-            .filter(|x| !self.line_settings.hide_empty || !x.is_empty());
+            .collect();
 
-        fn combine_line<I: Iterator<Item = String>>(
-            formatter: &StatusLineFormatter,
-            mut elements: I,
-        ) -> RahmenResult<String> {
-            // apply the line_transformations to the status line
-            // postprocess the status line using a python function defined in the config file (if it exists)
-            Ok(if let Some(code) = &formatter.py_postprocess_fn {
-                Python::with_gil(|py| -> PyResult<String> {
-                    let tags = PyList::new(py, &elements.collect::<Vec<_>>());
-                    code.call1(py, (tags, &formatter.line_settings.separator))?
-                        .extract(py)
-                })?
-            } else {
-                let string = elements.join(&formatter.line_settings.separator);
-                formatter
-                    .line_transformations
-                    .iter()
-                    .fold(string, |sl, t| t.transform(sl))
-            })
-        }
-
-        if self.line_settings.uniquify {
-            combine_line(self, elements_iter.unique())
+        // postprocess the status line using a python function defined in the config file (if it exists)
+        // this takes a Vec<String> of all the metadata found (empty strings if no data)
+        // and produces a Vec<String> of either the items returned from the Python code (if there's some code),
+        // or just the input
+        line_elements = if let Some(code) = &self.py_postprocess_fn {
+            Python::with_gil(|py| -> PyResult<Vec<String>> {
+                let tags = PyList::new(py, &line_elements);
+                code.call1(py, (tags, &self.line_settings.separator))?
+                    .extract(py)
+            })?
         } else {
-            combine_line(self, elements_iter)
-        }
+            line_elements
+        };
+
+        // filter out the empty items we received from above,
+        // unconditionally deduplicate them.
+        // and join them with the separator, producing the final status line
+        Ok(if self.line_settings.uniquify {
+            line_elements
+                .iter()
+                .filter(|x| !x.is_empty())
+                .unique()
+                .join(&self.line_settings.separator)
+        } else {
+            line_elements
+                .iter()
+                .filter(|x| !x.is_empty())
+                .join(&self.line_settings.separator)
+        })
     }
 }
