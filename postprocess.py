@@ -37,13 +37,31 @@ def pp_morocco(items, it, ix):
     return items
 
 
+# cantons and abbreviations for them, to be extended
+cantons = {'Zürich': 'ZH', 'Basel-Stadt': 'BS'}
+
+
+def pp_ch_cantons(items, ix):
+    ct = ''
+    for canton in cantons.keys():
+        # input fields
+        input_canton = items[ix - 1]
+        city = items[ix - 2]
+        # if the dict term is in the input input_canton
+        if canton in input_canton:
+            # and if the city name is not port of the dict canton
+            if city not in canton:
+                # append the canton's abbreviation
+                ct = ' ' + cantons.get(canton)
+            # mark city field for deletion
+            delx.append(ix - 2)
+            # update input_canton field with city + abbreviation (or '')
+            items[ix - 1] = city + ct
+
+
 def pp_ch(items, it, ix):
-    # Someplace, Kanton Zürich, => Someplace ZH,
-    if items[ix - 1] == "Kanton Zürich":
-        # we assign the new content to the province item
-        items[ix - 1] = items[ix - 2] + ' ZH'
-        # and we drop the location item
-        delx.append(ix - 2)
+    # Someplace, Kanton Zürich, => Someplace ZH, unless Someplace in 'Kanton Zürich'
+    pp_ch_cantons(items, ix)
     return items
 
 
@@ -72,6 +90,7 @@ def pp_glob(items, glob_replacements):
 
 # value/replacement dictionary
 glob_replacements = {'Zurich': 'Zürich', ' City': '', ' Township': '', ' Province': ''}
+
 
 # main filter
 def postprocess(items: [str], sep: str) -> str:
