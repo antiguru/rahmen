@@ -3,8 +3,11 @@ import postprocess
 
 sep = "|"
 
+
 def put_out(input):
+    # this code sounds weird :-)
     return sep.join(postprocess.postprocess(input.split(sep), sep))
+
 
 # keep in mind that these are run _after_ the regex magic has taken place
 
@@ -32,8 +35,10 @@ def test_glob3():
     input = "Zurich|SubLocation|Zurich|Zurich|Country|Date|Creator"
     assert put_out(input) == "Zürich|SubLocation|Zürich|Zürich|Country|Date|Creator"
 
+
 def test_glob4():
-    # test for global replacements (Zurich should be replaced by Zürich, ' Township', ' City', ' Province' should be removed)
+    # test for global replacements (Zurich should be replaced by Zürich, ' Township', ' City', ' Province'
+    # should be removed)
     input = "Zurich Township|SubLocation Township|Location City|Zurich Province|Country|Date|Creator"
     assert put_out(input) == "Zürich|SubLocation|Location|Zürich|Country|Date|Creator"
 
@@ -98,6 +103,7 @@ def test_ch2():
     # then we want to see "Name|SubLocation|Location ZH|Schweiz|Date|Creator"
     input = "Name|SubLocation|Location|Kanton Zürich|Schweiz|Date|Creator"
     assert put_out(input) == "Name|SubLocation|Location ZH|Schweiz|Date|Creator"
+
 
 def test_ch3():
     # same as 2, but with glob replacement ('Zurich Province'-> 'Zürich' and then as in #2 above)

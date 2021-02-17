@@ -245,7 +245,7 @@ impl StatusLineFormatter {
         })
     }
 
-    /// Format the meta data from the given path (called as an adaptor to the status line formatter)
+    /// Format the meta data from the given path (called as receiver to the status line formatter)
     pub fn format<P: AsRef<std::ffi::OsStr>>(&self, path: P) -> RahmenResult<String> {
         let metadata = Metadata::new_from_path(path)?;
         let mut line_elements = self
