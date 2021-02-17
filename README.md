@@ -24,14 +24,15 @@ Rahmen is not a soup.
 
 #### Case conversion
 
-As first step of the metadata processing chain it is possible to convert the case. See below, where this setting is
-discussed in the context of the configuration file.
+As first step of the metadata processing chain it is possible to convert the
+case. [See below, where this setting is discussed in the context of the configuration file](#changing-the-case).
 
 #### Regular expressions for individual metadata
 
 For each metadata entry, it's further possible to define pairs of
 [regular expressions and replacements](https://docs.rs/regex/) that will be applied to the metadata for each individual
-tag. Multiple regular expression and replacements will be applied in the given order.
+tag. Multiple regular expressions and replacements will be applied in the given
+order. [More details will be discussed in the context of the configuration file](#metadata).
 
 After this, the result will either be handed over to the [final processing step](#final-processing-step), or, before
 that, undergo the advanced processing step.
@@ -59,8 +60,10 @@ string and the separator string and returning a list of strings, representing th
 
 Other than that, it is possible to flexibly process the incoming string and build the output accordingly. We have used a
 positional approach in our processing, which identifies a certain match in the metadata items list and then manipulates
-items at a position relative to this match
-(see the ``postprocess.py`` example we have published).
+items at a position relative to this match (see the ``postprocess.py`` example we have published).
+
+More information can be
+found [where this is discussed in the context of the configuration file](#advanced-metadata-processing-using-python).
 
 ### Final processing step
 
@@ -87,7 +90,8 @@ Rahmen depends on various libraries, which should be available on most Linux dis
 
 * `libgexiv2-dev`
 
-Rahmen will run if there's no configuration file, but will use minimal defaults (see below).
+Rahmen will run if there's no configuration file, but will use minimal defaults (see below), and no metadata will be
+shown.
 
 ## Building
 
@@ -107,7 +111,7 @@ ARGS:
 ```
 
 The input can either be a filename, a file pattern (`IMGP4*.jpg`), or a file containing a list of file names. If you'd
-like to have a random image order, use the `shuf` command to create a file list
+like to have a random image order, use the `find` and `shuf` commands to create a file list
 (see the provided shell script for an example).
 
 ```shell
@@ -231,6 +235,8 @@ The [tag names that can be used are listed on the this exiv2 webpage](https://ex
 mean that all these are actually present in your image file. Use [exiftool](https://exiftool.org/)
 to show you the metadata in your file and see what is available.
 
+##### Changing the case
+
 Because some of the tags we used were in ALL-CAPS which doesn't look nice, we offer case conversions that you can apply
 to the data _before_ they are processed by the regular expressions described above. The order in the configuration file
 doesn't matter here. The [available case strings can be found here.](https://github.com/rutrum/convert-case#cases)
@@ -243,16 +249,14 @@ case_conversion = { from = 'Upper', to = 'Title' }
 capitalize = true
 ```
 
-Post-processing the metadata line: Optionally, the metadata line can be processed after it has been assembled from the
-tags described above. This can be finely controlled using the following settings:
+##### Custom separator
 
 ```toml
 separator = "|"
-uniquify = false
 ```
 
-That way it's possible to set a custom separator, and to display multiple identical tags
-(the defaults are `", "` for the separator and `true` for the other value.)
+That way it's possible to set a custom separator
+(the default is `", "`).
 
 This ends the basic processing of the metadata. The information line produced by the rules given will be handed over to
 the [final processing step](#final-processing-step), unless you decide to go further and process it using Python, which

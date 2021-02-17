@@ -13,9 +13,6 @@ delay = 90
 # What to insert between the metadata, default: insert ", ".
     # separator = "|"
 
-# Should we show duplicate strings only once (default: true)?
-#   uniquify = false
-
 # use this Python script for postprocessing
 py_postprocess =  "postprocess"
 # look for it in this path

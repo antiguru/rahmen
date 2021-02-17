@@ -209,8 +209,8 @@ impl StatusLineElement {
 pub struct StatusLineFormatter {
     // these are the meta tag entries in the config file
     elements: Vec<StatusLineElement>,
-    // the settings controlling the line output
-    line_settings: LineSettings,
+    // the separator string for the line output
+    separator: String,
     // the Python code used to postprocess the metadata items
     py_postprocess_fn: Option<Py<PyAny>>,
 }
@@ -221,7 +221,7 @@ impl StatusLineFormatter {
         // we get the arguments when we're called
         statusline_elements_iter: I,
         py_postprocess: Option<String>,
-        line_settings: LineSettings,
+        separator: String,
     ) -> RahmenResult<Self> {
         // read the metadata config entries and store them to the elements vector
         let mut elements = vec![];
@@ -240,8 +240,8 @@ impl StatusLineFormatter {
 
         Ok(Self {
             elements,
-            line_settings,
             py_postprocess_fn,
+            separator,
         })
     }
 
@@ -272,28 +272,19 @@ impl StatusLineFormatter {
         line_elements = if let Some(code) = &self.py_postprocess_fn {
             Python::with_gil(|py| -> PyResult<Vec<String>> {
                 let tags = PyList::new(py, &line_elements);
-                code.call1(py, (tags, &self.line_settings.separator))?
-                    .extract(py)
+                code.call1(py, (tags, &self.separator))?.extract(py)
             })?
         } else {
             // do nothing when there's no Python code
             line_elements
         };
 
-        // filter out the empty items we received from above,
-        // unconditionally deduplicate them.
-        // and join them with the separator, producing the final status line
-        Ok(if self.line_settings.uniquify {
-            line_elements
-                .iter()
-                .filter(|x| !x.is_empty())
-                .unique()
-                .join(&self.line_settings.separator)
-        } else {
-            line_elements
-                .iter()
-                .filter(|x| !x.is_empty())
-                .join(&self.line_settings.separator)
-        })
+        // unconditionally filter out the empty items we received from above and
+        // deduplicate them, and join them with the separator, producing the final status line
+        Ok(line_elements
+            .iter()
+            .filter(|x| !x.is_empty())
+            .unique()
+            .join(&self.separator))
     }
 }
