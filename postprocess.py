@@ -61,9 +61,8 @@ def pp_mark(items, it, ix):
 # primitive global replacements: the dictionary has keys (to look up) and replacement values.
 # these will be replaced wherever they occur
 # only literal keys are allowed, no regular expressions.
-def pp_glob(items):
+def pp_glob(items, glob_replacements):
     # value/replacement dictionary
-    glob_replacements = {'Zurich': 'Zürich', ' City': '', ' Township': '', ' Province': ''}
     for i, it in enumerate(items):
         for k in glob_replacements.keys():
             # update the working value to prevent regressions when multiple matches occur
@@ -79,7 +78,8 @@ def postprocess(items: [str], sep: str) -> str:
     delx.clear()
     print(items)
     # first, replace the global stuff
-    items = pp_glob(items)
+    glob_replacements = {'Zurich': 'Zürich', ' City': '', ' Township': '', ' Province': ''}
+    items = pp_glob(items, glob_replacements)
     print(items)
     for ix, it in enumerate(items):
         if it == "Südkorea":
