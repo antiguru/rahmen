@@ -260,7 +260,7 @@ That way it's possible to set a custom separator
 
 This ends the basic processing of the metadata. The information line produced by the rules given will be handed over to
 the [final processing step](#final-processing-step), unless you decide to go further and process it using Python, which
-is described next, and after that, it will be show below the image.
+is described next, and after that, it will be shown below the image.
 
 #### Advanced metadata processing using Python
 
