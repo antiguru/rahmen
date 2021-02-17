@@ -104,8 +104,23 @@ def test_ch2():
     input = "Name|SubLocation|Location|Kanton Zürich|Schweiz|Date|Creator"
     assert put_out(input) == "Name|SubLocation|Location ZH|Schweiz|Date|Creator"
 
-
 def test_ch3():
     # same as 2, but with glob replacement ('Zurich Province'-> 'Zürich' and then as in #2 above)
     input = "Name|SubLocation|Location|Kanton Zurich Province|Schweiz|Date|Creator"
     assert put_out(input) == "Name|SubLocation|Location ZH|Schweiz|Date|Creator"
+
+def test_ch4():
+    # ...except when input is "Name|SubLocation|Zürich|Kanton Zürich|Schweiz|Date|Creator"
+    # when the canton's name is in the city name
+    # then we want to see "Name|SubLocation|Zürich|Schweiz|Date|Creator"
+    input = "Name|SubLocation|Zürich|Kanton Zürich|Schweiz|Date|Creator"
+    assert put_out(input) == "Name|SubLocation|Zürich|Schweiz|Date|Creator"
+
+def test_ch5():
+    # ...except when input is "Name|SubLocation|Zürich|Kanton Zürich|Schweiz|Date|Creator"
+    # when the canton's name is in the city name
+    # then we want to see "Name|SubLocation|Zürich|Schweiz|Date|Creator"
+    input = "Name|SubLocation|Basel|Kanton Basel-Stadt|Schweiz|Date|Creator"
+    assert put_out(input) == "Name|SubLocation|Basel|Schweiz|Date|Creator"
+
+
