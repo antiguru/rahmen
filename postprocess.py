@@ -62,7 +62,6 @@ def pp_mark(items, it, ix):
 # these will be replaced wherever they occur
 # only literal keys are allowed, no regular expressions.
 def pp_glob(items, glob_replacements):
-    # value/replacement dictionary
     for i, it in enumerate(items):
         for k in glob_replacements.keys():
             # update the working value to prevent regressions when multiple matches occur
@@ -71,6 +70,7 @@ def pp_glob(items, glob_replacements):
     return items
 
 
+# value/replacement dictionary
 glob_replacements = {'Zurich': 'Zürich', ' City': '', ' Township': '', ' Province': ''}
 
 # main filter
