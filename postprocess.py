@@ -71,6 +71,8 @@ def pp_glob(items, glob_replacements):
     return items
 
 
+glob_replacements = {'Zurich': 'Zürich', ' City': '', ' Township': '', ' Province': ''}
+
 # main filter
 def postprocess(items: [str], sep: str) -> str:
     outitems = []
@@ -78,7 +80,6 @@ def postprocess(items: [str], sep: str) -> str:
     delx.clear()
     print(items)
     # first, replace the global stuff
-    glob_replacements = {'Zurich': 'Zürich', ' City': '', ' Township': '', ' Province': ''}
     items = pp_glob(items, glob_replacements)
     print(items)
     for ix, it in enumerate(items):
