@@ -103,8 +103,8 @@ def postprocess(items: [str], sep: str) -> str:
         print(outitems)
         items = outitems
 
-    # if you return a list of items, the final processing will cause empties to be filtered out (unconditionally),
-    # multiple items to be returned only once (if so configured), and finally join them to a line using the
+    # if you return a list of items, the final processing will cause empties to be filtered out and
+    # multiple items to be returned only once (unconditionally), and finally join them to a line using the
     # separator string.
     return items
     # if you return a list of only one item, the final processing step will see this as a non-empty, unique, single item

@@ -24,7 +24,7 @@ use rahmen::display_fltk::FltkDisplay;
 use rahmen::display_framebuffer::FramebufferDisplay;
 use rahmen::errors::{RahmenError, RahmenResult};
 use rahmen::font::FontRenderer;
-use rahmen::provider::{load_image_from_path, LineSettings, Provider, StatusLineFormatter};
+use rahmen::provider::{load_image_from_path, Provider, StatusLineFormatter};
 use rahmen::provider_list::ListProvider;
 
 /// dataflow control, this is used as result R part
@@ -180,21 +180,14 @@ fn main() -> RahmenResult<()> {
         });
     }
 
-    // if no entries are present in the config file, we set default values
-    // for the metadata separator, and for deduplication and hiding of empty tags;
-    // both of these are enabled by default
-    let line_settings: LineSettings = LineSettings {
-        separator: settings.separator.unwrap_or_else(|| ", ".to_string()),
-        uniquify: settings.uniquify.unwrap_or(true),
-    };
-    // build the status line, using the settings from the config file (first for the individual
-    // metadata tags, second for the regex(es) to process the whole status line),
+    // build the status line, using the settings from the config file for the individual
+    // metadata tags,
     // the metadata items being joined using the separator from the config file (or with the
-    // default value (see above) if no separator is given there)
+    // default value (", ") if no separator is given there)
     let status_line_formatter = StatusLineFormatter::new(
         settings.status_line.iter().cloned(),
         settings.py_postprocess,
-        line_settings,
+        settings.separator.unwrap_or_else(|| ", ".to_string()),
     )?;
 
     // continue evaluating the command line args
