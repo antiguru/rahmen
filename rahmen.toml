@@ -13,28 +13,13 @@ delay = 90
 # What to insert between the metadata, default: insert ", ".
     # separator = "|"
 
-# when there's python code, these will be used only for the input (and should be set false, see below)
-    # Should we show duplicate strings only once (default: true)?
-    uniquify = false
-    #Should we hide empty results (default: true)?
-    hide_empty = false
+# Should we show duplicate strings only once (default: true)?
+#   uniquify = false
 
+# use this Python script for postprocessing
 py_postprocess =  "postprocess"
+# look for it in this path
 py_path = ["."]
-
-# Regular expression(s) to apply to the whole line, after all the individual metadata has been processed
-# and joined using the separator.
-line_replacements = [
-#    {regex = '(?P<text>^.*), (?P<subloc>.*), (?P<loc>.*), (?P<province>Mark), (?P<rest>.*$)', replace = '$text, $subloc ($province), $rest'},
-#    {regex = '(?P<text>^.*), (?P<subloc>.*), (?P<loc>.*), (?P<province>.*), (?P<country>Südkorea), (?P<rest>.*$)', replace = '$text, $loc, $province, $country, $rest'},
-#    {regex = '(?P<text>^.*), (?P<sublocation>.*), (?P<location>.*), (?P<province>.*), (?P<country>Morocco), (?P<rest>.*$)',replace = '$text, $sublocation, $location, $country, $rest'},
-    #zap empty commas from the separator
-#    {regex = '^, ', replace = ','},
-    #{regex = '\W,+', replace = ''},
-    {regex = 'Zurich', replace = 'Zürich'},
-    {regex = ' Township', replace = ''},
-    {regex = ' Province', replace = ''},
-]
 
 # status line metadata (in this order) as provided by the exiv2 library
 [[status_line]]

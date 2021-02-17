@@ -33,32 +33,12 @@ For each metadata entry, it's further possible to define pairs of
 [regular expressions and replacements](https://docs.rs/regex/) that will be applied to the metadata for each individual
 tag. Multiple regular expression and replacements will be applied in the given order.
 
-#### Controlling output
-
-After this, the result will either be handed over to the final processing step, or, if defined, undergo the
-advanced processing step
-. Normally, empty results for metadata tags will be dropped, and multiple occurences of
-the same data will be reduced to one. As this may be undesirable if the data should be further processed, it's possible
-to change this behaviour using the ``uniquify`` and ``hide_empty`` entries in the config.file.
-After this processing step, the individual metadata items will be concatenated to from the line to appear below the
-image using a separator, the default being ``','``. For special processing, this can be changed using the ``separator``
-entry in the config file.
-
-### Advanced processing
-#### Regular Expressions for the whole line
-
-If you add a regular expression and a replacement to the ``line_replacements`` in the configuration file, it will be
-applied to the complete line that is the result of the steps shown above. Multiple pairs of regex/replace will be
-apllied in the order given.
-
-For example, this is useful when you want to globally change or remove something regardless in which tag it appears (
-because it can appear in several tags, or you don't remember the exact tag, ...)
+After this, the result will either be handed over to the [final processing step](#final-processing-step), or, before
+that, undergo the advanced processing step.
 
 ### Advanced processing using Python code
 
-As practice has shown the method of applying regular expressions to the whole line to be quickly resulting in unwieldy
-and awkward code, a more flexible alternative is to process the line using a programming language. It is possible to
-include a Python script to process the string produced by the steps described above.
+It is possible to include a Python script to process the string produced by the previous steps.
 
 Add the following to the configuration file to call a script named ``postprocess.py`` in the same directory as
 ``rahmen``:
@@ -75,13 +55,24 @@ This Python code gets the line string and the separator string as positional arg
 (in the order given here).
 
 The main function of the Python code has to be named ``export``. It is required to return a callable taking the line
-string and the separator string and returning list of strings, representing the processed metadata items.
+string and the separator string and returning a list of strings, representing the processed metadata items.
 
 Other than that, it is possible to flexibly process the incoming string and build the output accordingly. We have used a
 positional approach in our processing, which identifies a certain match in the metadata items list and then manipulates
 items at a position relative to this match
 (see the ``postprocess.py`` example we have published).
 
+### Final processing step
+
+Empty results for metadata tags will be dropped.
+
+Multiple occurences of the same data will be reduced to one. It's possible to change this behaviour using
+the ``uniquify`` entry in the configuration file.
+
+After this, the items will be joined using the default or configured separator.
+
+It's also possible to construct the metadata output line yourself in Python. You will have to return it as a list of one
+item, which will effectively prevent the final processing step.
 
 ### Resource consumption
 
@@ -258,35 +249,19 @@ tags described above. This can be finely controlled using the following settings
 ```toml
 separator = "|"
 uniquify = false
-hide_empty = false
 ```
 
-That way it's possible to set a custom separator, and to display multiple identical and/or empty tags, too
-(the defaults are `", "` for the separator and `true` for both other values.)
+That way it's possible to set a custom separator, and to display multiple identical tags
+(the defaults are `", "` for the separator and `true` for the other value.)
 
-Then, you can apply regular expressions to the whole line, in the same way described above for the individual tags. But
-you'll have to take care of removing empty entries (if not set to hide)
-(resulting in superfluous separators) and take care of deduplication
-(if disabled) by yourself. This might create a way to format metadata items in the text bar relative to other metadata,
-but this can be achieved more easliy and flexibly using a Python program (see below).
-
-Nevertheless, this still is useful if you want to change things globally.
-
-```toml
-# this will be applied to each metadata item
-line_replacements = [
-    { regex = 'Zurich', replace = 'Zürich' },
-]
-```
-
-This ends the basic processing of the metadata. The information line produced by the rules given will show below the
-image, unless you decide to go further and process it using Python, which is described next.
+This ends the basic processing of the metadata. The information line produced by the rules given will be handed over to
+the [final processing step](#final-processing-step), unless you decide to go further and process it using Python, which
+is described next, and after that, it will be show below the image.
 
 #### Advanced metadata processing using Python
 
-As the regex ``line_replacements`` method proved to quickly lead to awkward and unwieldy code, we introduced a way to
-use Python code that takes the metadata tags, after they have been processed using all the individual and per-line regex
-definitions and have been joined by the separator, and processes them accordingly.
+It's possible to use Python code that receives a list of the metadata tags, after they have been processed using all the
+individual and per-line regex definitions, and process them there.
 
 Add the following to the configuration file to call a script named ``postprocess.py`` in the same directory as
 ``rahmen`` (the extension ``.py`` being quietly assumed):
@@ -308,9 +283,12 @@ it will not be possible to find the script, and the program will abort.
 ##### Example script and test suite
 
 We provide an example script (``postprocess.py``) where some processing is done for certain filters. To check the
-processing, we used ``pytest``. We provide a test script (``test.py``) matching the processing rules in the example script.
-On our Debian system, invoking it with ``pytest-3 test.py`` runs the tests. It is strongly recommended to create a test
-for every processing rule you create to ensure it is properly working.
+processing, we used ``pytest``. We provide a test script (``test.py``) matching the processing rules in the example
+script. On our Debian system, invoking it with ``pytest-3 test.py`` runs the tests. It is strongly recommended to create
+a test for every processing rule you create to ensure it is properly working.
+
+After the Python code has returned the list of processed entries, they will be handed over to
+the [final processing step](#final-processing-step).
 
 ##### How to get the tags
 
@@ -319,7 +297,8 @@ tell Adobe Lightroom to add when it finds a GPS location in the image metadata.
 
 ## Bugs, Issues, Desiderata
 
-- Allow reacting to configuration file changes while running
+- Allow reacting to configuration file changes while running.
+- Allow for testing the whole text conversion chain, not only the Python part.
 - The font rendering is not really beautiful and sometimes, glyphs overlap.
 - The overflowing text is just not displayed.
 - The text bar might look better centered.

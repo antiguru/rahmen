@@ -186,7 +186,6 @@ fn main() -> RahmenResult<()> {
     let line_settings: LineSettings = LineSettings {
         separator: settings.separator.unwrap_or_else(|| ", ".to_string()),
         uniquify: settings.uniquify.unwrap_or(true),
-        hide_empty: settings.hide_empty.unwrap_or(true),
     };
     // build the status line, using the settings from the config file (first for the individual
     // metadata tags, second for the regex(es) to process the whole status line),
@@ -194,7 +193,6 @@ fn main() -> RahmenResult<()> {
     // default value (see above) if no separator is given there)
     let status_line_formatter = StatusLineFormatter::new(
         settings.status_line.iter().cloned(),
-        settings.line_replacements.iter().flatten().cloned(),
         settings.py_postprocess,
         line_settings,
     )?;
