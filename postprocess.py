@@ -76,23 +76,42 @@ def pp_mark(items, it, ix):
     return items
 
 
-# this defines timespans per country
-# { 'Start date': {'End date': 'Country'}, ... }
+# this defines timespans per country (province/state,(city, (...))
+# we use only the key values, the final value has to be None
+# { 'Start date': {'End date': {'Country': None}}, ... }
 # date format is YYYYMMDD
 # this way, un-geotagged images will be associated with the country you visited
 timespans = {
-    '20140925': {'20141101': 'USA'},
-    '20170210': {'20170222': 'Portugal'},
+    '20140925': {'20141120': {'USA': None}},
+    '20170210': {'20170222': {'Portugal': None}},
 }
+
+# consume the rest of the timespan after country
+def pp_consume_timespan(key_list, items, pos):
+    for next_key in eval("timespans['" + "']['".join(key_list) + "'].keys()"):
+        if next_key:
+            pos = pos + 1
+            i_pos = len(items) - pos
+            # too many items?
+            if i_pos >= 0:
+                items[i_pos] = next_key
+                # is there another key?
+                res = eval("timespans['" + "']['".join(key_list) + "'].get('" + next_key + "')")
+                # then do it again
+                if res is not None:
+                    key_list.append(next_key)
+                    items = pp_consume_timespan(key_list, items, pos)
+    return items
 
 
 # add country information to image if the image data is in a timespan and the image has no country information
 def pp_country_from_timespan(items):
+    pos = 3
     # we assume that date is the item before the last and that it's formatted d.m.yyyy
     # and that country is the item before date
     # this has to be configured that way in the configuration file
     # no real error checking is being done here
-    # the next two conditionals should catch crashes from missing indices
+    # the conditionals should catch crashes from missing indices
     # we need at least country|date|something, so more than two items
     if len(items) > 2:
         # only if there's no country information, we go further
@@ -105,10 +124,16 @@ def pp_country_from_timespan(items):
                 # convert the date string to YYYYMMDD
                 i_date = i_date_list[2] + i_date_list[1].zfill(2) + i_date_list[0].zfill(2)
                 for start_date in timespans.keys():
+                    key_list = [start_date]
                     if i_date >= start_date:
                         for end_date in timespans[start_date].keys():
                             if i_date <= end_date:
-                                items[len(items) - 3] = timespans[start_date].get(end_date)
+                                key_list.append(end_date)
+                                for country in timespans[start_date][end_date].keys():
+                                    items[len(items) - 3] = country
+                                    key_list.append(country)
+                                    if timespans[start_date][end_date].get(country) is not None:
+                                        items = pp_consume_timespan(key_list, items, pos)
     return (items)
 
 
