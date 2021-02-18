@@ -41,7 +41,7 @@ impl fmt::Display for RahmenError {
             RahmenError::IoError(err) => err.fmt(f),
             RahmenError::ImageError(err) => err.fmt(f),
             RahmenError::ParseFloatError(err) => err.fmt(f),
-            RahmenError::PythonError(err) => err.fmt(f),
+            RahmenError::PythonError(err) => write!(f, "Python error: {}", err),
             RahmenError::RegexError(err) => err.fmt(f),
             RahmenError::Retry => write!(f, "Retry"),
             RahmenError::Rexiv2Error(err) => err.fmt(f),
