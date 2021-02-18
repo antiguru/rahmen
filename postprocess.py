@@ -77,9 +77,9 @@ def pp_mark(items, it, ix):
 
 
 # this defines timespans per country
-# { 'Startdate': {'Enddate': 'Country'}, ... }
-# date format is YYYYMMMDD
-# this way, un-geotagged images will be associated with he country you visited
+# { 'Start date': {'End date': 'Country'}, ... }
+# date format is YYYYMMDD
+# this way, un-geotagged images will be associated with the country you visited
 timespans = {'20170210':{'20170222':'Portugal'}, '20140925':{'20141101':'USA'}}
 
 # associate an image date with the country if it is in the associated timespan
@@ -91,22 +91,24 @@ def pp_country_from_timespan(items):
     # the next two conditionals should catch crashes from missing indices
     # we need at least country|date|something, so more than two items
     if len(items) > 2:
-        # get the strings for day, month, year
-        i_date_list = items[len(items) -2].split('.')
-    else:
-        # too few items, check instructions in the configuration file; we do nothing
-        return items
-    if len(i_date_list) != 3:
-        # this is not a correct date, do nothing.
-        return items
-    # convert the date string to YYYYMMDD
-    i_date = i_date_list[2]+i_date_list[1].zfill(2)+i_date_list[0].zfill(2)
-    for start_date in timespans.keys():
-        if i_date >= start_date:
-            for end_date in timespans[start_date].keys():
-                if i_date <= end_date:
-                    # this assumes the country is before the date
-                    items[len(items) -3] = timespans[start_date].get(end_date)
+        # if there's no country information
+        if not items[len(items) -3]:
+           # get the strings for day, month, year (input format d.m.yyyy)
+            i_date_list = items[len(items) -2].split('.')
+        else:
+            # too few items, check instructions in the configuration file; we do nothing
+            return items
+        if len(i_date_list) != 3:
+            # this is not a correct date, do nothing.
+            return items
+        # convert the date string to YYYYMMDD
+        i_date = i_date_list[2]+i_date_list[1].zfill(2)+i_date_list[0].zfill(2)
+        for start_date in timespans.keys():
+            if i_date >= start_date:
+                for end_date in timespans[start_date].keys():
+                    if i_date <= end_date:
+                        # this assumes the country is before the date
+                        items[len(items) -3] = timespans[start_date].get(end_date)
     return(items)
 
 
