@@ -127,18 +127,18 @@ def test_ch5():
 # date timeline tests
 def test_timeline1():
     # this should return Portugal as country
-    input = "Name|SubLocation|Location|ProvinceState|Country|16.2.2017|Creator"
+    input = "Name|SubLocation|Location|ProvinceState||16.2.2017|Creator"
     assert put_out(input) == "Name|SubLocation|Location|ProvinceState|Portugal|16.2.2017|Creator"
 
 def test_timeline2():
     # this should return USA as country
-    input = "Name|SubLocation|Location|ProvinceState|Country|1.10.2014|Creator"
+    input = "Name|SubLocation|Location|ProvinceState||1.10.2014|Creator"
     assert put_out(input) == "Name|SubLocation|Location|ProvinceState|USA|1.10.2014|Creator"
 
 def test_timeline3():
     # incorrect/no date
     # this should return unchanged
-    input = "Name|SubLocation|Location|ProvinceState|Country|Date|Creator"
+    input = "Name|SubLocation|Location|ProvinceState||Date|Creator"
     assert put_out(input) == input
 
 def test_timeline4():
@@ -150,5 +150,10 @@ def test_timeline4():
 def test_timeline5():
     # minimal items
     # this should return USA as country
-    input = "Country|1.10.2014|Creator"
+    input = "|1.10.2014|Creator"
     assert put_out(input) == "USA|1.10.2014|Creator"
+def test_timeline6():
+    # country name already present
+    # this should return unchanged
+    input = "Name|SubLocation|Location|ProvinceState|USA|1.10.2014|Creator"
+    assert put_out(input) == input
