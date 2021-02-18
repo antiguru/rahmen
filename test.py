@@ -104,10 +104,12 @@ def test_ch2():
     input = "Name|SubLocation|Location|Kanton Zürich|Schweiz|1.11.2001|Creator"
     assert put_out(input) == "Name|SubLocation|Location ZH|Schweiz|1.11.2001|Creator"
 
+
 def test_ch3():
     # same as 2, but with glob replacement ('Zurich Province'-> 'Zürich' and then as in #2 above)
     input = "Name|SubLocation|Location|Kanton Zurich Province|Schweiz|1.11.2001|Creator"
     assert put_out(input) == "Name|SubLocation|Location ZH|Schweiz|1.11.2001|Creator"
+
 
 def test_ch4():
     # ...except when input is "Name|SubLocation|Zürich|Kanton Zürich|Schweiz|1.11.2001|Creator"
@@ -115,6 +117,7 @@ def test_ch4():
     # then we want to see "Name|SubLocation|Zürich|Schweiz|1.11.2001|Creator"
     input = "Name|SubLocation|Zürich|Kanton Zürich|Schweiz|1.11.2001|Creator"
     assert put_out(input) == "Name|SubLocation|Zürich|Schweiz|1.11.2001|Creator"
+
 
 def test_ch5():
     # ...except when input is "Name|SubLocation|Zürich|Kanton Zürich|Schweiz|1.11.2001|Creator"
@@ -130,10 +133,12 @@ def test_timeline1():
     input = "Name|SubLocation|Location|ProvinceState||16.2.2017|Creator"
     assert put_out(input) == "Name|SubLocation|Location|ProvinceState|Portugal|16.2.2017|Creator"
 
+
 def test_timeline2():
     # this should return USA as country
     input = "Name|SubLocation|Location|ProvinceState||1.10.2014|Creator"
     assert put_out(input) == "Name|SubLocation|Location|ProvinceState|USA|1.10.2014|Creator"
+
 
 def test_timeline3():
     # incorrect/no date
@@ -141,17 +146,21 @@ def test_timeline3():
     input = "Name|SubLocation|Location|ProvinceState||Date|Creator"
     assert put_out(input) == input
 
+
 def test_timeline4():
     # too few items
     # this should return unchanged
     input = "Name|Date"
     assert put_out(input) == input
 
+
 def test_timeline5():
     # minimal items
     # this should return USA as country
     input = "|1.10.2014|Creator"
     assert put_out(input) == "USA|1.10.2014|Creator"
+
+
 def test_timeline6():
     # country name already present
     # this should return unchanged

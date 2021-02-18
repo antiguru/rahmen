@@ -80,9 +80,13 @@ def pp_mark(items, it, ix):
 # { 'Start date': {'End date': 'Country'}, ... }
 # date format is YYYYMMDD
 # this way, un-geotagged images will be associated with the country you visited
-timespans = {'20170210':{'20170222':'Portugal'}, '20140925':{'20141101':'USA'}}
+timespans = {
+    '20140925': {'20141101': 'USA'},
+    '20170210': {'20170222': 'Portugal'},
+}
 
-# associate an image date with the country if it is in the associated timespan
+
+# add country information to image if the image data is in a timespan and the image has no country information
 def pp_country_from_timespan(items):
     # we assume that date is the item before the last and that it's formatted d.m.yyyy
     # and that country is the item before date
@@ -91,25 +95,21 @@ def pp_country_from_timespan(items):
     # the next two conditionals should catch crashes from missing indices
     # we need at least country|date|something, so more than two items
     if len(items) > 2:
-        # if there's no country information
-        if not items[len(items) -3]:
-           # get the strings for day, month, year (input format d.m.yyyy)
-            i_date_list = items[len(items) -2].split('.')
-        else:
-            # too few items, check instructions in the configuration file; we do nothing
-            return items
-        if len(i_date_list) != 3:
-            # this is not a correct date, do nothing.
-            return items
-        # convert the date string to YYYYMMDD
-        i_date = i_date_list[2]+i_date_list[1].zfill(2)+i_date_list[0].zfill(2)
-        for start_date in timespans.keys():
-            if i_date >= start_date:
-                for end_date in timespans[start_date].keys():
-                    if i_date <= end_date:
-                        # this assumes the country is before the date
-                        items[len(items) -3] = timespans[start_date].get(end_date)
-    return(items)
+        # only if there's no country information, we go further
+        # this assumes the country is before the date
+        if not items[len(items) - 3]:
+            # get the strings for day, month, year (input format d.m.yyyy)
+            i_date_list = items[len(items) - 2].split('.')
+            # without 3 items, it's not a correct date
+            if len(i_date_list) == 3:
+                # convert the date string to YYYYMMDD
+                i_date = i_date_list[2] + i_date_list[1].zfill(2) + i_date_list[0].zfill(2)
+                for start_date in timespans.keys():
+                    if i_date >= start_date:
+                        for end_date in timespans[start_date].keys():
+                            if i_date <= end_date:
+                                items[len(items) - 3] = timespans[start_date].get(end_date)
+    return (items)
 
 
 # primitive global replacements: the dictionary has keys (to look up) and replacement values.
@@ -136,7 +136,7 @@ def postprocess(items: [str], sep: str) -> str:
     print(items)
     # first, replace the global stuff
     items = pp_glob(items, glob_replacements)
-    items= pp_country_from_timespan(items)
+    items = pp_country_from_timespan(items)
     print(items)
     for ix, it in enumerate(items):
         if it == "Südkorea":
