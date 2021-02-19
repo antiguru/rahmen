@@ -1,12 +1,12 @@
-# python code that takes the metadata tags, after they have
-# been processed using the regex definitions and been joined by the separator,
+# python code that takes a list of the metadata tags, after they have
+# been processed using the regex definitions,
 # and processes them accordingly. It is currently required that this will return
 # a list of items (strings).
 #
-# The output will be unconditionally cleaned of empties and uniquified (so you should probably
-# set 'uniquify' and 'hide_empty' to false to have consistency in your input).
+# The output will be unconditionally cleaned of empties and uniquified unless you return a list of just one item
+# (see the example at the end)
 #
-# this holds the item postions we want to drop
+# this holds the item positions we want to drop
 # dropping cannot be done ad hoc because it would shift the positions
 delx = []
 
