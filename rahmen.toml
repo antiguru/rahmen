@@ -27,7 +27,7 @@ py_path = ["."]
 
 [[status_line]]
     exif_tags = ["Iptc.Application2.City"]
-    replace =[{regex= ' City', replace = ''}, {regex = '-si', replace = ''}]
+    replace =[{regex= ' City', replace = ''}, {regex = '-si', replace = ''},{regex= '(-gu)n*', replace = ''}]
 
 [[status_line]]
     exif_tags = ["Iptc.Application2.ProvinceState"]

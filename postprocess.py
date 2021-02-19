@@ -10,7 +10,6 @@
 # dropping cannot be done ad hoc because it would shift the positions
 delx = []
 
-
 def pp_s_korea(items, it, ix):
     # look for the item before the country ('Südkorea'), it's ProvinceState
     # the structure is then Info, Quarter, District_or_City, ProvinceState, Südkorea, Date, Creator
@@ -20,20 +19,34 @@ def pp_s_korea(items, it, ix):
     # except in the case of Jeju, do this:
     if items[ix - 1] != "Jeju":
         # ...in the big cities, the name of the province is the well-known city name, so keep it
-        if items[ix - 1] in ["Seoul", "Busan"]:
+        if items[ix - 1] in ["Seoul"]:
             # ...but drop the city district
             delx.append(ix - 2)
         else:
-            # ...otherwise drop the province
-            delx.append(ix - 1)
+            if items[ix-1] not in ['Busan']:
+                # ...otherwise drop the province
+                delx.append(ix - 1)
     # always drop the district quarter
+    if items[ix-3] == 'Pungcheon-myeon':
+        items[ix-4] = 'Hahoe'
+    if items[ix-3] == 'Sanga-dong':
+        items[ix-4] = 'Woryeonggyo-Brücke'
+    if items[ix-3] == 'Jinhyeon-dong':
+       items[ix-4] = 'Bulguksa'
+    if items[ix-3] == 'Cheongnyong-dong':
+        items[ix-4] = 'Beomeosa'
+
     delx.append(ix - 3)
     return items
 
 
 def pp_morocco(items, it, ix):
-    # drop the province
-    delx.append(ix - 1)
+    # drop the province, except when it's Marrake([s|c]h)
+    if not 'Marrakesch' in items[ix - 1]:
+        delx.append(ix - 1)
+    if items[ix-2] == "M'Semrir":
+       items[ix-4] = 'Gorges du Dades'
+
     return items
 
 
@@ -71,6 +84,10 @@ def pp_mark(items, it, ix):
     loc = items[ix - 1]
     # drop it
     delx.append(ix - 1)
+    if loc == 'Fürstenberg':
+        if items[ix -2] == 'Himmelpfort':
+            loc = 'Himmelpfort'
+            delx.append(ix - 2)
     # assign new content to province item
     items[ix] = loc + ' ' + ''.join(['(', it, ')'])
     return items
@@ -101,17 +118,24 @@ timespans = {
     '20141009': {'20141010': {'USA': {'PA': {'Pittsburgh': None}}}},
     '20141012': {'20141014': {'USA': {'IL': {'Chicago': None}}}},
     '20141015': {'20141016': {'USA': {'': {'Chicago -> Zug 5 -> Reno': None}}}},
-    '20141017': {'20141018': {'USA': {'NV': {'': None}}}},
+    '20141017': {'20141017': {'USA': {'NV': None}}},
+    '20141018': {'20141018': {'USA': {'NV': {'Pyramid Lake': None}}}},
     '20141019': {'20141019': {'USA': {'': {'Lake Tahoe': None}}}},
     '20141020': {'20141120': {'USA': None}},
     '20170210': {'20170222': {'Portugal': None}},
+    '20190201': {'20190217': {'Portugal': None}},
+    '20190501': {'20190527': {'Südkorea': None}},
+    '20201016': {'20201016': {'': {'': {'': {'':{ 'vom Dia': None}}}}}},
+    '20201028': {'20201028': {'': {'': {'': {'':{ 'vom Dia': None}}}}}},
+    '20201101': {'20210301': {'': {'': {'Himmelpfort (Mark)': None}}}},
+
 }
 
 
 # consume the rest of the timespan after country
 def pp_consume_timespan(key_list, items, pos):
     # build the timespans dict access for the current key from the key list
-    # if there are more items in the timespan than items configured, we crash, but that's ok as it is an error.
+    # if there are more items in the timespan than items configured, we stop, but that's ok as it is an error.
     # TODO there might be a better way than using eval...
     # this gives timespans[key][key][...]...
     eval_base = "timespans['" + "']['".join(key_list) + "']"
@@ -124,7 +148,7 @@ def pp_consume_timespan(key_list, items, pos):
         # unfortunately, lists wrap, we have to take care of that, otherwise we might overwrite values
         # when we find too many items in a timespan entry, we stop and throw an alert
         if i_pos < 0:
-            raise ValueError('Too many items in timespan: '+ str(key_list) + ' >>> ' + next_key)
+            raise ValueError('Too many items in timespan: ' + str(key_list) + ' >>> ' + next_key)
         else:
             # item not set?
             if not items[i_pos]:
@@ -181,7 +205,13 @@ def pp_glob(items, glob_replacements):
 
 
 # value/replacement dictionary
-glob_replacements = {'Zurich': 'Zürich', ' City': '', ' Township': '', ' Province': ''}
+glob_replacements = {'Zurich': 'Zürich',
+                     ' City': '',
+                     ' Township': '',
+                     ' Province': '',
+                     'Mezguita': 'Tamnougalt',
+                     'Marrakech': 'Marrakesch',
+                     'Marrakesh': 'Marrakesch'}
 
 
 # main filter
@@ -193,6 +223,8 @@ def postprocess(items: [str], sep: str) -> str:
     # first, replace the global stuff
     items = pp_glob(items, glob_replacements)
     # get metadata from timespans
+    # (if it was me who photographed)
+    #if 'Hartmut' in items[len(items)-1]:
     items = pp_metadata_from_timespan(items)
     print(items)
     # now the specific filters
