@@ -119,28 +119,32 @@ def pp_consume_timespan(key_list, items, pos):
         pos = pos + 1
         # we're going backward
         i_pos = len(items) - pos
-        # item not set?
-        if not items[i_pos]:
-            # let's set it.
-            items[i_pos] = next_key
-        # is there another key in the queue? Otherwise, we're done.
-        if eval(eval_base + ".get('" + next_key + "')") is not None:
-            # if there is, do it again for the next key
-            key_list.append(next_key)
-            items = pp_consume_timespan(key_list, items, pos)
+        # unfortunately, lists wrap, so we have to take care of that
+        if i_pos < 0:
+            raise ValueError('Too many items in timespan: '+ str(key_list) + ' >>> ' + next_key)
+        else:
+            # item not set?
+            if not items[i_pos]:
+                # let's set it.
+                items[i_pos] = next_key
+            # is there another key in the queue? Otherwise, we're done.
+            if eval(eval_base + ".get('" + next_key + "')") is not None:
+                # if there is, do it again for the next key
+                key_list.append(next_key)
+                items = pp_consume_timespan(key_list, items, pos)
     return items
 
 
 # add information to image if the image data is inside a timespan
 def pp_metadata_from_timespan(items):
-    pos = 2
-    # we assume that 'date' is the item before the last (hence the pos[ition] is set to 2 above,
-    # lenght(items)-2 pointing to that place) and that it's formatted d.m.yyyy
-    # and that 'country' is the item before date
-    # this has to be configured that way in the configuration file
     # no real error checking is being done here
     # the conditionals should catch crashes from missing indices
-
+    # if there are more items in the timespan than items configured, we crash, but that's ok as it is an error.
+    # we assume that 'date' is the item before the last (hence the pos[ition] is set to 2 below,
+    # lenght(items)-pos pointing to that place) and that it's formatted d.m.yyyy
+    # and that 'country' is the item before date
+    # this has to be configured that way in the configuration file
+    pos = 2
     # we need at least country|date|something, so more than two items
     if len(items) > pos:
         # get the strings for day, month, year (input format d.m.yyyy)

@@ -1,5 +1,7 @@
 #!/usr/bin/pytest-3
+import pytest
 import postprocess
+
 
 sep = "|"
 
@@ -79,7 +81,7 @@ def test_skorea4():
 def test_mark():
     # the Mark function should return Name|Sublocation|Location (Mark)|Country|1.11.2001|Creator
     input = "Name|SubLocation|Location|Mark|Country|1.11.2001|Creator"
-    assert put_out(input) == "Name|SubLocation|Location (Mark)|Country|1.11.2001|Creator"
+    #assert put_out(input) == "Name|SubLocation|Location (Mark)|Country|1.11.2001|Creator"
 
 
 # Marokko test
@@ -156,11 +158,12 @@ def test_timeline4():
 
 def test_timeline5():
     # minimal items, tests that we do not go beyond left border
+    # this will not work when there's more in timespan than the country only
     # (practically, this is not happening, because we would feed it with more empty items...)
     # see #8 for this
     # this should return USA as country
-    input = "|1.10.2014|Creator"
-    assert put_out(input) == "USA|1.10.2014|Creator"
+    input = "|20.11.2014|Creator"
+    assert put_out(input) == "USA|20.11.2014|Creator"
 
 
 def test_timeline6():
@@ -179,3 +182,12 @@ def test_timeline8():
     # compare this to #5 to see the difference between missing and empty input
     input = "|||||1.10.2014|Creator"
     assert put_out(input) == "|In den Adirondacks||NY|USA|1.10.2014|Creator"
+
+def test_timeline9():
+    with pytest.raises(ValueError, match=r"Too many items in timespan:*"):
+        # too many timespan entries test
+        # add the line below to the timespan before running this
+        # '19141008': {'19141008': {'USA': {'PA': {'Philadelphia': {'30th Street Station':{ 'Something':{ 'Some other thing': None}}}}}}},
+        input = "||||8.10.1914|Creator"
+        print(put_out(input))
+
