@@ -84,18 +84,18 @@ def pp_mark(items, it, ix):
 # Name, Sublocation, Location, ProvinceState, Country, Date, Creator
 # We match between and including start and end dates and proceed left from there: Country, ProvinceState, etc.
 # Date format here is YYYYMMDD (unlike in the display and config file).
-# This way, un-geotagged images will be associated with the country you visited
+# This way, un-geotagged images will be associated with the country or places you visited
 # To skip items (leave them untouched), insert an empty string.
 # Existing entries will not be overwritten.
 # The start date has to be unique. Do not overlap end dates, when they do, the entry starting first wins.
 timespans = {
     '20140925': {'20140928': {'USA': {'NY': {'New York': None}}}},
     '20140929': {'20140930': {'USA': {'MA': {'': {'Berkshires': None}}}}},
-    '20140930': {'20140930': {'USA': {'NY': {'': {'Auf der Fahrt in die Adirondacks': None}}}}},
+    '20140930': {'20140930': {'USA': {'NY': {'': {'Fahrt in die Adirondacks': None}}}}},
     '20141001': {'20141003': {'USA': {'NY': {'': {'In den Adirondacks': None}}}}},
-    '20141004': {'20141004': {'USA': {'NY': {'': {'Auf der Fahrt Adirondacks - Catskills': None}}}}},
+    '20141004': {'20141004': {'USA': {'NY': {'': {'Fahrt Adirondacks - Catskills': None}}}}},
     '20141005': {'20141005': {'USA': {'NY': {'': {'In den Catskills': None}}}}},
-    '20141006': {'20141006': {'USA': {'NY': {'': {'Auf der Fahrt Catskills - New York': None}}}}},
+    '20141006': {'20141006': {'USA': {'NY': {'': {'Fahrt Catskills - New York': None}}}}},
     '20141007': {'20141007': {'USA': {'NY': {'New York': None}}}},
     '20141008': {'20141008': {'USA': {'PA': {'Philadelphia': {'30th Street Station': None}}}}},
     '20141009': {'20141010': {'USA': {'PA': {'Pittsburgh': None}}}},
@@ -111,7 +111,8 @@ timespans = {
 # consume the rest of the timespan after country
 def pp_consume_timespan(key_list, items, pos):
     # build the timespans dict access for the current key from the key list
-    eval_base="timespans['" + "']['".join(key_list) + "']"
+    # TODO there might be a better way than using eval...
+    eval_base = "timespans['" + "']['".join(key_list) + "']"
     # now look for the key
     for next_key in eval(eval_base + ".keys()"):
         # move our pointer
@@ -131,36 +132,32 @@ def pp_consume_timespan(key_list, items, pos):
     return items
 
 
-# add country information to image if the image data is in a timespan and the image has no country information
-def pp_country_from_timespan(items):
-    pos = 3
-    # we assume that date is the item before the last and that it's formatted d.m.yyyy
-    # and that country is the item before date
+# add information to image if the image data is inside a timespan
+def pp_metadata_from_timespan(items):
+    pos = 2
+    # we assume that 'date' is the item before the last (hence the pos[ition] is set to 2 above,
+    # lenght(items)-2 pointing to that place) and that it's formatted d.m.yyyy
+    # and that 'country' is the item before date
     # this has to be configured that way in the configuration file
     # no real error checking is being done here
     # the conditionals should catch crashes from missing indices
+
     # we need at least country|date|something, so more than two items
-    if len(items) > 2:
-        # only if there's no country information, we go further
-        # this assumes the country is before the date
-        if not items[len(items) - 3]:
-            # get the strings for day, month, year (input format d.m.yyyy)
-            i_date_list = items[len(items) - 2].split('.')
-            # without 3 items, it's not a correct date
-            if len(i_date_list) == 3:
-                # convert the date string to YYYYMMDD
-                i_date = i_date_list[2] + i_date_list[1].zfill(2) + i_date_list[0].zfill(2)
-                for start_date in timespans.keys():
-                    key_list = [start_date]
-                    if i_date >= start_date:
-                        for end_date in timespans[start_date].keys():
-                            if i_date <= end_date:
-                                key_list.append(end_date)
-                                for country in timespans[start_date][end_date].keys():
-                                    items[len(items) - 3] = country
-                                    key_list.append(country)
-                                    if timespans[start_date][end_date].get(country) is not None:
-                                        items = pp_consume_timespan(key_list, items, pos)
+    if len(items) > pos:
+        # get the strings for day, month, year (input format d.m.yyyy)
+        i_date_list = items[len(items) - pos].split('.')
+        # without 3 items, it's not a correct date
+        if len(i_date_list) == 3:
+            # convert the date string to YYYYMMDD
+            i_date = i_date_list[2] + i_date_list[1].zfill(2) + i_date_list[0].zfill(2)
+            # we use for, but it's always only one key
+            for start_date in timespans.keys():
+                if i_date >= start_date:
+                    for end_date in timespans[start_date].keys():
+                        if i_date <= end_date:
+                            key_list = [start_date, end_date]
+                            # now we consume the timespan data
+                            items = pp_consume_timespan(key_list, items, pos)
     return (items)
 
 
@@ -188,8 +185,10 @@ def postprocess(items: [str], sep: str) -> str:
     print(items)
     # first, replace the global stuff
     items = pp_glob(items, glob_replacements)
-    items = pp_country_from_timespan(items)
+    # get metadata from timespans
+    items = pp_metadata_from_timespan(items)
     print(items)
+    # now the specific filters
     for ix, it in enumerate(items):
         if it == "Südkorea":
             outitems = pp_s_korea(items, it, ix)
