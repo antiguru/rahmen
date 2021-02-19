@@ -127,7 +127,7 @@ def test_ch5():
     assert put_out(input) == "Name|SubLocation|Basel|Schweiz|1.11.2001|Creator"
 
 
-# date timeline tests
+# date timeline tests: they assume the matching timespans in postprocess.py
 def test_timeline1():
     # this should return Portugal as country
     input = "Name|SubLocation|Location|ProvinceState||16.2.2017|Creator"
@@ -135,9 +135,9 @@ def test_timeline1():
 
 
 def test_timeline2():
-    # this should return USA as country
-    input = "Name|SubLocation|Location|ProvinceState||1.10.2014|Creator"
-    assert put_out(input) == "Name|SubLocation|Location|ProvinceState|USA|1.10.2014|Creator"
+    # this should return USA as country, NY as state, 'In den Adirondacks' as sublocation, but leave Location untouched
+    input = "||Location|||1.10.2014|Creator"
+    assert put_out(input) == "|In den Adirondacks|Location|NY|USA|1.10.2014|Creator"
 
 
 def test_timeline3():
@@ -166,3 +166,9 @@ def test_timeline6():
     # this should return unchanged
     input = "Name|SubLocation|Location|ProvinceState|USA|1.10.2014|Creator"
     assert put_out(input) == input
+
+
+def test_timeline7():
+    # detailed timespan entry test
+    input = "|||||8.10.2014|"
+    assert put_out(input) == '|30th Street Station|Philadelphia|PA|USA|8.10.2014|'

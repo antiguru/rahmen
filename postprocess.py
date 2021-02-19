@@ -82,25 +82,45 @@ def pp_mark(items, it, ix):
 # date format is YYYYMMDD
 # this way, un-geotagged images will be associated with the country you visited
 timespans = {
-    '20140925': {'20141120': {'USA': None}},
+    '20140925': {'20140928': {'USA': {'NY': {'New York': None}}}},
+    '20140929': {'20140930': {'USA': {'MA': {'': {'Berkshires': None}}}}},
+    '20140930': {'20140930': {'USA': {'NY': {'': {'Auf der Fahrt in die Adirondacks': None}}}}},
+    '20141001': {'20141003': {'USA': {'NY': {'': {'In den Adirondacks': None}}}}},
+    '20141004': {'20141004': {'USA': {'NY': {'': {'Auf der Fahrt Adirondacks - Catskills': None}}}}},
+    '20141005': {'20141005': {'USA': {'NY': {'': {'In den Catskills': None}}}}},
+    '20141006': {'20141006': {'USA': {'NY': {'': {'Auf der Fahrt Catskills - New York': None}}}}},
+    '20141007': {'20141007': {'USA': {'NY': {'New York': None}}}},
+    '20141008': {'20141008': {'USA': {'PA': {'Philadelphia': {'30th Street Station': None}}}}},
+    '20141009': {'20141010': {'USA': {'PA': {'Pittsburgh': None}}}},
+    '20141012': {'20141014': {'USA': {'IL': {'Chicago': None}}}},
+    '20141015': {'20141016': {'USA': {'': {'Chicago -> Reno': None}}}},
+    '20141017': {'20141018': {'USA': {'NV': {'': None}}}},
+    '20141019': {'20141019': {'USA': {'': {'Lake Tahoe': None}}}},
+    '20141020': {'20141120': {'USA': None}},
     '20170210': {'20170222': {'Portugal': None}},
 }
 
+
 # consume the rest of the timespan after country
 def pp_consume_timespan(key_list, items, pos):
-    for next_key in eval("timespans['" + "']['".join(key_list) + "'].keys()"):
-        if next_key:
-            pos = pos + 1
-            i_pos = len(items) - pos
-            # too many items?
-            if i_pos >= 0:
+    # build the timespans dict access for the current key from the key list
+    eval_base="timespans['" + "']['".join(key_list) + "']"
+    # now look for the key
+    for next_key in eval(eval_base + ".keys()"):
+        # move our pointer
+        pos = pos + 1
+        # we're going backward
+        i_pos = len(items) - pos
+        # if there are too many items in the timespans entry, the items list will be exhausted. Then we stop.
+        if i_pos >= 0:
+            # set item only if unset
+            if not items[i_pos]:
                 items[i_pos] = next_key
-                # is there another key?
-                res = eval("timespans['" + "']['".join(key_list) + "'].get('" + next_key + "')")
-                # then do it again
-                if res is not None:
-                    key_list.append(next_key)
-                    items = pp_consume_timespan(key_list, items, pos)
+            # is there another key in the queue? Otherwise, we're done.
+            if eval(eval_base + ".get('" + next_key + "')") is not None:
+                # if there is, do it again
+                key_list.append(next_key)
+                items = pp_consume_timespan(key_list, items, pos)
     return items
 
 
