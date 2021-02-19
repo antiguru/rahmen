@@ -119,16 +119,15 @@ def pp_consume_timespan(key_list, items, pos):
         pos = pos + 1
         # we're going backward
         i_pos = len(items) - pos
-        # if there are too many items in the timespans entry, the items list will be exhausted. Then we stop.
-        if i_pos >= 0:
-            # set item only if unset
-            if not items[i_pos]:
-                items[i_pos] = next_key
-            # is there another key in the queue? Otherwise, we're done.
-            if eval(eval_base + ".get('" + next_key + "')") is not None:
-                # if there is, do it again
-                key_list.append(next_key)
-                items = pp_consume_timespan(key_list, items, pos)
+        # item not set?
+        if not items[i_pos]:
+            # let's set it.
+            items[i_pos] = next_key
+        # is there another key in the queue? Otherwise, we're done.
+        if eval(eval_base + ".get('" + next_key + "')") is not None:
+            # if there is, do it again for the next key
+            key_list.append(next_key)
+            items = pp_consume_timespan(key_list, items, pos)
     return items
 
 
@@ -148,11 +147,13 @@ def pp_metadata_from_timespan(items):
         i_date_list = items[len(items) - pos].split('.')
         # without 3 items, it's not a correct date
         if len(i_date_list) == 3:
-            # convert the date string to YYYYMMDD
+            # convert the date string to YYYYMMDD (add leading zeros if necessary)
             i_date = i_date_list[2] + i_date_list[1].zfill(2) + i_date_list[0].zfill(2)
-            # we use for, but it's always only one key
+            # we look for our dates
             for start_date in timespans.keys():
                 if i_date >= start_date:
+                    # for assigns an anonymous key to a variable, which is what we need, even if
+                    # there will be only one key
                     for end_date in timespans[start_date].keys():
                         if i_date <= end_date:
                             key_list = [start_date, end_date]
