@@ -2,7 +2,6 @@
 import pytest
 import postprocess
 
-
 sep = "|"
 
 
@@ -81,7 +80,7 @@ def test_skorea4():
 def test_mark():
     # the Mark function should return Name|Sublocation|Location (Mark)|Country|1.11.2001|Creator
     input = "Name|SubLocation|Location|Mark|Country|1.11.2001|Creator"
-    #assert put_out(input) == "Name|SubLocation|Location (Mark)|Country|1.11.2001|Creator"
+    assert put_out(input) == "Name|SubLocation|Location (Mark)|Country|1.11.2001|Creator"
 
 
 # Marokko test
@@ -178,16 +177,17 @@ def test_timeline7():
     input = "|||||8.10.2014|"
     assert put_out(input) == '|30th Street Station|Philadelphia|PA|USA|8.10.2014|'
 
+
 def test_timeline8():
     # compare this to #5 to see the difference between missing and empty input
     input = "|||||1.10.2014|Creator"
     assert put_out(input) == "|In den Adirondacks||NY|USA|1.10.2014|Creator"
 
+
 def test_timeline9():
     with pytest.raises(ValueError, match=r"Too many items in timespan:*"):
         # too many timespan entries test
-        # add the line below to the timespan before running this
-        # '19141008': {'19141008': {'USA': {'PA': {'Philadelphia': {'30th Street Station':{ 'Something':{ 'Some other thing': None}}}}}}},
+        # add the line below to the timespans before running this
+        # '19141008': {'19141008': {'USA': {'PA': {'Philadelphia': {'30th Street Station':{ 'Something':{ 'This here's too much': None}}}}}}},
         input = "||||8.10.1914|Creator"
         print(put_out(input))
-

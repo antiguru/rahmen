@@ -90,17 +90,17 @@ def pp_mark(items, it, ix):
 # The start date has to be unique. Do not overlap end dates, when they do, the entry starting first wins.
 timespans = {
     '20140925': {'20140928': {'USA': {'NY': {'New York': None}}}},
-    '20140929': {'20140930': {'USA': {'MA': {'': {'Berkshires': None}}}}},
+    '20140929': {'20140930': {'USA': {'MA': {'': {'In den Berkshires': None}}}}},
     '20140930': {'20140930': {'USA': {'NY': {'': {'Fahrt in die Adirondacks': None}}}}},
     '20141001': {'20141003': {'USA': {'NY': {'': {'In den Adirondacks': None}}}}},
-    '20141004': {'20141004': {'USA': {'NY': {'': {'Fahrt Adirondacks - Catskills': None}}}}},
+    '20141004': {'20141004': {'USA': {'NY': {'': {'Adirondacks -> Catskills': None}}}}},
     '20141005': {'20141005': {'USA': {'NY': {'': {'In den Catskills': None}}}}},
-    '20141006': {'20141006': {'USA': {'NY': {'': {'Fahrt Catskills - New York': None}}}}},
+    '20141006': {'20141006': {'USA': {'NY': {'': {'Catskills -> Poughkeepsie -> NYC': None}}}}},
     '20141007': {'20141007': {'USA': {'NY': {'New York': None}}}},
     '20141008': {'20141008': {'USA': {'PA': {'Philadelphia': {'30th Street Station': None}}}}},
     '20141009': {'20141010': {'USA': {'PA': {'Pittsburgh': None}}}},
     '20141012': {'20141014': {'USA': {'IL': {'Chicago': None}}}},
-    '20141015': {'20141016': {'USA': {'': {'Chicago -> Reno': None}}}},
+    '20141015': {'20141016': {'USA': {'': {'Chicago -> Zug 5 -> Reno': None}}}},
     '20141017': {'20141018': {'USA': {'NV': {'': None}}}},
     '20141019': {'20141019': {'USA': {'': {'Lake Tahoe': None}}}},
     '20141020': {'20141120': {'USA': None}},
@@ -111,7 +111,9 @@ timespans = {
 # consume the rest of the timespan after country
 def pp_consume_timespan(key_list, items, pos):
     # build the timespans dict access for the current key from the key list
+    # if there are more items in the timespan than items configured, we crash, but that's ok as it is an error.
     # TODO there might be a better way than using eval...
+    # this gives timespans[key][key][...]...
     eval_base = "timespans['" + "']['".join(key_list) + "']"
     # now look for the key
     for next_key in eval(eval_base + ".keys()"):
@@ -119,7 +121,8 @@ def pp_consume_timespan(key_list, items, pos):
         pos = pos + 1
         # we're going backward
         i_pos = len(items) - pos
-        # unfortunately, lists wrap, so we have to take care of that
+        # unfortunately, lists wrap, we have to take care of that, otherwise we might overwrite values
+        # when we find too many items in a timespan entry, we stop and throw an alert
         if i_pos < 0:
             raise ValueError('Too many items in timespan: '+ str(key_list) + ' >>> ' + next_key)
         else:
@@ -137,13 +140,12 @@ def pp_consume_timespan(key_list, items, pos):
 
 # add information to image if the image data is inside a timespan
 def pp_metadata_from_timespan(items):
-    # no real error checking is being done here
-    # the conditionals should catch crashes from missing indices
-    # if there are more items in the timespan than items configured, we crash, but that's ok as it is an error.
     # we assume that 'date' is the item before the last (hence the pos[ition] is set to 2 below,
     # lenght(items)-pos pointing to that place) and that it's formatted d.m.yyyy
     # and that 'country' is the item before date
     # this has to be configured that way in the configuration file
+    # no real error checking is being done here, but
+    # the conditionals should catch crashes from missing indices
     pos = 2
     # we need at least country|date|something, so more than two items
     if len(items) > pos:
@@ -156,7 +158,7 @@ def pp_metadata_from_timespan(items):
             # we look for our dates
             for start_date in timespans.keys():
                 if i_date >= start_date:
-                    # for assigns an anonymous key to a variable, which is what we need, even if
+                    # 'for' assigns an anonymous key to a variable, which is what we need, even if
                     # there will be only one key
                     for end_date in timespans[start_date].keys():
                         if i_date <= end_date:
