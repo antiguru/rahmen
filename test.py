@@ -155,7 +155,9 @@ def test_timeline4():
 
 
 def test_timeline5():
-    # minimal items
+    # minimal items, tests that we do not go beyond left border
+    # (practically, this is not happening, because we would feed it with more empty items...)
+    # see #8 for this
     # this should return USA as country
     input = "|1.10.2014|Creator"
     assert put_out(input) == "USA|1.10.2014|Creator"
@@ -172,3 +174,8 @@ def test_timeline7():
     # detailed timespan entry test
     input = "|||||8.10.2014|"
     assert put_out(input) == '|30th Street Station|Philadelphia|PA|USA|8.10.2014|'
+
+def test_timeline8():
+    # compare this to #5 to see the difference between missing and empty input
+    input = "|||||1.10.2014|Creator"
+    assert put_out(input) == "|In den Adirondacks||NY|USA|1.10.2014|Creator"

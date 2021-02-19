@@ -76,11 +76,18 @@ def pp_mark(items, it, ix):
     return items
 
 
-# this defines timespans per country (province/state,(city, (...))
-# we use only the key values, the final value has to be None
+# This defines timespans per country (province/state,(city, (...)).
+# We use only the key values, the value for the last key has to be None.
 # { 'Start date': {'End date': {'Country': None}}, ... }
-# date format is YYYYMMDD
-# this way, un-geotagged images will be associated with the country you visited
+# This matches the metatags that are defined in the config file, but the order is reversed here.
+# This example assumes that the config file metatags amount to
+# Name, Sublocation, Location, ProvinceState, Country, Date, Creator
+# We match between and including start and end dates and proceed left from there: Country, ProvinceState, etc.
+# Date format here is YYYYMMDD (unlike in the display and config file).
+# This way, un-geotagged images will be associated with the country you visited
+# To skip items (leave them untouched), insert an empty string.
+# Existing entries will not be overwritten.
+# The start date has to be unique. Do not overlap end dates, when they do, the entry starting first wins.
 timespans = {
     '20140925': {'20140928': {'USA': {'NY': {'New York': None}}}},
     '20140929': {'20140930': {'USA': {'MA': {'': {'Berkshires': None}}}}},
