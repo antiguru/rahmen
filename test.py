@@ -56,30 +56,30 @@ def test_dia1():
 # Südkorea tests
 def test_skorea1():
     # we generally want to omit the province in S Korea
-    # so the S Korea function should return Name|Location|Südkorea|1.11.2001|Creator
+    # so the S Korea function should return Name|SubLocation|Location|Südkorea|1.11.2001|Creator
     input = "Name|SubLocation|Location|ProvinceState|Südkorea|1.11.2001|Creator"
-    assert put_out(input) == "Name|Location|Südkorea|1.11.2001|Creator"
+    assert put_out(input) == "Name|SubLocation|Location|Südkorea|1.11.2001|Creator"
 
 
 def test_skorea2():
     # except when ProvinceState is Busan, then it should return
     # Name|Busan|Südkorea|1.11.2001|Creator
     input = "Name|SubLocation|Location|Busan|Südkorea|1.11.2001|Creator"
-    assert put_out(input) == "Name|Location|Busan|Südkorea|1.11.2001|Creator"
+    assert put_out(input) == "Name|SubLocation|Location|Busan|Südkorea|1.11.2001|Creator"
 
 
 def test_skorea3():
     # except when ProvinceState is Seoul, then it should return
     # Name|Seoul|Südkorea|1.11.2001|Creator
     input = "Name|SubLocation|Location|Seoul|Südkorea|1.11.2001|Creator"
-    assert put_out(input) == "Name|Seoul|Südkorea|1.11.2001|Creator"
+    assert put_out(input) == "Name|SubLocation|Location|Seoul|Südkorea|1.11.2001|Creator"
 
 
 def test_skorea4():
     # except when ProvinceState is Jeju, then it should return
     # Name|Location|Jeju|Südkorea|1.11.2001|Creator
     input = "Name|SubLocation|Location|Jeju|Südkorea|1.11.2001|Creator"
-    assert put_out(input) == "Name|Location|Jeju|Südkorea|1.11.2001|Creator"
+    assert put_out(input) == "Name|SubLocation|Location|Jeju|Südkorea|1.11.2001|Creator"
 
 
 # Mark Brandenburg test
