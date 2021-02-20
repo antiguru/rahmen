@@ -1,5 +1,5 @@
 #!/usr/bin/pytest-3
-import pytest
+#import pytest
 import postprocess
 
 sep = "|"
@@ -45,7 +45,13 @@ def test_glob4():
 
 
 # we have to make up a test for every filtered item of input
-# now, we have Südkorea, Mark, Marokko, Schweiz
+# now, we have Dia, Südkorea, Mark, Marokko, Schweiz
+
+# Südkorea tests
+def test_dia1():
+    # we remove all info except creator from images that are duplicates of slides
+    input = "vom Dia|SubLocation|Location|ProvinceState|Country|1.11.2001|Creator"
+    assert put_out(input) == "vom Dia|Creator"
 
 # Südkorea tests
 def test_skorea1():
@@ -177,7 +183,6 @@ def test_timeline6():
     # this should return unchanged
     input = "Name|SubLocation|Location|ProvinceState|USA|1.10.2014|Creator"
     assert put_out(input) == input
-
 
 def test_timeline7():
     # detailed timespan entry test

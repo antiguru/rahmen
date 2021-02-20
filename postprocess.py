@@ -20,24 +20,32 @@ def pp_s_korea(items, it, ix):
     # except in the case of Jeju, do this:
     if items[ix - 1] != "Jeju":
         # ...in the big cities, the name of the province is the well-known city name, so keep it
-        if items[ix - 1] in ["Seoul"]:
-            # ...but drop the city district
-            delx.append(ix - 2)
-        else:
+        if items[ix - 1] not in ["Seoul"]:
+        # ...but drop the city district
+        # delx.append(ix - 2)
+        #else:
             if items[ix - 1] not in ['Busan']:
                 # ...otherwise drop the province
                 delx.append(ix - 1)
+    # cut away city quarter overkill
+    quarter_parts = items[ix - 3].split(' ')
+    if len(quarter_parts) > 1:
+        items[ix - 3] = quarter_parts[0]
     # set some landmark names from the district quarter
     if items[ix - 3] == 'Pungcheon-myeon':
+        delx.append(ix - 3)
         items[ix - 4] = 'Hahoe'
-    if items[ix - 3] == 'Sanga-dong':
+    if items[ix - 3] == 'Sanga':
+        delx.append(ix - 3)
         items[ix - 4] = 'Woryeonggyo-Brücke'
-    if items[ix - 3] == 'Jinhyeon-dong':
+    if items[ix - 3] == 'Jinhyeon':
+        delx.append(ix - 3)
         items[ix - 4] = 'Bulguksa'
-    if items[ix - 3] == 'Cheongnyong-dong':
+    if items[ix - 3] == 'Cheongnyong':
+        delx.append(ix - 3)
         items[ix - 4] = 'Beomeosa'
     # always drop the district quarter
-    delx.append(ix - 3)
+    # delx.append(ix - 3)
     return items
 
 
@@ -45,12 +53,15 @@ def pp_morocco(items, it, ix):
     # drop the province, except when it's Marrake([s|c]h)
     if not 'Marrakesch' in items[ix - 1]:
         delx.append(ix - 1)
+    # set some landmark names from the city
     if items[ix - 2] == "M'Semrir":
         items[ix - 4] = 'Gorges du Dades'
     if items[ix - 2] == "Zerkten":
         items[ix - 4] = "Tizi n'Tichka"
     if items[ix - 2] == "Mezguita":
         items[ix - 4] = "Tamnougalt"
+    if items[ix - 2] == "Ikniouen":
+        items[ix - 4] = "Jbel Saghro"
 
     return items
 
@@ -202,7 +213,7 @@ def pp_metadata_from_timespan(items):
 
 
 def pp_dia(ix):
-    for i in [1, 2, 3, 4]:
+    for i in [1, 2, 3, 4, 5]:
         delx.append(ix + 1)
 
 
@@ -243,7 +254,8 @@ def postprocess(items: [str], sep: str) -> str:
     # now the specific filters
     for ix, it in enumerate(items):
         if 'vom Dia' in it:
-            outitems = pp_dia(ix)
+            pp_dia(ix)
+            outitems = items
         if it == "Südkorea":
             outitems = pp_s_korea(items, it, ix)
         if it == "Mark":
