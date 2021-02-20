@@ -21,6 +21,7 @@ def pp_s_korea(items, it, ix):
     if items[ix - 1] != "Jeju":
         # ...in the big cities, the name of the province is the well-known city name, so keep it
         if items[ix - 1] not in ["Seoul"]:
+        # TODO this is WIP here, I haven't decided on what's looking better
         # ...but drop the city district
         # delx.append(ix - 2)
         #else:
@@ -32,7 +33,8 @@ def pp_s_korea(items, it, ix):
     if len(quarter_parts) > 1:
         items[ix - 3] = quarter_parts[0]
     # set some landmark names from the district quarter
-    if items[ix - 3] == 'Pungcheon-myeon':
+    # TODO we could move this to a dict and use it for morocco too
+    if items[ix - 3] == 'Pungcheon':
         delx.append(ix - 3)
         items[ix - 4] = 'Hahoe'
     if items[ix - 3] == 'Sanga':
@@ -222,9 +224,9 @@ def pp_dia(ix):
 # only literal keys are allowed, no regular expressions.
 def pp_glob(items, glob_replacements):
     for i, it in enumerate(items):
-        for k in glob_replacements.keys():
+        for key, value in glob_replacements.items():
             # update the working value to prevent regressions when multiple matches occur
-            it = it.replace(k, glob_replacements.get(k))
+            it = it.replace(key, value)
             items[i] = it
     return items
 
@@ -270,9 +272,8 @@ def postprocess(items: [str], sep: str) -> str:
     else:
         # only now, we remove the dropped items
         for x in delx:
-            if x >= 0:
-                if outitems[x]:
-                    del outitems[x]
+            if x >= 0 and outitems[x]:
+                del outitems[x]
         print("Status line changed to:")
         print(outitems)
         items = outitems
