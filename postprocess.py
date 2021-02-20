@@ -10,6 +10,7 @@
 # dropping cannot be done ad hoc because it would shift the positions
 delx = []
 
+
 def pp_s_korea(items, it, ix):
     # look for the item before the country ('Südkorea'), it's ProvinceState
     # the structure is then Info, Quarter, District_or_City, ProvinceState, Südkorea, Date, Creator
@@ -23,19 +24,19 @@ def pp_s_korea(items, it, ix):
             # ...but drop the city district
             delx.append(ix - 2)
         else:
-            if items[ix-1] not in ['Busan']:
+            if items[ix - 1] not in ['Busan']:
                 # ...otherwise drop the province
                 delx.append(ix - 1)
+    # set some landmark names from the district quarter
+    if items[ix - 3] == 'Pungcheon-myeon':
+        items[ix - 4] = 'Hahoe'
+    if items[ix - 3] == 'Sanga-dong':
+        items[ix - 4] = 'Woryeonggyo-Brücke'
+    if items[ix - 3] == 'Jinhyeon-dong':
+        items[ix - 4] = 'Bulguksa'
+    if items[ix - 3] == 'Cheongnyong-dong':
+        items[ix - 4] = 'Beomeosa'
     # always drop the district quarter
-    if items[ix-3] == 'Pungcheon-myeon':
-        items[ix-4] = 'Hahoe'
-    if items[ix-3] == 'Sanga-dong':
-        items[ix-4] = 'Woryeonggyo-Brücke'
-    if items[ix-3] == 'Jinhyeon-dong':
-       items[ix-4] = 'Bulguksa'
-    if items[ix-3] == 'Cheongnyong-dong':
-        items[ix-4] = 'Beomeosa'
-
     delx.append(ix - 3)
     return items
 
@@ -44,14 +45,18 @@ def pp_morocco(items, it, ix):
     # drop the province, except when it's Marrake([s|c]h)
     if not 'Marrakesch' in items[ix - 1]:
         delx.append(ix - 1)
-    if items[ix-2] == "M'Semrir":
-       items[ix-4] = 'Gorges du Dades'
+    if items[ix - 2] == "M'Semrir":
+        items[ix - 4] = 'Gorges du Dades'
+    if items[ix - 2] == "Zerkten":
+        items[ix - 4] = "Tizi n'Tichka"
+    if items[ix - 2] == "Mezguita":
+        items[ix - 4] = "Tamnougalt"
 
     return items
 
 
 # cantons and abbreviations for them, to be extended
-cantons = {'Zürich': 'ZH', 'Basel-Stadt': 'BS'}
+cantons = {'Zürich': 'ZH', 'Basel-Stadt': 'BS', 'St. Gallen': 'SG'}
 
 
 def pp_ch_cantons(items, ix):
@@ -66,7 +71,8 @@ def pp_ch_cantons(items, ix):
             if city not in canton:
                 # append the canton's abbreviation
                 ct = ' ' + cantons.get(canton)
-            # mark city field for deletion
+            # mark city and country field for deletion
+            delx.append(ix)
             delx.append(ix - 2)
             # update input_canton field with city + abbreviation (or '')
             items[ix - 1] = city + ct
@@ -84,12 +90,15 @@ def pp_mark(items, it, ix):
     loc = items[ix - 1]
     # drop it
     delx.append(ix - 1)
+    # in case of Himmelpfort, no Fürstenberg
+    if items[ix - 2] == 'Himmelpfort':
+        loc = 'Himmelpfort'
+        delx.append(ix - 2)
+    # Fürstenberg(Mark) is somewhere else
     if loc == 'Fürstenberg':
-        if items[ix -2] == 'Himmelpfort':
-            loc = 'Himmelpfort'
-            delx.append(ix - 2)
-    # assign new content to province item
-    items[ix] = loc + ' ' + ''.join(['(', it, ')'])
+        items[ix] = loc + ' (Havel)'
+    else:
+        items[ix] = loc + ' ' + ''.join(['(', it, ')'])
     return items
 
 
@@ -117,16 +126,16 @@ timespans = {
     '20141008': {'20141008': {'USA': {'PA': {'Philadelphia': {'30th Street Station': None}}}}},
     '20141009': {'20141010': {'USA': {'PA': {'Pittsburgh': None}}}},
     '20141012': {'20141014': {'USA': {'IL': {'Chicago': None}}}},
-    '20141015': {'20141016': {'USA': {'': {'Chicago -> Zug 5 -> Reno': None}}}},
+    '20141015': {'20141016': {'USA': {'': {'Chicago -> Train 5 -> Reno': None}}}},
     '20141017': {'20141017': {'USA': {'NV': None}}},
     '20141018': {'20141018': {'USA': {'NV': {'Pyramid Lake': None}}}},
     '20141019': {'20141019': {'USA': {'': {'Lake Tahoe': None}}}},
-    '20141020': {'20141120': {'USA': None}},
+    '20141020': {'20141122': {'USA': None}},
     '20170210': {'20170222': {'Portugal': None}},
-    '20190201': {'20190217': {'Portugal': None}},
+    '20190131': {'20190217': {'Portugal': None}},
     '20190501': {'20190527': {'Südkorea': None}},
-    '20201016': {'20201016': {'': {'': {'': {'':{ 'vom Dia': None}}}}}},
-    '20201028': {'20201028': {'': {'': {'': {'':{ 'vom Dia': None}}}}}},
+    '20201016': {'20201016': {'': {'': {'': {'': {'vom Dia': None}}}}}},
+    '20201028': {'20201028': {'': {'': {'': {'': {'vom Dia': None}}}}}},
     '20201101': {'20210301': {'': {'': {'Himmelpfort (Mark)': None}}}},
 
 }
@@ -192,6 +201,11 @@ def pp_metadata_from_timespan(items):
     return (items)
 
 
+def pp_dia(ix):
+    for i in [1, 2, 3, 4]:
+        delx.append(ix + 1)
+
+
 # primitive global replacements: the dictionary has keys (to look up) and replacement values.
 # these will be replaced wherever they occur
 # only literal keys are allowed, no regular expressions.
@@ -209,7 +223,6 @@ glob_replacements = {'Zurich': 'Zürich',
                      ' City': '',
                      ' Township': '',
                      ' Province': '',
-                     'Mezguita': 'Tamnougalt',
                      'Marrakech': 'Marrakesch',
                      'Marrakesh': 'Marrakesch'}
 
@@ -224,11 +237,13 @@ def postprocess(items: [str], sep: str) -> str:
     items = pp_glob(items, glob_replacements)
     # get metadata from timespans
     # (if it was me who photographed)
-    #if 'Hartmut' in items[len(items)-1]:
+    # if 'Hartmut' in items[len(items)-1]:
     items = pp_metadata_from_timespan(items)
     print(items)
     # now the specific filters
     for ix, it in enumerate(items):
+        if 'vom Dia' in it:
+            outitems = pp_dia(ix)
         if it == "Südkorea":
             outitems = pp_s_korea(items, it, ix)
         if it == "Mark":
