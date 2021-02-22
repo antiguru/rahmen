@@ -24,10 +24,11 @@ exif_tags = ["Iptc.Application2.ObjectName"]
 
 [[status_line]]
 exif_tags = ["Iptc.Application2.SubLocation"]
+replace = [{ regex = '-myeon', replace = '' },{ regex = '-dong', replace = '' }]
 
 [[status_line]]
 exif_tags = ["Iptc.Application2.City"]
-replace = [{ regex = ' City', replace = '' }, { regex = '-si', replace = '' }, { regex = '(-gu)n*', replace = '' }]
+replace = [{ regex = ' City', replace = '' }, { regex = '-si', replace = '' }, { regex = '(-gu)n*', replace = '' }, { regex = '-eup', replace = '' }]
 
 [[status_line]]
 exif_tags = ["Iptc.Application2.ProvinceState"]
