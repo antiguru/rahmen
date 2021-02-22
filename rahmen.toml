@@ -11,56 +11,51 @@ delay = 90
 # or the line_replace regex(es).
 
 # What to insert between the metadata, default: insert ", ".
-    # separator = "|"
+# separator = "|"
 
 # use this Python script for postprocessing
-py_postprocess =  "postprocess"
+py_postprocess = "postprocess"
 # look for it in this path
 py_path = ["."]
 
 # status line metadata (in this order) as provided by the exiv2 library
 [[status_line]]
-    exif_tags = ["Iptc.Application2.ObjectName"]
+exif_tags = ["Iptc.Application2.ObjectName"]
 
 [[status_line]]
-    exif_tags = ["Iptc.Application2.SubLocation"]
+exif_tags = ["Iptc.Application2.SubLocation"]
+replace = [{ regex = '-myeon', replace = '' },{ regex = '-dong', replace = '' }]
 
 [[status_line]]
-    exif_tags = ["Iptc.Application2.City"]
-    replace =[{regex= ' City', replace = ''}, {regex = '-si', replace = ''}]
+exif_tags = ["Iptc.Application2.City"]
+replace = [{ regex = ' City', replace = '' }, { regex = '-si', replace = '' }, { regex = '(-gu)n*', replace = '' }, { regex = '-eup', replace = '' }]
 
 [[status_line]]
-    exif_tags = ["Iptc.Application2.ProvinceState"]
-    replace = [{regex = '(?i)Mecklenburg-Western\sPomerania', replace = 'MV' },
-        {regex = 'Brandenburg', replace = 'Mark'},
-        {regex = '-do', replace = ''},
-        {regex= '(?i)West Pomeranian Voivodeship', replace = ''}]
+exif_tags = ["Iptc.Application2.ProvinceState"]
+replace = [{ regex = '-do', replace = '' }]
 
 [[status_line]]
-    exif_tags = ["Iptc.Application2.CountryName"]
-    replace = [{regex = 'South\sKorea', replace = 'Südkorea' },
-        {regex = '(?i)United\sStates\sOf\sAmerica', replace = 'USA' },
-        {regex = 'Germany', replace = ''},
-        {regex = 'Morocco', replace = 'Marokko'}]
+exif_tags = ["Iptc.Application2.CountryName"]
+replace = [{ regex = '(?i)United\sStates\sOf\sAmerica', replace = 'USA' }, ]
 
 [[status_line]]
-    exif_tags = ["Exif.Photo.DateTimeOriginal"]
+exif_tags = ["Exif.Photo.DateTimeOriginal"]
 
 # convert date to German format
 [[status_line.replace]]
-    regex = '(?P<y>\d{4})[-:]0*(?P<M>\d+)[-:]0*(?P<d>\d+)\s+0*(?P<h>\d+:)0*(?P<m>\d+):(?P<s>\d{2})'
-    # e.g. with time:  replace = '$d.$M.$y, $h$m'
-    replace = '$d.$M.$y'
+regex = '(?P<y>\d{4})[-:](?P<M>\d+)[-:](?P<d>\d+)\s+(?P<h>\d+:)(?P<m>\d+):(?P<s>\d{2})'
+# e.g. with time:  replace = '$y-$M-$d, $h:$m'
+replace = '$y-$M-$d'
 
 [[status_line]]
-    exif_tags = ["Xmp.dc.creator"]
-    # convert input from UPPER CASE to Title Case (there's also the more powerful case_conversion instruction)
-    #capitalize = true
+exif_tags = ["Xmp.dc.creator"]
+# convert input from UPPER CASE to Title Case (there's also the more powerful case_conversion instruction)
+#capitalize = true
 
-    # convert input from case to case (see https://github.com/rutrum/convert-case#cases)
-    case_conversion = {from = 'Upper', to = 'Title'}
+# convert input from case to case (see https://github.com/rutrum/convert-case#cases)
+case_conversion = { from = 'Upper', to = 'Title' }
 
-    # remove everything after the first word, add s/th before name
-    replace = [{ regex = '\s.*$', replace = '' }, { regex = '(?P<a>^.*$)', replace = 'von $a' }]
+# remove everything after the first word, add s/th before name
+replace = [{ regex = '\s.*$', replace = '' }, { regex = '(?P<a>^.*$)', replace = 'by $a' }]
 
 
