@@ -10,6 +10,8 @@ def put_out(input):
     return sep.join(postprocess.postprocess(input.split(sep), sep))
 
 
+
+
 # keep in mind that these are run _after_ the regex magic has taken place
 
 def test_nochange():
@@ -81,6 +83,11 @@ def test_skorea4():
     input = "Name|SubLocation|Location|Jeju|Südkorea|1.11.2001|Creator"
     assert put_out(input) == "Name|SubLocation|Location|Jeju|Südkorea|1.11.2001|Creator"
 
+def test_skorea5():
+    # tests landmark adding
+    input = "|Pungcheon|Location|ProvinceState|Südkorea|1.11.2001|Creator"
+    assert put_out(input) == "Hahoe|Location|Südkorea|1.11.2001|Creator"
+
 
 # Mark Brandenburg test
 def test_mark():
@@ -105,6 +112,16 @@ def test_morocco():
     # the Morocco function should return Name|SubLocation|Location|Marokko|1.11.2001|Creator
     input = "Name|SubLocation|Location|ProvinceState|Marokko|1.11.2001|Creator"
     assert put_out(input) == "Name|SubLocation|Location|Marokko|1.11.2001|Creator"
+
+def test_morocco2():
+    # tests landmark adding
+    input = "|SubLocation|M'Semrir|ProvinceState|Marokko|1.11.2001|Creator"
+    assert put_out(input) == "Gorges du Dades|SubLocation|M'Semrir|Marokko|1.11.2001|Creator"
+
+def test_morocco3():
+    # various ways to write Marrakesh (tests glob regex)
+    input = "|SubLocation|Marrakech|Marrakech|Marokko|1.11.2001|Creator"
+    assert put_out(input) == "|SubLocation|Marrakesch|Marrakesch|Marokko|1.11.2001|Creator"
 
 
 # Schweiz tests

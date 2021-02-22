@@ -1,7 +1,18 @@
+import re
+
 # python code that takes a list of the metadata tags, after they have
 # been processed using the regex definitions,
 # and processes them accordingly. It is currently required that this will return
 # a list of items (strings).
+#
+# We used a positional approach here. We know how many tags we configured to be shown in the configuration file;
+# thus we can move back or forth from any given item and find another that way.
+# Let's say we have defined the field structure Info, Quarter, District_or_City, ProvinceState, Country, Date, Creator,
+# and we have looked for 'USA' and got the index for it. Assuming that 'USA' is in the 'country' field
+# (you'll have to take care that you choose your search terms carefully so that false positives are ruled out),
+# the structure is then Info, Quarter, District_or_City, ProvinceState, USA, Date, Creator
+# and the offsets:      ^^^⁻4,^^^-3,   ^^^-2,            ^^^-1          ^^^  ^^^+1 ^^^+2
+# so the 'info' field would be at index-4, the 'creator' field at index+2
 #
 # The output will be unconditionally cleaned of empties and uniquified unless you return a list of just one item
 # (see the example at the end)
@@ -11,20 +22,35 @@
 delx = []
 
 
+def modify(items, ix_to_check, val_to_check, ix_to_modify, val_to_modify, ix_to_delete=None):
+    # modify an item in items if it is not set depending on s/th matching another item,
+    # optionally mark item for deletion
+    #
+    # if this item matches the control value, and
+    if items[ix_to_check] == val_to_check:
+        # if the item to be modified is not set,
+        if not items[ix_to_modify]:
+            # modify it
+            items[ix_to_modify] = val_to_modify
+        # optionally mark item[ix] for deletion
+        if ix_to_delete:
+            delx.append(ix_to_delete)
+
+
 def pp_s_korea(items, it, ix):
     # look for the item before the country ('Südkorea'), it's ProvinceState
     # the structure is then Info, Quarter, District_or_City, ProvinceState, Südkorea, Date, Creator
-    # the offsets:                ^^^-3    ^^^-2             ^^^-1     ^^^we start here
+    # the offsets:          ^^^⁻4,^^^-3,   ^^^-2,            ^^^-1          ^^^we start here
     # the following assumes that the province suffix '-do' has already been regexed away
     #
     # except in the case of Jeju, do this:
     if items[ix - 1] != "Jeju":
         # ...in the big cities, the name of the province is the well-known city name, so keep it
         if items[ix - 1] not in ["Seoul"]:
-        # TODO this is WIP here, I haven't decided on what's looking better
-        # ...but drop the city district
-        # delx.append(ix - 2)
-        #else:
+            # TODO this is WIP here, I haven't decided on what's looking better
+            # ...but drop the city district
+            # delx.append(ix - 2)
+            # else:
             if items[ix - 1] not in ['Busan']:
                 # ...otherwise drop the province
                 delx.append(ix - 1)
@@ -33,21 +59,11 @@ def pp_s_korea(items, it, ix):
     if len(quarter_parts) > 1:
         items[ix - 3] = quarter_parts[0]
     # set some landmark names from the district quarter
-    # TODO we could move this to a dict and use it for morocco too
-    if items[ix - 3] == 'Pungcheon':
-        delx.append(ix - 3)
-        items[ix - 4] = 'Hahoe'
-    if items[ix - 3] == 'Sanga':
-        delx.append(ix - 3)
-        items[ix - 4] = 'Woryeonggyo-Brücke'
-    if items[ix - 3] == 'Jinhyeon':
-        delx.append(ix - 3)
-        items[ix - 4] = 'Bulguksa'
-    if items[ix - 3] == 'Cheongnyong':
-        delx.append(ix - 3)
-        items[ix - 4] = 'Beomeosa'
-    # always drop the district quarter
-    # delx.append(ix - 3)
+    # TODO we could move this to a dict
+    modify(items, ix - 3, 'Pungcheon', ix - 4, 'Hahoe', ix - 3)
+    modify(items, ix - 3, 'Sanga', ix - 4, 'Woryeonggyo-Brücke', ix - 3)
+    modify(items, ix - 3, 'Jinheon', ix - 4, 'Bulguksa', ix - 3)
+    modify(items, ix - 3, 'Cheongnyong', ix - 4, 'Beomeosa', ix - 3)
     return items
 
 
@@ -56,14 +72,10 @@ def pp_morocco(items, it, ix):
     if not 'Marrakesch' in items[ix - 1]:
         delx.append(ix - 1)
     # set some landmark names from the city
-    if items[ix - 2] == "M'Semrir":
-        items[ix - 4] = 'Gorges du Dades'
-    if items[ix - 2] == "Zerkten":
-        items[ix - 4] = "Tizi n'Tichka"
-    if items[ix - 2] == "Mezguita":
-        items[ix - 4] = "Tamnougalt"
-    if items[ix - 2] == "Ikniouen":
-        items[ix - 4] = "Jbel Saghro"
+    modify(items, ix - 2, "M'Semrir", ix - 4, 'Gorges du Dades')
+    modify(items, ix - 2, "Zerkten", ix - 4, "Tizi n'Tichka")
+    modify(items, ix - 2, "Mezguita", ix - 4, "Tamnougalt")
+    modify(items, ix - 2, "Ikniouen", ix - 4, "Jbel Saghro")
 
     return items
 
@@ -221,12 +233,12 @@ def pp_dia(ix):
 
 # primitive global replacements: the dictionary has keys (to look up) and replacement values.
 # these will be replaced wherever they occur
-# only literal keys are allowed, no regular expressions.
+# literal keys and regular expressions [https://docs.python.org/3/library/re.html] are allowed
 def pp_glob(items, glob_replacements):
     for i, it in enumerate(items):
         for key, value in glob_replacements.items():
             # update the working value to prevent regressions when multiple matches occur
-            it = it.replace(key, value)
+            it = re.sub(key, value, it)
             items[i] = it
     return items
 
@@ -235,9 +247,10 @@ def pp_glob(items, glob_replacements):
 glob_replacements = {'Zurich': 'Zürich',
                      ' City': '',
                      ' Township': '',
+                     ' District': '',
                      ' Province': '',
-                     'Marrakech': 'Marrakesch',
-                     'Marrakesh': 'Marrakesch'}
+                     'Marrake[s|c]h': 'Marrakesch',
+                     }
 
 
 # main filter
@@ -272,7 +285,7 @@ def postprocess(items: [str], sep: str) -> str:
     else:
         # only now, we remove the dropped items
         for x in delx:
-            if x >= 0 and outitems[x]:
+            if 0 <= x <= len(outitems) and outitems[x]:
                 del outitems[x]
         print("Status line changed to:")
         print(outitems)
