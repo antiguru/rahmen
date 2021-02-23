@@ -273,7 +273,8 @@ impl StatusLineFormatter {
             Python::with_gil(|py| -> PyResult<Vec<String>> {
                 let tags = PyList::new(py, &line_elements);
                 code.call1(py, (tags, &self.separator))?.extract(py)
-            })?
+            })
+            .unwrap()
         } else {
             // do nothing when there's no Python code
             line_elements
