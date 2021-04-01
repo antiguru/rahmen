@@ -39,19 +39,13 @@ pub struct Settings {
     pub delay: Option<f64>,
     /// Font size of the status line (optional)
     pub font_size: Option<f32>,
-    /// Status line: a collection of  elements (metadata tags, mandatory)
-    pub status_line: Vec<Element>,
-    /// to post-process the status line with one or more regular expressions (optional)
-    pub line_replacements: Option<Vec<Replacement>>,
+    /// Python module paths
+    pub py_path: Option<Vec<String>>,
+    /// python code to postprocess the status line
+    pub py_postprocess: Option<String>,
     /// the separator that will be inserted between every element (metadata) of the
     /// status line (optional, but default is to insert ", ")
     pub separator: Option<String>,
-    /// should we return duplicate strings? if not, set to true (optional, default: true)
-    pub uniquify: Option<bool>,
-    /// should we hide empty fields? (optional, default: true)
-    pub hide_empty: Option<bool>,
-    /// python code to postprocess the status line
-    pub py_postprocess: Option<String>,
-    /// Python module paths
-    pub py_path: Option<Vec<String>>,
+    /// Status line: a collection of  elements (metadata tags, mandatory)
+    pub status_line: Vec<Element>,
 }

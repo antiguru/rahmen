@@ -20,47 +20,26 @@ offers a wide range of tools to process the raw metadata.
 
 Rahmen is not a soup.
 
-### Basic processing
+### Basic metadata processing
 
 #### Case conversion
 
-As first step of the metadata processing chain it is possible to convert the case. See below, where this setting is
-discussed in the context of the configuration file.
+As first step of the metadata processing chain it is possible to convert the
+case. [See below, where this setting is discussed in the context of the configuration file](#changing-the-case).
 
 #### Regular expressions for individual metadata
 
 For each metadata entry, it's further possible to define pairs of
 [regular expressions and replacements](https://docs.rs/regex/) that will be applied to the metadata for each individual
-tag. Multiple regular expression and replacements will be applied in the given order.
+tag. Multiple regular expressions and replacements will be applied in the given
+order. [More details will be discussed in the context of the configuration file](#metadata).
 
-#### Controlling output
+After this, the result will either be handed over to the [final processing step](#final-processing-step), or, before
+that, undergo the advanced processing step.
 
-After this, processing continues. Normally, empty results for metadata tags will be dropped, and multiple occurences of
-the same data will be reduced to one. As this may be undesirable if the data should be further processed, it's possible
-to change this behaviour using the ``uniquify`` and ``hide_empty`` entries in the config.file.
+### Advanced processing using Python code
 
-After this processing step, the individual metadata items will be concatenated to from the line to appear below the
-image using a separator, the default being ``','``. For special processing, this can be changed using the ``separator``
-entry in the config file.
-
-After this, the basic processing is finished, and the information line could be shown below the image.
-
-### Advanced processing
-
-#### Regular Expressions for the whole line
-
-If you add a regular expression and a replacement to the ``line_replacements`` in the configuration file, it will be
-applied to the complete line that is the result of the steps shown above. Multiple pairs of regex/replace will be
-apllied in the order given.
-
-For example, this is useful when you want to globally change or remove something regardless in which tag it appears (
-because it can appear in several tags, or you don't remember the exact tag, ...)
-
-#### Processing using Python code
-
-As practice has shown the method of applying regular expressions to the whole line to be quickly resulting in unwieldy
-and awkward code, a more flexible alternative is to process the line using a programming language. It is possible to
-include a Python script to process the string produced by the steps described above.
+It is possible to include a Python script to process the string produced by the previous steps.
 
 Add the following to the configuration file to call a script named ``postprocess.py`` in the same directory as
 ``rahmen``:
@@ -77,16 +56,26 @@ This Python code gets the line string and the separator string as positional arg
 (in the order given here).
 
 The main function of the Python code has to be named ``export``. It is required to return a callable taking the line
-string and the separator string and returning list of strings, representing the processed metadata items.
+string and the separator string and returning a list of strings, representing the processed metadata items.
 
 Other than that, it is possible to flexibly process the incoming string and build the output accordingly. We have used a
 positional approach in our processing, which identifies a certain match in the metadata items list and then manipulates
-items at a position relative to this match
-(see the ``postprocess.py`` example we have published).
+items at a position relative to this match (see the ``postprocess.py`` example we have published).
 
-After the items list is returned from the Python code, once more, and this time unconditionally, empties will be
-dropped, multiples uniquified, and the final output line will be concatenated from the items using the separator. If you
-really want to circumvent this, just pass a list with a single string.
+More information can be
+found [where this is discussed in the context of the configuration file](#advanced-metadata-processing-using-python).
+
+### Final processing step
+
+Empty results for metadata tags will be dropped.
+
+Multiple occurences of the same data will be reduced to one. It's possible to change this behaviour using
+the ``uniquify`` entry in the configuration file.
+
+After this, the items will be joined using the default or configured separator.
+
+It's also possible to construct the metadata output line yourself in Python. You will have to return it as a list of one
+item, which will effectively prevent the final processing step.
 
 ### Resource consumption
 
@@ -101,7 +90,8 @@ Rahmen depends on various libraries, which should be available on most Linux dis
 
 * `libgexiv2-dev`
 
-Rahmen will run if there's no configuration file, but will use minimal defaults (see below).
+Rahmen will run if there's no configuration file, but will use minimal defaults (see below), and no metadata will be
+shown.
 
 ## Building
 
@@ -121,7 +111,7 @@ ARGS:
 ```
 
 The input can either be a filename, a file pattern (`IMGP4*.jpg`), or a file containing a list of file names. If you'd
-like to have a random image order, use the `shuf` command to create a file list
+like to have a random image order, use the `find` and `shuf` commands to create a file list
 (see the provided shell script for an example).
 
 ```shell
@@ -245,6 +235,8 @@ The [tag names that can be used are listed on the this exiv2 webpage](https://ex
 mean that all these are actually present in your image file. Use [exiftool](https://exiftool.org/)
 to show you the metadata in your file and see what is available.
 
+##### Changing the case
+
 Because some of the tags we used were in ALL-CAPS which doesn't look nice, we offer case conversions that you can apply
 to the data _before_ they are processed by the regular expressions described above. The order in the configuration file
 doesn't matter here. The [available case strings can be found here.](https://github.com/rutrum/convert-case#cases)
@@ -257,41 +249,23 @@ case_conversion = { from = 'Upper', to = 'Title' }
 capitalize = true
 ```
 
-Post-processing the metadata line: Optionally, the metadata line can be processed after it has been assembled from the
-tags described above. This can be finely controlled using the following settings:
+##### Custom separator
 
 ```toml
 separator = "|"
-uniquify = false
-hide_empty = false
 ```
 
-That way it's possible to set a custom separator, and to display multiple identical and/or empty tags, too
-(the defaults are `", "` for the separator and `true` for both other values.)
+That way it's possible to set a custom separator
+(the default is `", "`).
 
-Then, you can apply regular expressions to the whole line, in the same way described above for the individual tags. But
-you'll have to take care of removing empty entries (if not set to hide)
-(resulting in superfluous separators) and take care of deduplication
-(if disabled) by yourself. This might create a way to format metadata items in the text bar relative to other metadata,
-but this can be achieved more easliy and flexibly using a Python program (see below).
-
-Nevertheless, this still is useful if you want to change things globally.
-
-```toml
-# this will be applied to each metadata item
-line_replacements = [
-    { regex = 'Zurich', replace = 'Zürich' },
-]
-```
-
-This ends the basic processing of the metadata. The information line produced by the rules given will show below the
-image, unless you decide to go further and process it using Python, which is described next.
+This ends the basic processing of the metadata. The information line produced by the rules given will be handed over to
+the [final processing step](#final-processing-step), unless you decide to go further and process it using Python, which
+is described next, and after that, it will be shown below the image.
 
 #### Advanced metadata processing using Python
 
-As the regex ``line_replacements`` method proved to quickly lead to awkward and unwieldy code, we introduced a way to
-use Python code that takes the metadata tags, after they have been processed using all the individual and per-line regex
-definitions and have been joined by the separator, and processes them accordingly.
+It's possible to use Python code that receives a list of the metadata tags, after they have been processed using all the
+individual and per-line regex definitions, and process them there.
 
 Add the following to the configuration file to call a script named ``postprocess.py`` in the same directory as
 ``rahmen`` (the extension ``.py`` being quietly assumed):
@@ -313,15 +287,12 @@ it will not be possible to find the script, and the program will abort.
 ##### Example script and test suite
 
 We provide an example script (``postprocess.py``) where some processing is done for certain filters. To check the
-processing, we used ``pytest``. We provide a test script (``test.py``) matching the processing rules in the example script.
-On our Debian system, invoking it with ``pytest-3 test.py`` runs the tests. It is strongly recommended to create a test
-for every processing rule you create to ensure it is properly working.
+processing, we used ``pytest``. We provide a test script (``test.py``) matching the processing rules in the example
+script. On our Debian system, invoking it with ``pytest-3 test.py`` runs the tests. It is strongly recommended to create
+a test for every processing rule you create to ensure it is properly working.
 
-##### Final processing step (only when Python code was invoked)
-
-The Python output will be unconditionally cleaned of empties and uniquified (so you should probably set 'uniquify' and '
-hide_empty' to false to have consistency in your input). To circumvent this final stage of output processing, you could
-return a list containing a single string.
+After the Python code has returned the list of processed entries, they will be handed over to
+the [final processing step](#final-processing-step).
 
 ##### How to get the tags
 
@@ -330,7 +301,8 @@ tell Adobe Lightroom to add when it finds a GPS location in the image metadata.
 
 ## Bugs, Issues, Desiderata
 
-- Allow reacting to configuration file changes while running
+- Allow reacting to configuration file changes while running.
+- Allow for testing the whole text conversion chain, not only the Python part.
 - The font rendering is not really beautiful and sometimes, glyphs overlap.
 - The overflowing text is just not displayed.
 - The text bar might look better centered.
