@@ -3,7 +3,7 @@ name = "rahmen"
 version = "0.1.3"
 authors = ["Moritz Hoffmann <antiguru@gmail.com>", "sys3175 <https://github.com/sys3175>"]
 edition = "2018"
-license = "MIT"
+license = "GPL"
 description = "Rahmen is a lightweight image presenter"
 readme = "README.md"
 
@@ -49,7 +49,7 @@ features = ["auto-initialize"]
 [package.metadata.deb]
 maintainer = "Moritz Hoffmann <antiguru@gmail.com>"
 copyright = "2021, Moritz Hoffmann <antiguru@gmail.com>"
-license-file = ["LICENSE", "4"]
+license-file = ["LICENSE", "0"]
 extended-description = """\
 A simple tool to show images on a screen with little dependencies and resource requirements."""
 depends = "$auto"
