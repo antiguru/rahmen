@@ -388,3 +388,8 @@ the debug symbols from the binary:
 The FLTK renders a window on various platforms, which can be used for development.
 
 The feature `fltk` is not enabled by default. Pass `--features fltk` to `cargo build` to enable.
+
+## License
+
+Rahmen is licensed under the terms of the GNU General Public License version 3. See the [LICENSE](LICENSE) file for a
+copy.
