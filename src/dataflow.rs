@@ -103,19 +103,24 @@ impl<S: Scope> FormatText<S> for Stream<S, String> {
                     if let Some(text) = text_stash.remove(time.time()) {
                         current_text = Some(text);
                     }
-                    if current_text.is_some()
-                        && current_screen_dimension.is_some()
-                        && current_font_size.is_some()
-                        && current_font_canvas_vstretch.is_some()
-                    {
-                        let font_size = current_font_size.unwrap();
+                    if let (
+                        Some(text),
+                        Some(screen_dimension),
+                        Some(font_size),
+                        Some(font_canvas_vstretch),
+                    ) = (
+                        current_text.as_ref(),
+                        current_screen_dimension.as_ref(),
+                        current_font_size,
+                        current_font_canvas_vstretch,
+                    ) {
                         // font canvas height, factor controls vertical padding
-                        let canvas_height = font_size * current_font_canvas_vstretch.unwrap();
-                        let dimension = current_screen_dimension.as_ref().unwrap();
+                        let canvas_height = font_size * font_canvas_vstretch;
+                        let dimension = screen_dimension;
                         let mut img = DynamicImage::new_luma8(dimension.0, canvas_height as _);
                         font_renderer
                             .render(
-                                current_text.as_ref().unwrap(),
+                                text,
                                 font_size,
                                 (dimension.0, canvas_height as _),
                                 |x, y, pixel| {
@@ -273,16 +278,16 @@ impl<S: Scope> ResizeImage<S> for ImageStream<S> {
                     if let Some(img) = img_stash.remove(time.time()) {
                         current_image = Some(img);
                     }
-                    if current_screen_size.is_some() && current_image.is_some() {
-                        let current_screen_size = current_screen_size.unwrap();
-                        let current_image = current_image.as_ref().unwrap();
-                        let resized = current_image.resize(
-                            current_screen_size.0,
-                            current_screen_size.1,
+                    if let (Some(screen_size), Some(image)) =
+                        (current_screen_size, current_image.as_ref())
+                    {
+                        let resized = image.resize(
+                            screen_size.0,
+                            screen_size.1,
                             image::imageops::FilterType::Triangle,
                         );
-                        let x_offset = (current_screen_size.0 - resized.dimensions().0) / 2;
-                        let y_offset = (current_screen_size.1 - resized.dimensions().1) / 2;
+                        let x_offset = (screen_size.0 - resized.dimensions().0) / 2;
+                        let y_offset = (screen_size.1 - resized.dimensions().1) / 2;
                         out.session(&time)
                             .give((key, (x_offset, y_offset), Arc::new(resized)));
                     }

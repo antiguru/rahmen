@@ -101,7 +101,7 @@ pub fn str_to_case(s: String) -> RahmenResult<Case> {
 /// abstract runtime definitions for the transformation ops for the meta data entries
 #[derive(Debug)]
 enum StatusLineTransformation {
-    RegexReplace(Regex, String),
+    RegexReplace(Box<(Regex, String)>),
     Capitalize,
     ChangeCase(Case, Case),
 }
@@ -110,9 +110,7 @@ enum StatusLineTransformation {
 impl StatusLineTransformation {
     fn transform<S: AsRef<str>>(&self, input: S) -> String {
         match self {
-            Self::RegexReplace(re, replacement) => re
-                .replace_all(input.as_ref(), replacement.as_str())
-                .into_owned(),
+            Self::RegexReplace(re) => re.0.replace_all(input.as_ref(), re.1.as_str()).into_owned(),
             Self::Capitalize => input.as_ref().from_case(Case::Upper).to_case(Case::Title),
             Self::ChangeCase(f, t) => input.as_ref().from_case(*f).to_case(*t),
         }
@@ -127,10 +125,10 @@ impl TryFrom<Replacement> for StatusLineTransformation {
         // collect the transformation ops and store their parameters
         // iterate over the regex(es)
 
-        Ok(StatusLineTransformation::RegexReplace(
+        Ok(StatusLineTransformation::RegexReplace(Box::new((
             Regex::new(value.regex.as_ref())?,
             value.replace,
-        ))
+        ))))
     }
 }
 
@@ -161,10 +159,10 @@ impl TryFrom<Element> for StatusLineElement {
         }
         // iterate over the regex(es)
         for replace in value.replace.into_iter().flat_map(Vec::into_iter) {
-            transformations.push(StatusLineTransformation::RegexReplace(
+            transformations.push(StatusLineTransformation::RegexReplace(Box::new((
                 Regex::new(replace.regex.as_ref())?,
                 replace.replace,
-            ));
+            ))));
         }
 
         // return the transformations and the tags vector
