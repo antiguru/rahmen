@@ -5,11 +5,12 @@ use crate::errors::RahmenResult;
 
 use fltk::{
     app::{App, Scheme},
+    enums::ColorDepth,
+    enums::{Event, Key},
     frame::Frame,
     image::RgbImage,
-    text::Key,
+    prelude::{GroupExt, WidgetBase, WidgetExt, WindowExt},
     window::Window,
-    Event, GroupExt, WidgetBase, WidgetExt, WindowExt,
 };
 use image::{DynamicImage, GenericImageView};
 use std::time::Duration;
@@ -34,7 +35,7 @@ impl FltkDisplay {
         window.show_with_env_args();
 
         let mut is_fullscreen = false;
-        window.handle2(move |t, ev| match ev {
+        window.handle(move |t, ev| match ev {
             Event::KeyDown => match fltk::app::event_key() {
                 Key::Enter => {
                     t.fullscreen(!is_fullscreen);
@@ -67,7 +68,8 @@ impl Display for FltkDisplay {
     fn render(&mut self, img: &DynamicImage) -> RahmenResult<()> {
         let _t = crate::Timer::new(|e| println!("Rendering {}ms", e.as_millis()));
         let (x, y) = img.dimensions();
-        let image = RgbImage::new(&img.to_rgb8().into_raw(), x, y, 3).unwrap();
+        let image =
+            RgbImage::new(&img.to_rgb8().into_raw(), x as _, y as _, ColorDepth::Rgb8).unwrap();
         self.frame.set_image(Some(image));
         self.window.redraw();
         Ok(())
