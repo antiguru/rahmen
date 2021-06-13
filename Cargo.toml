@@ -22,11 +22,11 @@ clap = { version = "3.0.0-beta.2", default-features = false, features = ["color"
 config = "0.11"
 convert_case = "0.4.0"
 ctrlc = "3.1.9"
-fltk = { version = "1.0.12", optional = true, features = ["fltk-shared"] }
-font-kit = "0.10.0"
+fltk = { version = "=1.0.12", optional = true, features = ["fltk-shared"] }
+font-kit = "0.10.1"
 framebuffer = "0.2.2"
 glob = "0.3.0"
-itertools = "0.10.0"
+itertools = "0.10.1"
 memmap = "0.7.0"
 mozjpeg = "0.9.0"
 pathfinder_geometry = "0.5.1"
@@ -34,17 +34,18 @@ rexiv2 = "0.9.1"
 regex = "1.5.4"
 serde = "1.0.126"
 serde_derive = "1.0.126"
-timely = { git = "https://github.com/TimelyDataflow/timely-dataflow" }
+#timely = { git = "https://github.com/TimelyDataflow/timely-dataflow" }
+timely = { git = "https://github.com/antiguru/timely-dataflow" , branch="notificator_for_each_395"}
 xdg = "2.2.0"
 
 [dependencies.image]
-version = "0.23.12"
+version = "0.23.14"
 default-features = false
 # Disable jpeg_rayon
 features = ["jpeg"]
 
 [dependencies.pyo3]
-version = "0.13.1"
+version = "0.13.2"
 features = ["auto-initialize"]
 
 [package.metadata.deb]

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::str::FromStr;
@@ -6,18 +7,20 @@ use std::time::{Duration, Instant};
 
 use clap::{App, Arg};
 use font_kit::loaders::freetype::Font;
+use image::{DynamicImage, GenericImageView};
 use pyo3::{types::PyList, PyTryInto, Python};
+use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::capture::Event;
 use timely::dataflow::operators::{
-    Branch, Capture, Concat, ConnectLoop, Enter, Filter, Inspect, Leave, LoopVariable, Map, Probe,
-    ResultStream,
+    Branch, Capture, Concat, ConnectLoop, Enter, Filter, Inspect, Leave, LoopVariable, Map,
+    Notificator, Operator, Probe, ResultStream,
 };
 use timely::dataflow::{InputHandle, ProbeHandle, Scope};
 use timely::order::Product;
 use timely::worker::Config;
 
 use rahmen::config::Settings;
-use rahmen::dataflow::{ComposeImage, Configuration, FormatText, ResizeImage};
+use rahmen::dataflow::{Configuration, FormatText, ResizeImage};
 use rahmen::display::Display;
 #[cfg(feature = "fltk")]
 use rahmen::display_fltk::FltkDisplay;
@@ -28,7 +31,7 @@ use rahmen::provider::{load_image_from_path, Provider, StatusLineFormatter};
 use rahmen::provider_list::ListProvider;
 
 /// dataflow control, this is used as result R part
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum RunControl {
     /// terminate stream processing (by external command)
     Terminate,
@@ -58,6 +61,12 @@ fn suppress_err<T>(result: RahmenResult<T>) -> RunResult<T> {
         eprintln!("Encountered error, suppressing: {}", e);
         RunControl::Suppressed
     })
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum Render {
+    Image(usize, (u32, u32), Arc<DynamicImage>),
+    Blank(usize, u32, u32, u32, u32),
 }
 
 type RunResult<T> = Result<T, RunControl>;
@@ -163,7 +172,7 @@ fn main() -> RahmenResult<()> {
         Default::default()
     };
     // Python search path: use the Python system path, and prepend the value(s) from the config file
-    // Note: contrary to the documentation, the Python system path will nor contain the directory from which we're called,
+    // Note: contrary to the documentation, the Python system path will not contain the directory from which we're called,
     // so this has to be indicated in the configuration file
     if let Some(python_paths) = settings.py_path {
         Python::with_gil(|py| {
@@ -218,6 +227,9 @@ fn main() -> RahmenResult<()> {
         .or(settings.font_size)
         .unwrap_or(30.);
 
+    let show_time = settings.display_time.unwrap_or(false);
+    let time_format = settings.time_format.unwrap_or("%H:%M:%S".into());
+
     // initialization for timely dataflow
     let allocator = timely::communication::allocator::Thread::new();
     let mut worker = timely::worker::Worker::new(Config::default(), allocator);
@@ -251,37 +263,110 @@ fn main() -> RahmenResult<()> {
         });
         let err_stream = img_path_stream.err();
 
-        let status_line_stream = img_path_stream
+        let mut buffer = vec![];
+        let mut stash: HashMap<Duration, String> = HashMap::new();
+        let mut current_text = None;
+
+        let mut status_line_stream = img_path_stream
             .ok()
             .flat_map(move |(p, _img)| status_line_formatter.format(&p).ok())
             .inspect(|loc| println!("Status line: {}", loc));
+        if show_time {
+            status_line_stream = status_line_stream.unary_notify(
+                Pipeline,
+                "Show time",
+                Some(Duration::from_secs(0)),
+                move |input, output, not: &mut Notificator<Duration>| {
+                    input.for_each(|cap, data| {
+                        data.swap(&mut buffer);
+                        if let Some(text) = buffer.drain(..).last() {
+                            *stash.entry(cap.time().clone()).or_default() = text;
+                            not.notify_at(cap.retain());
+                        }
+                    });
+                    not.for_each(|cap, cnt, not| {
+                        let request_notification = if let Some(text) = stash.remove(cap.time()) {
+                            current_text = Some(text);
+                            cnt == 2
+                        } else {
+                            true
+                        };
+                        let now = chrono::Local::now();
+                        let delay = std::cmp::max(50, 1000 - now.timestamp_subsec_millis() as u64);
+                        if request_notification && !not.frontier(0).is_empty() {
+                            let mut next_time = *cap.time() + Duration::from_millis(delay);
+                            while !not.frontier(0).less_equal(&next_time) {
+                                next_time += Duration::from_secs(1);
+                            }
+                            not.notify_at(cap.delayed(&next_time));
+                        }
+                        if let Some(text) = &current_text {
+                            let time_text = format!("[{}] {}", now.format(&time_format), text);
+                            output.session(&cap).give(time_text);
+                        }
+                    });
+                },
+            );
+        }
+        let status_line_stream =
+            status_line_stream.map(|s| s.split('\n').map(Into::into).collect());
 
         let text_img_stream =
             status_line_stream.format_text(&configuration_stream, font_renderer, 2);
 
         let adjusted_configuration_stream = {
+            let mut stash: HashMap<_, Vec<_>> = HashMap::new();
+            let mut buffer = vec![];
             // Hack: adjust screen size for the resize operator to reserve space for the status line
             let mut current_font_size = None;
             let mut current_font_canvas_vstretch = None;
 
-            configuration_stream.map(move |configuration| match configuration {
-                Configuration::FontSize(font_size) => {
-                    current_font_size = Some(font_size);
-                    Configuration::FontSize(font_size)
-                }
-                Configuration::FontCanvasVStretch(font_canvas_vstretch) => {
-                    current_font_canvas_vstretch = Some(font_canvas_vstretch);
-                    Configuration::FontCanvasVStretch(font_canvas_vstretch)
-                }
-                Configuration::ScreenDimensions(width, height) => Configuration::ScreenDimensions(
-                    width,
-                    height
-                        - (current_font_size.unwrap_or(0.)
-                            * current_font_canvas_vstretch.unwrap_or(1.0))
-                        .ceil() as u32,
-                ),
-                configuration => configuration,
-            })
+            configuration_stream.unary_notify(
+                Pipeline,
+                "Adjust configuration",
+                None,
+                move |input, output, not| {
+                    input.for_each(|cap, data| {
+                        data.swap(&mut buffer);
+                        stash
+                            .entry(*cap.time())
+                            .or_default()
+                            .extend(buffer.drain(..));
+                        not.notify_at(cap.retain());
+                    });
+                    not.for_each(|cap, _, _not| {
+                        if let Some(updates) = stash.remove(cap.time()) {
+                            output.session(&cap).give_iterator(updates.into_iter().map(
+                                |configuration| {
+                                    match configuration {
+                                        Configuration::FontSize(font_size) => {
+                                            current_font_size = Some(font_size);
+                                            Configuration::FontSize(font_size)
+                                        }
+                                        Configuration::FontCanvasVStretch(font_canvas_vstretch) => {
+                                            current_font_canvas_vstretch =
+                                                Some(font_canvas_vstretch);
+                                            Configuration::FontCanvasVStretch(font_canvas_vstretch)
+                                        }
+                                        Configuration::ScreenDimensions(width, height) => {
+                                            Configuration::ScreenDimensions(
+                                                width,
+                                                height
+                                                    - (current_font_size.unwrap_or(0.)
+                                                        * current_font_canvas_vstretch
+                                                            .unwrap_or(1.0))
+                                                    .ceil()
+                                                        as u32,
+                                            )
+                                        }
+                                        configuration => configuration,
+                                    }
+                                },
+                            ));
+                        }
+                    });
+                },
+            )
         };
 
         let img_stream = img_path_stream
@@ -289,9 +374,45 @@ fn main() -> RahmenResult<()> {
             .map(|(_, img)| img)
             .resize_image(&adjusted_configuration_stream, 1);
 
-        let composed_img_stream = img_stream
-            .concat(&text_img_stream)
-            .compose_image(&configuration_stream);
+        let mut size_stash: HashMap<usize, _> = HashMap::new();
+        let mut input_buffer: HashMap<_, Vec<(_, _, _)>> = HashMap::new();
+
+        let composed_img_stream = img_stream.concat(&text_img_stream).unary_notify(
+            Pipeline,
+            "Infer blanking",
+            None,
+            move |input, output, not| {
+                let mut buffer = vec![];
+                input.for_each(|time, data| {
+                    data.swap(&mut buffer);
+                    input_buffer
+                        .entry(*time.time())
+                        .or_default()
+                        .extend(buffer.drain(..));
+                    not.notify_at(time.retain());
+                });
+                not.for_each(|time, _count, _not| {
+                    if let Some(updates) = input_buffer.remove(&time.time()) {
+                        output
+                            .session(&time)
+                            .give_iterator(updates.into_iter().flat_map(
+                                |(key, (x_off, y_off), img)| {
+                                    size_stash
+                                        .insert(
+                                            key,
+                                            (x_off, y_off, img.dimensions().0, img.dimensions().1),
+                                        )
+                                        .into_iter()
+                                        .map(move |(x_off, y_off, x_size, y_size)| {
+                                            Render::Blank(key, x_off, y_off, x_size, y_size)
+                                        })
+                                        .chain(Some(Render::Image(key, (x_off, y_off), img)))
+                                },
+                            ));
+                    }
+                })
+            },
+        );
 
         err_stream
             .map(Err)
@@ -328,21 +449,49 @@ fn main() -> RahmenResult<()> {
         while probe.less_than(&now) {
             worker.step();
         }
-        match output.try_iter().all(|result| match result {
+        let mut has_update = false;
+        let result = match output.try_iter().all(|result| match result {
             // Continue processing on progress messages
             Event::Progress(_) => true,
             // Handle data messages by rending an image and determining whether to terminate
-            Event::Messages(_, ref r) => {
-                r.iter()
-                    .filter(|r| r.is_ok())
-                    .last()
-                    .map(|img| img.as_ref().map(|img| display.render(img)));
-                !r.iter()
-                    .any(|r| r.as_ref().err() == Some(&RunControl::Terminate))
+            Event::Messages(_, r) => {
+                let mut terminate = false;
+                for result in r {
+                    match result {
+                        Ok(Render::Image(key, (x_offset, y_offset), ref img)) => {
+                            has_update = true;
+                            display
+                                .render(key, x_offset, y_offset, img.as_ref())
+                                .err()
+                                .map(|err| {
+                                    println!("Render failed: {}", err);
+                                    terminate = true;
+                                });
+                        }
+                        Ok(Render::Blank(key, x_offset, y_offset, x_size, y_size)) => {
+                            has_update = true;
+                            display
+                                .blank(key, x_offset, y_offset, x_size, y_size)
+                                .err()
+                                .map(|err| {
+                                    println!("Blank failed: {}", err);
+                                    terminate = true;
+                                });
+                        }
+                        Err(RunControl::Terminate) => terminate = true,
+                        _ => {}
+                    }
+                }
+                !terminate
             }
         }) {
             true => Ok(()),
             false => Err(RahmenError::Terminate),
+        };
+        if result.is_ok() && has_update {
+            display.update()
+        } else {
+            result
         }
     };
 

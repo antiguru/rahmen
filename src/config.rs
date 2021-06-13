@@ -48,4 +48,8 @@ pub struct Settings {
     pub separator: Option<String>,
     /// Status line: a collection of  elements (metadata tags, mandatory)
     pub status_line: Vec<Element>,
+    /// Show the time in the status line
+    pub display_time: Option<bool>,
+    /// Time format string
+    pub time_format: Option<String>,
 }

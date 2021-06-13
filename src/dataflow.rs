@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::font::FontRenderer;
 use crate::Timer;
-use image::{DynamicImage, GenericImage, GenericImageView, Pixel};
+use image::{DynamicImage, GenericImageView};
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::Operator;
 use timely::dataflow::{Scope, Stream};
@@ -43,11 +43,11 @@ pub trait FormatText<S: Scope> {
     ) -> ImagePosStream<S>;
 }
 
-impl<S: Scope> FormatText<S> for Stream<S, String> {
+impl<S: Scope> FormatText<S> for Stream<S, Vec<String>> {
     fn format_text(
         &self,
         configuration_stream: &ConfigurationStream<S>,
-        font_renderer: FontRenderer,
+        mut font_renderer: FontRenderer,
         key: usize,
     ) -> ImagePosStream<S> {
         let mut configuration_stash = HashMap::new();
@@ -105,7 +105,7 @@ impl<S: Scope> FormatText<S> for Stream<S, String> {
                     }
                     if let (
                         Some(text),
-                        Some(screen_dimension),
+                        Some(dimension),
                         Some(font_size),
                         Some(font_canvas_vstretch),
                     ) = (
@@ -116,17 +116,11 @@ impl<S: Scope> FormatText<S> for Stream<S, String> {
                     ) {
                         // font canvas height, factor controls vertical padding
                         let canvas_height = font_size * font_canvas_vstretch;
-                        let dimension = screen_dimension;
-                        let mut img = DynamicImage::new_luma8(dimension.0, canvas_height as _);
-                        font_renderer
+                        let img = font_renderer
                             .render(
-                                text,
+                                text.iter().map(String::as_str),
                                 font_size,
                                 (dimension.0, canvas_height as _),
-                                |x, y, pixel| {
-                                    img.put_pixel(x as _, y as _, pixel.to_rgba());
-                                    Ok(())
-                                },
                             )
                             .unwrap();
                         out.session(&time).give((
@@ -136,85 +130,6 @@ impl<S: Scope> FormatText<S> for Stream<S, String> {
                         ));
                     }
                 });
-            },
-        )
-    }
-}
-
-/// Compose a set of images identified by a key with offsets into a final image
-pub trait ComposeImage<S: Scope> {
-    /// Compose the images
-    fn compose_image(&self, configuration_stream: &ConfigurationStream<S>) -> ImageStream<S>;
-}
-
-impl<S: Scope> ComposeImage<S> for ImagePosStream<S> {
-    fn compose_image(&self, configuration_stream: &ConfigurationStream<S>) -> ImageStream<S> {
-        let mut buffer1 = vec![];
-        let mut buffer2 = vec![];
-        let mut img_stash = HashMap::new();
-        let mut configuration_stash = HashMap::new();
-        let mut current_screen_size = None;
-        let mut current_image = HashMap::new();
-        self.binary_notify(
-            &configuration_stream,
-            Pipeline,
-            Pipeline,
-            "Compose image",
-            None,
-            move |in1, in2, out, not| {
-                let _t = Timer::new(|e| println!("Compose image op {}ms", e.as_millis()));
-                in1.for_each(|time, data| {
-                    data.swap(&mut buffer1);
-                    for img in buffer1.drain(..) {
-                        img_stash
-                            .entry(time.time().clone())
-                            .or_insert_with(Vec::new)
-                            .push(img);
-                    }
-                    not.notify_at(time.retain());
-                });
-                in2.for_each(|time, data| {
-                    data.swap(&mut buffer2);
-                    for configuration in buffer2.drain(..) {
-                        configuration_stash
-                            .entry(time.time().clone())
-                            .or_insert_with(Vec::new)
-                            .push(configuration);
-                    }
-                    not.notify_at(time.retain());
-                });
-                not.for_each(|time, _cnt, _not| {
-                    if let Some(configurations) = configuration_stash.remove(time.time()) {
-                        for configuration in configurations {
-                            if let Configuration::ScreenDimensions(width, height) = configuration {
-                                current_screen_size = Some((width, height))
-                            }
-                        }
-                    }
-                    if let Some(imgs) = img_stash.remove(time.time()) {
-                        for img in imgs {
-                            current_image.insert(img.0, img);
-                        }
-                    }
-                    if let Some(current_screen_size) = current_screen_size {
-                        let mut output_image =
-                            DynamicImage::new_bgr8(current_screen_size.0, current_screen_size.1);
-                        println!("current screen size: {:?}", current_screen_size);
-                        for (_key, (x_offset, y_offset), img) in current_image.values() {
-                            println!(
-                                " Key:{} -> xy:({}, {}) + img:{:?}",
-                                _key,
-                                x_offset,
-                                y_offset,
-                                img.as_ref().dimensions()
-                            );
-                            output_image
-                                .copy_from(img.as_ref(), *x_offset, *y_offset)
-                                .unwrap();
-                        }
-                        out.session(&time).give(Arc::new(output_image));
-                    }
-                })
             },
         )
     }

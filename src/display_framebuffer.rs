@@ -4,7 +4,7 @@ use crate::display::Display;
 use crate::errors::RahmenResult;
 
 use framebuffer::Framebuffer;
-use image::{DynamicImage, GenericImageView, Pixel};
+use image::{Bgra, DynamicImage, FlatSamples, GenericImage, GenericImageView, Pixel};
 use std::time::Duration;
 
 /// A display driver for Linux framebuffers
@@ -27,19 +27,44 @@ impl FramebufferDisplay {
             std::thread::sleep(Duration::from_millis(50));
         }
     }
-}
 
-impl Display for FramebufferDisplay {
-    fn render(&mut self, img: &DynamicImage) -> RahmenResult<()> {
-        let mut buffer = image::ImageBuffer::<image::Bgra<_>, _>::from_raw(
+    fn image_buffer(&mut self) -> image::ImageBuffer<Bgra<u8>, &mut [u8]> {
+        image::ImageBuffer::<Bgra<_>, _>::from_raw(
             self.dimensions().0,
             self.dimensions().1,
             &mut *self.framebuffer.frame,
         )
-        .unwrap();
-        for (buffer_pixel, (_, _, pixel)) in buffer.pixels_mut().zip(img.pixels()) {
-            *buffer_pixel = pixel.to_bgra();
+        .unwrap()
+    }
+}
+
+impl Display for FramebufferDisplay {
+    fn render(
+        &mut self,
+        _key: usize,
+        x_offset: u32,
+        y_offset: u32,
+        img: &DynamicImage,
+    ) -> RahmenResult<()> {
+        let mut buffer = self.image_buffer();
+        for (x, y, pixel) in img.pixels() {
+            *buffer.get_pixel_mut(x_offset + x, y_offset + y) = pixel.to_bgra();
         }
+        Ok(())
+    }
+
+    fn blank(
+        &mut self,
+        _key: usize,
+        x_offset: u32,
+        y_offset: u32,
+        x_size: u32,
+        y_size: u32,
+    ) -> RahmenResult<()> {
+        let _t = crate::Timer::new(|e| println!("Blanking {}ms", e.as_millis()));
+        let mut buffer = self.image_buffer();
+        let black = FlatSamples::with_monocolor(&Bgra([0; 4]), x_size, y_size);
+        buffer.copy_from(&black.as_view().unwrap(), x_offset, y_offset)?;
         Ok(())
     }
 
@@ -48,5 +73,9 @@ impl Display for FramebufferDisplay {
             self.framebuffer.var_screen_info.xres,
             self.framebuffer.var_screen_info.yres,
         )
+    }
+
+    fn update(&mut self) -> RahmenResult<()> {
+        Ok(())
     }
 }

@@ -1,18 +1,17 @@
 //! Functionality to render images on a FLTK window
 
 use crate::display::Display;
-use crate::errors::RahmenResult;
+use crate::errors::{RahmenError, RahmenResult};
 
 use fltk::{
     app::{App, Scheme},
     enums::ColorDepth,
     enums::{Event, Key},
     frame::Frame,
-    image::RgbImage,
     prelude::{GroupExt, WidgetBase, WidgetExt, WindowExt},
     window::Window,
 };
-use image::{DynamicImage, GenericImageView};
+use image::{DynamicImage, GenericImage, Rgb, RgbImage};
 use std::time::Duration;
 
 /// A display driver rendering to a FLTK window
@@ -20,6 +19,7 @@ use std::time::Duration;
 pub struct FltkDisplay {
     window: Window,
     frame: Frame,
+    image: RgbImage,
 }
 
 impl FltkDisplay {
@@ -47,7 +47,11 @@ impl FltkDisplay {
             _ => false,
         });
 
-        Self { window, frame }
+        Self {
+            window,
+            frame,
+            image: Default::default(),
+        }
     }
 
     /// Main loop to handle FLTK events and call back into Rahmen's logic
@@ -56,20 +60,61 @@ impl FltkDisplay {
             match fltk::app::wait_for(Duration::from_millis(50).as_secs_f64()) {
                 Err(e) => {
                     eprintln!("FLTK error: {}", e);
-                    break;
+                    // break;
                 }
                 _ => {}
             }
         }
     }
+
+    fn match_dimensions(&mut self) -> RahmenResult<()> {
+        if self.image.dimensions() != self.dimensions() {
+            self.image = RgbImage::from_raw(
+                self.dimensions().0,
+                self.dimensions().1,
+                vec![0u8; (self.dimensions().0 * self.dimensions().1 * 3) as usize],
+            )
+            .ok_or(RahmenError::Terminate)?;
+        }
+        Ok(())
+    }
 }
 
 impl Display for FltkDisplay {
-    fn render(&mut self, img: &DynamicImage) -> RahmenResult<()> {
+    fn render(
+        &mut self,
+        _key: usize,
+        x_offset: u32,
+        y_offset: u32,
+        img: &DynamicImage,
+    ) -> RahmenResult<()> {
         let _t = crate::Timer::new(|e| println!("Rendering {}ms", e.as_millis()));
-        let (x, y) = img.dimensions();
+        self.match_dimensions()?;
+        self.image.copy_from(&img.to_rgb8(), x_offset, y_offset)?;
+        Ok(())
+    }
+
+    fn blank(
+        &mut self,
+        _key: usize,
+        x_offset: u32,
+        y_offset: u32,
+        x_size: u32,
+        y_size: u32,
+    ) -> RahmenResult<()> {
+        let _t = crate::Timer::new(|e| println!("Rendering {}ms", e.as_millis()));
+        self.match_dimensions()?;
+        let black = image::FlatSamples::with_monocolor(&Rgb([0; 3]), x_size, y_size);
+        self.image
+            .copy_from(&black.as_view().unwrap(), x_offset, y_offset)?;
+        Ok(())
+    }
+
+    fn update(&mut self) -> RahmenResult<()> {
+        let (x, y) = self.image.dimensions();
         let image =
-            RgbImage::new(&img.to_rgb8().into_raw(), x as _, y as _, ColorDepth::Rgb8).unwrap();
+            fltk::image::RgbImage::new(self.image.as_raw(), x as _, y as _, ColorDepth::Rgb8)
+                .unwrap();
         self.frame.set_image(Some(image));
         self.window.redraw();
         Ok(())
