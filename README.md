@@ -317,6 +317,41 @@ Of course, building natively on a Pi 1 also works, but the term "nightly build" 
 especially for the first run. Small changes to this source code only without the need to rebuild stuff depending on it
 (no new dependencies added) will take approximately 90...100 minutes.
 
+### Compiling on the Raspberry Pi 4
+
+Using `cargo deb` to build a package for the Raspberry Pi 1 (armv6hf):
+```commandline
+env \
+  PYO3_CROSS_LIB_DIR="/usr/lib" \
+  CFLAGS="-march=armv6" \
+  PKG_CONFIG_LIBDIR=/usr/lib/arm-linux-gnueabihf/pkgconfig/ \
+  FREETYPE_CFLAGS="-I/usr/include/freetype2" \
+  FREETYPE_LIBS="-L/usr/lib -lfreetype" \
+  CC=gcc \
+  AR=ar \
+  PKG_CONFIG_ALLOW_CROSS=1 \
+  cargo deb --target arm-unknown-linux-gnueabihf
+```
+
+### 4k on the Raspberry Pi 1
+
+The Raspberry Pi 1 supports 4k resolution at reduced frame rates. The following configuration
+works on a screen we have at hands. It does not require overclocking, but limits the refresh
+rate to 15 frames per second, which seems to be fine when displaying mostly static content.
+
+```
+disable_overscan=1
+hdmi_ignore_edid=0xa5000080
+hdmi_cvt=3840 2160 15
+framebuffer_width=3840
+framebuffer_height=2160
+hdmi_group=2
+hdmi_mode=87
+hdmi_pixel_freq_limit=400000000
+max_framebuffer_width=3840
+max_framebuffer_height=2160
+```
+
 ### Previous attempts to cross-compile
 
 Cross-compilation is a mess. The instructions below worked until we decided to include a dependency on `libgexiv2` to
