@@ -53,7 +53,7 @@ impl<F: Fn(Duration)> Timer<F> {
 impl<F: Fn(Duration)> Drop for Timer<F> {
     fn drop(&mut self) {
         let elapsed = self.start.elapsed();
-        if elapsed >= Duration::from_millis(1) {
+        if elapsed >= Duration::from_millis(20) {
             (self.f)(elapsed)
         }
     }
