@@ -7,7 +7,7 @@ takes a list of files or a pattern, and periodically shows the next image. It's 
 here should work.
 
 Below the image, some information gathered from the image's metadata will be shown. This feature has to be configured in
-the `rahmen.toml` configuration file. There, you can enter one ore more metadata tags name known to
+the `rahmen.toml` configuration file. There, you can enter one or more metadata tags name known to
 the [exiv2](https://exiv2.org/metadata.html) library to be displayed in the information line.
 
 All the information items will be displayed on one line, with `", "` as (default, but read on)
@@ -24,7 +24,7 @@ Rahmen is not a soup.
 
 #### Case conversion
 
-As first step of the metadata processing chain it is possible to convert the
+As first step of the metadata processing chain, it is possible to convert the
 case. [See below, where this setting is discussed in the context of the configuration file](#changing-the-case).
 
 #### Regular expressions for individual metadata
@@ -69,7 +69,7 @@ found [where this is discussed in the context of the configuration file](#advanc
 
 Empty results for metadata tags will be dropped.
 
-Multiple occurences of the same data will be reduced to one. It's possible to change this behaviour using
+Multiple occurrences of the same data will be reduced to one. It's possible to change this behaviour using
 the ``uniquify`` entry in the configuration file.
 
 After this, the items will be joined using the default or configured separator.
@@ -191,13 +191,32 @@ are present, the file in the home directory takes precedence.
 
 The configuration file has to be written in TOML and takes the following instructions:
 
-```
+```toml
 font_size = 24
 delay = 90
 ```
 
 Values for font size (px) and the interval before the next image (in s, see above, --time parameter). If command line
 parameters are given, they take precedence over the values in this file.
+
+### Displaying the time
+
+Rahmen can optionally display the current time as part of the status line. To enable showing the current time, add the
+following option to the configuration file:
+
+```toml
+display_time = true
+```
+
+By default, it uses a pattern of "%H:%M:%S" ("14:28:22"). The pattern can be replaced by a custom pattern in the
+configuration file:
+
+```toml
+time_format = "%H:%M"
+```
+
+For a reference of supported format specifiers,
+see [Chrono's documentation](https://docs.rs/chrono/0.4.19/chrono/#formatting-and-parsing).
 
 ### Metadata
 
@@ -320,7 +339,8 @@ especially for the first run. Small changes to this source code only without the
 ### Compiling on the Raspberry Pi 4
 
 Using `cargo deb` to build a package for the Raspberry Pi 1 (armv6hf):
-```commandline
+
+```shell
 env \
   PYO3_CROSS_LIB_DIR="/usr/lib" \
   CFLAGS="-march=armv6" \
@@ -335,9 +355,9 @@ env \
 
 ### 4k on the Raspberry Pi 1
 
-The Raspberry Pi 1 supports 4k resolution at reduced frame rates. The following configuration
-works on a screen we have at hands. It does not require overclocking, but limits the refresh
-rate to 15 frames per second, which seems to be fine when displaying mostly static content.
+The Raspberry Pi 1 supports 4k resolution at reduced frame rates. The following configuration works on a screen we have
+at hands. It does not require overclocking, but limits the refresh rate to 15 frames per second, which seems to be fine
+when displaying mostly static content.
 
 ```
 disable_overscan=1
@@ -364,7 +384,7 @@ Preparation:
    rustup target add arm-unknown-linux-gnueabihf
    ```
 
-2. Setup the GCC toolchain. The first-generation Raspberry Pi had a BCM2835, supporting the ARMv6 instruction set.
+2. Set up the GCC toolchain. The first-generation Raspberry Pi had a BCM2835, supporting the ARMv6 instruction set.
    Current ARM compilers on Debian only support armv7. For this reason, we need to use a different toolchain, for
    example the one provided specifically for the Raspberry Pi
    on [github.com/raspberrypi/tools](https://github.com/raspberrypi/tools). Export its `bin` directory to the local
