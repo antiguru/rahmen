@@ -40,7 +40,7 @@ impl FramebufferDisplay {
             self.image = BgraImage::from_raw(
                 self.dimensions().0,
                 self.dimensions().1,
-                vec![0u8; (self.dimensions().0 * self.dimensions().1 * 3) as usize],
+                vec![0u8; (self.dimensions().0 * self.dimensions().1 * 4) as usize],
             )
             .ok_or(RahmenError::Terminate)?;
         }
