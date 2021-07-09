@@ -53,7 +53,7 @@ def test_glob4():
 # Südkorea tests
 def test_slide1():
     # we remove all info except creator from images that are duplicates of slides
-    input = "From Slide|SubLocation|Location|ProvinceState|Country|1.11.2001|Creator"
+    input = "From Slide|SubLocation|Location|ProvinceState|Country|11-01-2001|Creator"
     assert put_out(input) == "From Slide|Creator"
 
 
@@ -185,7 +185,7 @@ def test_timeline7():
 
 def test_timeline8():
     # this should return no values except 'From Slide|Creator'
-    input = "|SubLocation|Location|ProvinceState|Country|10-16-2020|Creator"
+    input = "|SubLocation|Location|ProvinceState|Country|11-01-2001|Creator"
     assert put_out(input) == "From Slide|Creator"
 
 # def test_timeline9():

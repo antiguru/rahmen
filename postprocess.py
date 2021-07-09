@@ -23,6 +23,9 @@ import re
 # dropping cannot be done ad hoc because it would shift the positions
 delx = []
 
+def append_to_delete(ix):
+    if ix not in delx:
+        delx.append(ix)
 
 def modify(items, ix_to_check, val_to_check, ix_to_modify, val_to_modify, ix_to_delete=None):
     # modify an item in items if it is not set depending on s/th matching another item,
@@ -36,7 +39,7 @@ def modify(items, ix_to_check, val_to_check, ix_to_modify, val_to_modify, ix_to_
             items[ix_to_modify] = val_to_modify
         # optionally mark item[ix] for deletion
         if ix_to_delete:
-            delx.append(ix_to_delete)
+            append_to_delete(ix_to_delete)
 
 
 def pp_s_korea(items, it, ix):
@@ -48,7 +51,7 @@ def pp_s_korea(items, it, ix):
     # ...in the big cities  and in Jeju, the name of the province is the well-known name, so keep it
     if items[ix - 1] not in ["Seoul", "Jeju", "Busan"]:
         # ...otherwise drop the province
-        delx.append(ix - 1)
+        append_to_delete(ix - 1)
     # cut away city quarter overkill
     quarter_parts = items[ix - 3].split(' ')
     if len(quarter_parts) > 1:
@@ -65,7 +68,7 @@ def pp_s_korea(items, it, ix):
 def pp_morocco(items, it, ix):
     # drop the province, except when it's Marrake([s|c]h)
     if not 'Marrakech' in items[ix - 1]:
-        delx.append(ix - 1)
+        append_to_delete(ix - 1)
     # set some landmark names from the city
     modify(items, ix - 2, "M'Semrir", ix - 4, 'Gorges du Dades')
     modify(items, ix - 2, "Zerkten", ix - 4, "Tizi n'Tichka")
@@ -93,16 +96,15 @@ def pp_ch_cantons(items, ix):
                 # append the canton's abbreviation
                 ct = ' ' + cantons.get(canton)
             # mark city and country field for deletion
-            delx.append(ix)
-            delx.append(ix - 2)
+            append_to_delete(ix)
+            append_to_delete(ix - 2)
             # update input_canton field with city + abbreviation (or '')
             items[ix - 1] = city + ct
     return items
 
-
 # This defines timespans per country (province/state,(city, (...)).
-# We use only the key values, the value for the last key has to be None.
-# { 'Start date': {'End date': {'Country': None}}, ... }
+# These are tuples (immutable lists) of values.
+# ('Start date','End date','Country','ProvinceState', 'City','Quarter','Info')
 # This matches the metatags that are defined in the config file, but the order is reversed here.
 # This example assumes that the config file metatags amount to
 # Name, Sublocation, Location, ProvinceState, Country, Date, Creator
@@ -112,89 +114,76 @@ def pp_ch_cantons(items, ix):
 # To skip items (leave them untouched), insert an empty string.
 # Existing entries will not be overwritten.
 # The start date has to be unique. Do not overlap end dates, when they do, the entry starting first wins.
-timespans = {
-    # 8-12-2012 to 8-14-2012, photos were taken in NY City
-    '20120812': {'20120814': {'USA': {'NY': {'New York': None}}}},
-    # 8-15-2012 to 8-28-2012, photos were taken in the Catskills
-    '20120815': {'20120828': {'USA': {'NY': {'': {'In the Catskills': None}}}}},
-    # 10-19-2013, photos were taken at Pyramid Lake
-    '20131019': {'20131019': {'USA': {'NV': {'Pyramid Lake': None}}}},
-    # from 4-20-2019 to 5-22-2019, photos are from the US
-    '20190420': {'20190522': {'USA': None}},
-    # from 1-10-2020 to 1-22-2020, photos are from Portugal
-    '20200110': {'20200122': {'Portugal': None}},
-    # 10-16 and 10-28-2020, Photos were repro'd from slides
-    '20201016': {'20201016': {'': {'': {'': {'': {'From Slide': None}}}}}},
-    '20201028': {'20201028': {'': {'': {'': {'': {'From Slide': None}}}}}},
-
-}
-
-
-# consume the rest of the timespan after country
-def pp_consume_timespan(key_list, items, pos):
-    # build the timespans dict access for the current key from the key list
-    # if there are more items in the timespan than items configured, we stop, but that's ok as it is an error.
-    # TODO there might be a better way than using eval...
-    # this gives timespans[key][key][...]...
-    eval_base = "timespans['" + "']['".join(key_list) + "']"
-    # now look for the key
-    for next_key in eval(eval_base + ".keys()"):
-        # move our pointer
-        pos = pos + 1
-        # we're going backward
-        i_pos = len(items) - pos
-        # unfortunately, lists wrap, we have to take care of that, otherwise we might overwrite values
-        # when we find too many items in a timespan entry, we stop and throw an alert
-        if i_pos < 0:
-            raise ValueError('Too many items in timespan: ' + str(key_list) + ' >>> ' + next_key)
-        else:
-            # item not set?
-            if not items[i_pos]:
-                # let's set it.
-                items[i_pos] = next_key
-            # is there another key in the queue? Otherwise, we're done.
-            if eval(eval_base + ".get('" + next_key + "')") is not None:
-                # if there is, do it again for the next key
-                key_list.append(next_key)
-                items = pp_consume_timespan(key_list, items, pos)
-    return items
-
+timespans = (
+    ('20120812', '20120814', 'USA', 'NY', 'New York'),
+    ('20120815', '20120821', 'USA', 'NY', '', 'In the Catskills'),
+    ('20131019', '20131019', 'USA', 'NV', 'Pyramid Lake'),
+    ('20141019', '20141019', 'USA', '', 'Lake Tahoe'),
+    ('20190420', '20190522', 'USA'),
+    ('20200110', '20200122', 'Portugal'),
+    ('20011101', '20011101', '', '', '', '', 'From Slide'),
+)
 
 # add information to image if the image data is inside a timespan
 def pp_metadata_from_timespan(items):
-    # we assume that 'date' is the item before the last (hence the pos[ition] is set to 2 below,
-    # lenght(items)-pos pointing to that place) and that it's formatted d.m.yyyy
+    # we assume that 'date' is the item before the last (hence the i_start is set to 2 below,
+    # lenght(items)-i_start pointing to that place) and that it's formatted d.m.yyyy
     # and that 'country' is the item before date
     # this has to be configured that way in the configuration file
-    # no real error checking is being done here, but
-    # the conditionals should catch crashes from missing indices
-    pos = 2
-    # we need at least country|date|something, so more than two items
-    if len(items) > pos:
-        # get the strings for day, month, year (input format yyyy-mm-dd)
-        i_date_list = items[len(items) - pos].split('-')
-        print(i_date_list, len(i_date_list))
-        # without 3 items, it's not a correct date
+    # no real error checking is being done here
+    # this assumes the item list is configured like this:
+    # ['info', 'sublocation', 'location', 'provincestate', 'country', 'date', 'creator']
+    # we start at date, which is at len()-2                            ^^^-2
+    # so our starting value is 2
+    i_start = 2
+    # which gives us the position of date
+    i_pos = len(items) - i_start
+    # we need at least country|date|creator, so, more items than just counted from or starting point
+    if len(items) > i_start:
+        # let's look at what's at the date position and try to
+        # get the strings for day, month, year (input format m-d-yyyy)
+        # this should give us M, D, YYYY @ 0, 1, 2
+        i_date_list = items[i_pos].split('-')
+        # without 3 items, it's not a correct date (this is only _very_ basic error checking)
         if len(i_date_list) == 3:
-            # convert the date string to YYYYMMDD (add leading zeros if necessary)
+            # convert the date string to YYYYMMDD to make it sortable (add leading zeros if necessary)
             i_date = i_date_list[2] + i_date_list[0].zfill(2) + i_date_list[1].zfill(2)
-            # we look for our dates
-            for start_date in timespans.keys():
+            for timespan in timespans:
+                # make timespan tuple iterable
+                timespan_iter = iter(timespan)
+                # get first tuple from the timespans
+                # to compare with the item's date
+                start_date = next(timespan_iter)
                 if i_date >= start_date:
-                    # 'for' assigns an anonymous key to a variable, which is what we need, even if
-                    # there will be only one key
-                    for end_date in timespans[start_date].keys():
-                        if i_date <= end_date:
-                            key_list = [start_date, end_date]
-                            # now we consume the timespan data
-                            items = pp_consume_timespan(key_list, items, pos)
+                    end_date = next(timespan_iter)
+                    if i_date <= end_date:
+                        # we have a hit on the timespan
+                        # now, move the position to the item before the date (should be 'country')
+                        i_pos = i_pos - 1
+                        # don't wrap around the item list (this catches and ignores too many items in timespan tuple)
+                        while i_pos >= 0:
+                            # this try block catches the end of the timespan tuple because it will be left if there's
+                            # no more 'next'
+                            try:
+                                # work through the timespan tuple:
+                                # get the next new item from the timespan tuple...
+                                new_item = next(timespan_iter)
+                                # ...set the metadata item from the timespan item if it isn't set already
+                                # (and is not empty)...
+                                if not items[i_pos]:
+                                    items[i_pos] = new_item
+                                # ...move our item pointer to the previous item (we're going backward)
+                                i_pos = i_pos - 1
+                            except StopIteration:
+                                # no more items in tuple, so we're done
+                                break
     return (items)
-
+# consume the rest of the timespan after country
 
 # for slides we delete all info that may have been set from the camera's GPS
-def pp_dia(ix):
+def pp_dia():
     for i in [1, 2, 3, 4, 5]:
-        delx.append(ix + 1)
+        append_to_delete(i)
 
 
 # global replacements: the dictionary has keys (to look up) and replacement values.
@@ -223,7 +212,6 @@ def postprocess(items: [str], sep: str) -> str:
     outitems = []
     # clear the drop list
     delx.clear()
-    print(items)
     # first, replace the global stuff
     items = pp_glob(items, glob_replacements)
     # get metadata from timespans
@@ -234,7 +222,7 @@ def postprocess(items: [str], sep: str) -> str:
     # now the specific filters
     for ix, it in enumerate(items):
         if 'From Slide' in it:
-            pp_dia(ix)
+            pp_dia()
             outitems = items
         if it == "South Korea":
             outitems = pp_s_korea(items, it, ix)
@@ -247,9 +235,8 @@ def postprocess(items: [str], sep: str) -> str:
         print("Status line unfiltered.")
     else:
         # only now, we remove the dropped items
-        for x in delx:
-            if 0 <= x <= len(outitems) and outitems[x]:
-                del outitems[x]
+        for x in sorted(delx, reverse=True):
+            del outitems[x]
         print("Status line changed to:")
         print(outitems)
         items = outitems
