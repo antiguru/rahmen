@@ -3,6 +3,7 @@
 use crate::display::Display;
 use crate::errors::{RahmenError, RahmenResult};
 
+use crate::Vector;
 use fltk::{
     app::{App, Scheme},
     enums::ColorDepth,
@@ -81,32 +82,20 @@ impl FltkDisplay {
 }
 
 impl Display for FltkDisplay {
-    fn render(
-        &mut self,
-        _key: usize,
-        x_offset: u32,
-        y_offset: u32,
-        img: &DynamicImage,
-    ) -> RahmenResult<()> {
+    fn render(&mut self, _key: usize, anchor: Vector, img: &DynamicImage) -> RahmenResult<()> {
         let _t = crate::Timer::new(|e| println!("Rendering {}ms", e.as_millis()));
         self.match_dimensions()?;
-        self.image.copy_from(&img.to_rgb8(), x_offset, y_offset)?;
+        self.image
+            .copy_from(&img.to_rgb8(), anchor.x() as _, anchor.y() as _)?;
         Ok(())
     }
 
-    fn blank(
-        &mut self,
-        _key: usize,
-        x_offset: u32,
-        y_offset: u32,
-        x_size: u32,
-        y_size: u32,
-    ) -> RahmenResult<()> {
+    fn blank(&mut self, _key: usize, anchor: Vector, size: Vector) -> RahmenResult<()> {
         let _t = crate::Timer::new(|e| println!("Rendering {}ms", e.as_millis()));
         self.match_dimensions()?;
-        let black = image::FlatSamples::with_monocolor(&Rgb([0; 3]), x_size, y_size);
+        let black = image::FlatSamples::with_monocolor(&Rgb([0; 3]), size.x() as _, size.y() as _);
         self.image
-            .copy_from(&black.as_view().unwrap(), x_offset, y_offset)?;
+            .copy_from(&black.as_view().unwrap(), anchor.x() as _, anchor.y() as _)?;
         Ok(())
     }
 

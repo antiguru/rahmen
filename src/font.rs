@@ -51,8 +51,8 @@ impl FontRenderer {
             for char in line.chars() {
                 if let Some((glyph_id, raster_rect)) =
                     self.raster_cache.entry(char).or_insert_with(|| {
-                        if let Some(glyph_id) = font.glyph_for_char(char) {
-                            Some((
+                        font.glyph_for_char(char).map(|glyph_id| {
+                            (
                                 glyph_id,
                                 font.raster_bounds(
                                     glyph_id,
@@ -62,10 +62,8 @@ impl FontRenderer {
                                     rasterization,
                                 )
                                 .expect("Failed to determine raster bounds"),
-                            ))
-                        } else {
-                            None
-                        }
+                            )
+                        })
                     })
                 {
                     if (base_x as i32 + raster_rect.width() + raster_rect.origin_x()) as u32

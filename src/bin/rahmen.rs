@@ -19,6 +19,7 @@ use timely::dataflow::{InputHandle, ProbeHandle, Scope};
 use timely::order::Product;
 use timely::worker::Config;
 
+use pathfinder_geometry::rect::RectI;
 use rahmen::config::Settings;
 use rahmen::dataflow::{Configuration, FormatText, ResizeImage};
 use rahmen::display::Display;
@@ -29,6 +30,7 @@ use rahmen::errors::{RahmenError, RahmenResult};
 use rahmen::font::FontRenderer;
 use rahmen::provider::{load_image_from_path, Provider, StatusLineFormatter};
 use rahmen::provider_list::ListProvider;
+use rahmen::Vector;
 
 /// dataflow control, this is used as result R part
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -65,8 +67,8 @@ fn suppress_err<T>(result: RahmenResult<T>) -> RunResult<T> {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum Render {
-    Image(usize, (u32, u32), Arc<DynamicImage>),
-    Blank(usize, u32, u32, u32, u32),
+    Image(usize, Vector, Arc<DynamicImage>),
+    Blank(usize, Vector, Vector),
 }
 
 type RunResult<T> = Result<T, RunControl>;
@@ -395,20 +397,17 @@ fn main() -> RahmenResult<()> {
                     if let Some(updates) = input_buffer.remove(&time.time()) {
                         output
                             .session(&time)
-                            .give_iterator(updates.into_iter().flat_map(
-                                |(key, (x_off, y_off), img)| {
-                                    size_stash
-                                        .insert(
-                                            key,
-                                            (x_off, y_off, img.dimensions().0, img.dimensions().1),
-                                        )
-                                        .into_iter()
-                                        .map(move |(x_off, y_off, x_size, y_size)| {
-                                            Render::Blank(key, x_off, y_off, x_size, y_size)
-                                        })
-                                        .chain(Some(Render::Image(key, (x_off, y_off), img)))
-                                },
-                            ));
+                            .give_iterator(updates.into_iter().flat_map(|(key, anchor, img)| {
+                                let rect = RectI::new(
+                                    anchor,
+                                    Vector::new(img.dimensions().0 as _, img.dimensions().1 as _),
+                                );
+                                size_stash
+                                    .insert(key, rect)
+                                    .into_iter()
+                                    .flat_map(move |old_rect| compute_blanking(key, rect, old_rect))
+                                    .chain(Some(Render::Image(key, anchor, img)))
+                            }));
                     }
                 })
             },
@@ -458,25 +457,19 @@ fn main() -> RahmenResult<()> {
                 let mut terminate = false;
                 for result in r {
                     match result {
-                        Ok(Render::Image(key, (x_offset, y_offset), ref img)) => {
+                        Ok(Render::Image(key, anchor, ref img)) => {
                             has_update = true;
-                            display
-                                .render(key, x_offset, y_offset, img.as_ref())
-                                .err()
-                                .map(|err| {
-                                    println!("Render failed: {}", err);
-                                    terminate = true;
-                                });
+                            display.render(key, anchor, img.as_ref()).err().map(|err| {
+                                println!("Render failed: {}", err);
+                                terminate = true;
+                            });
                         }
-                        Ok(Render::Blank(key, x_offset, y_offset, x_size, y_size)) => {
+                        Ok(Render::Blank(key, anchor, size)) => {
                             has_update = true;
-                            display
-                                .blank(key, x_offset, y_offset, x_size, y_size)
-                                .err()
-                                .map(|err| {
-                                    println!("Blank failed: {}", err);
-                                    terminate = true;
-                                });
+                            display.blank(key, anchor, size).err().map(|err| {
+                                println!("Blank failed: {}", err);
+                                terminate = true;
+                            });
                         }
                         Err(RunControl::Terminate) => terminate = true,
                         _ => {}
@@ -521,4 +514,20 @@ fn main() -> RahmenResult<()> {
     input_configuration.close();
     while worker.step() {}
     Ok(())
+}
+
+fn compute_blanking(key: usize, rect: RectI, old_rect: RectI) -> Vec<Render> {
+    if let Some(overlap) = old_rect.intersection(rect) {
+        let above = RectI::from_points(old_rect.origin(), overlap.upper_right());
+        let left = RectI::from_points(old_rect.origin(), overlap.lower_left());
+        let right = RectI::from_points(overlap.upper_right(), old_rect.lower_right());
+        let below = RectI::from_points(overlap.lower_left(), old_rect.lower_right());
+        [above, left, right, below]
+            .iter()
+            .filter(|r| r.width() > 0 && r.height() > 0)
+            .map(|r| Render::Blank(key, r.origin(), r.size()))
+            .collect::<Vec<_>>()
+    } else {
+        vec![Render::Blank(key, old_rect.origin(), old_rect.size())]
+    }
 }

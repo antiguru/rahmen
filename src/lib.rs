@@ -19,6 +19,7 @@
 #[macro_use]
 extern crate serde_derive;
 
+use pathfinder_geometry::vector::Vector2I;
 use std::time::{Duration, Instant};
 
 pub mod config;
@@ -58,3 +59,5 @@ impl<F: Fn(Duration)> Drop for Timer<F> {
         }
     }
 }
+
+pub type Vector = Vector2I;

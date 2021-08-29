@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::font::FontRenderer;
-use crate::Timer;
+use crate::{Timer, Vector};
 use image::{DynamicImage, GenericImageView};
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::Operator;
@@ -14,7 +14,7 @@ use timely::dataflow::{Scope, Stream};
 pub type ImageStream<S> = Stream<S, Arc<DynamicImage>>;
 
 /// A keyed stream of offset and image
-pub type ImagePosStream<S> = Stream<S, (usize, (u32, u32), Arc<DynamicImage>)>;
+pub type ImagePosStream<S> = Stream<S, (usize, Vector, Arc<DynamicImage>)>;
 
 /// A configuration stream
 pub type ConfigurationStream<S> = Stream<S, Configuration>;
@@ -109,8 +109,8 @@ impl<S: Scope> FormatText<S> for Stream<S, Vec<String>> {
                         Some(font_size),
                         Some(font_canvas_vstretch),
                     ) = (
-                        current_text.as_ref(),
-                        current_screen_dimension.as_ref(),
+                        &current_text,
+                        &current_screen_dimension,
                         current_font_size,
                         current_font_canvas_vstretch,
                     ) {
@@ -125,7 +125,7 @@ impl<S: Scope> FormatText<S> for Stream<S, Vec<String>> {
                             .unwrap();
                         out.session(&time).give((
                             key,
-                            (0, dimension.1 - canvas_height as u32),
+                            Vector::new(0, dimension.1 as i32 - canvas_height as i32),
                             Arc::new(img),
                         ));
                     }
@@ -203,8 +203,11 @@ impl<S: Scope> ResizeImage<S> for ImageStream<S> {
                         );
                         let x_offset = (screen_size.0 - resized.dimensions().0) / 2;
                         let y_offset = (screen_size.1 - resized.dimensions().1) / 2;
-                        out.session(&time)
-                            .give((key, (x_offset, y_offset), Arc::new(resized)));
+                        out.session(&time).give((
+                            key,
+                            Vector::new(x_offset as _, y_offset as _),
+                            Arc::new(resized),
+                        ));
                     }
                 })
             },
