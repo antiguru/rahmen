@@ -43,7 +43,7 @@ xdg = "2.2.0"
 version = "0.23.14"
 default-features = false
 # Disable jpeg_rayon
-features = ["jpeg"]
+features = ["jpeg", "png"]
 
 [dependencies.pyo3]
 version = "0.13.2"

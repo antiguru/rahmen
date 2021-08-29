@@ -20,7 +20,7 @@ pub type ImagePosStream<S> = Stream<S, (usize, Vector, Arc<DynamicImage>)>;
 pub type ConfigurationStream<S> = Stream<S, Configuration>;
 
 /// A configuration element to be passed in a configuration stream
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Configuration {
     /// Update the font size for the status line
     FontSize(f32),
@@ -30,6 +30,10 @@ pub enum Configuration {
     ScreenDimensions(u32, u32),
     /// Show a new image
     Tick,
+    /// Splash screen
+    Splash(Arc<DynamicImage>),
+    /// Greeting message
+    Greeting(String),
 }
 
 /// Format text for the status line trait

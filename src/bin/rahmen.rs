@@ -33,6 +33,9 @@ use rahmen::provider::{load_image_from_path, Provider, StatusLineFormatter};
 use rahmen::provider_list::ListProvider;
 use rahmen::Vector;
 
+static SPLASH: &'static [u8] = include_bytes!("rahmen.png");
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 /// dataflow control, this is used as result R part
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum RunControl {
@@ -275,6 +278,10 @@ fn main() -> RahmenResult<()> {
         let mut status_line_stream = img_path_stream
             .ok()
             .flat_map(move |(p, _img)| status_line_formatter.format(&p).ok())
+            .concat(&configuration_stream.flat_map(|c| match c {
+                Configuration::Greeting(text) => Some(text),
+                _ => None,
+            }))
             .inspect(|loc| info!("Status line: {}", loc));
         if show_time {
             status_line_stream = status_line_stream.unary_notify(
@@ -377,6 +384,10 @@ fn main() -> RahmenResult<()> {
         let img_stream = img_path_stream
             .ok()
             .map(|(_, img)| img)
+            .concat(&configuration_stream.flat_map(|c| match c {
+                Configuration::Splash(img) => Some(img),
+                _ => None,
+            }))
             .resize_image(&adjusted_configuration_stream, 1);
 
         let mut size_stash: HashMap<usize, _> = HashMap::new();
@@ -429,8 +440,16 @@ fn main() -> RahmenResult<()> {
     input_configuration.send(Configuration::FontSize(font_size_f));
     // enlarge font canvas vertically by this factor (default given here: 1.4)
     input_configuration.send(Configuration::FontCanvasVStretch(1.4));
+    match image::load_from_memory(SPLASH) {
+        Ok(image) => {
+            info!("Sending splash screen");
+            input_configuration.send(Configuration::Splash(Arc::new(image)));
+        }
+        Err(err) => warn!("Failed to load splash screen: {}", err),
+    }
+    input_configuration.send(Configuration::Greeting(format!("Rahmen {}", VERSION)));
 
-    let mut next_image_at = start_time.elapsed();
+    let mut next_image_at = start_time.elapsed() + Duration::from_secs(1);
 
     let display_fn = |display: &mut dyn Display| {
         let now = start_time.elapsed();
