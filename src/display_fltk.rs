@@ -60,7 +60,7 @@ impl FltkDisplay {
         while callback(self).is_ok() && self.window.shown() {
             match fltk::app::wait_for(Duration::from_millis(50).as_secs_f64()) {
                 Err(e) => {
-                    eprintln!("FLTK error: {}", e);
+                    error!("FLTK error: {}", e);
                     // break;
                 }
                 _ => {}
@@ -83,7 +83,7 @@ impl FltkDisplay {
 
 impl Display for FltkDisplay {
     fn render(&mut self, _key: usize, anchor: Vector, img: &DynamicImage) -> RahmenResult<()> {
-        let _t = crate::Timer::new(|e| println!("Rendering {}ms", e.as_millis()));
+        let _t = crate::Timer::new(|e| debug!("Rendering {}ms", e.as_millis()));
         self.match_dimensions()?;
         self.image
             .copy_from(&img.to_rgb8(), anchor.x() as _, anchor.y() as _)?;
@@ -91,7 +91,7 @@ impl Display for FltkDisplay {
     }
 
     fn blank(&mut self, _key: usize, anchor: Vector, size: Vector) -> RahmenResult<()> {
-        let _t = crate::Timer::new(|e| println!("Rendering {}ms", e.as_millis()));
+        let _t = crate::Timer::new(|e| debug!("Rendering {}ms", e.as_millis()));
         self.match_dimensions()?;
         let black = image::FlatSamples::with_monocolor(&Rgb([0; 3]), size.x() as _, size.y() as _);
         self.image

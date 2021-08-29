@@ -65,7 +65,7 @@ impl<S: Scope> FormatText<S> for Stream<S, Vec<String>> {
             "Format text",
             None,
             move |in1, in2, out, not| {
-                let _t = Timer::new(|e| println!("Render font op {}ms", e.as_millis()));
+                let _t = Timer::new(|e| debug!("Render font op {}ms", e.as_millis()));
                 in1.for_each(|time, data| {
                     data.swap(&mut in_buffer1);
                     for text in in_buffer1.drain(..) {
@@ -164,7 +164,7 @@ impl<S: Scope> ResizeImage<S> for ImageStream<S> {
             "Resize image",
             None,
             move |in1, in2, out, not| {
-                let _t = Timer::new(|e| println!("Resize image op {}ms", e.as_millis()));
+                let _t = Timer::new(|e| debug!("Resize image op {}ms", e.as_millis()));
                 in1.for_each(|time, data| {
                     data.swap(&mut buffer1);
                     for img in buffer1.drain(..) {

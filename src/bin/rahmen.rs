@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use clap::{App, Arg};
 use font_kit::loaders::freetype::Font;
 use image::{DynamicImage, GenericImageView};
+use log::{error, info, warn};
 use pyo3::{types::PyList, PyTryInto, Python};
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::capture::Event;
@@ -50,7 +51,7 @@ fn fatal_err<T>(result: RahmenResult<Option<T>>) -> RunResult<T> {
         Ok(Some(t)) => Ok(t),
         // display error and terminate
         Err(e) => {
-            eprintln!("Encountered error, terminating: {}", e);
+            error!("Encountered error, terminating: {}", e);
             Err(RunControl::Terminate)
         }
     }
@@ -60,7 +61,7 @@ fn fatal_err<T>(result: RahmenResult<Option<T>>) -> RunResult<T> {
 fn suppress_err<T>(result: RahmenResult<T>) -> RunResult<T> {
     result.map_err(|e| {
         // just notify about error but keep processing
-        eprintln!("Encountered error, suppressing: {}", e);
+        error!("Encountered error, suppressing: {}", e);
         RunControl::Suppressed
     })
 }
@@ -77,6 +78,8 @@ type RunResult<T> = Result<T, RunControl>;
 const SYSTEM_CONFIG_PATH: &str = "/etc/rahmen.toml";
 
 fn main() -> RahmenResult<()> {
+    env_logger::init();
+
     // read command line args
     let matches = App::new("Rahmen client")
         .arg(
@@ -140,13 +143,13 @@ fn main() -> RahmenResult<()> {
     let input = matches.value_of("input").expect("Input missing");
     // box is used bec of dynamic typing for provider
     let mut provider: Box<dyn Provider<_>> = if input.eq("-") {
-        println!("Reading from stdin");
+        info!("Reading from stdin");
         Box::new(ListProvider::new(BufReader::new(std::io::stdin())))
     } else if let Ok(file) = File::open(input) {
-        println!("Reading from file");
+        info!("Reading from file");
         Box::new(ListProvider::new(BufReader::new(file)))
     } else {
-        println!("Reading from pattern {}", input);
+        info!("Reading from pattern {}", input);
         Box::new(rahmen::provider_glob::create(input)?)
     };
 
@@ -170,7 +173,7 @@ fn main() -> RahmenResult<()> {
         c.merge(config::File::from(path))?;
         c.try_into()?
     } else {
-        eprintln!("Config file not found, continuing with default settings");
+        warn!("Config file not found, continuing with default settings");
         Default::default()
     };
     // Python search path: use the Python system path, and prepend the value(s) from the config file
@@ -219,7 +222,7 @@ fn main() -> RahmenResult<()> {
         .unwrap_or(90.)
         * 1000f64) as u64;
     let delay = Duration::from_millis(duration_millis);
-    println!("Delay: {:?}", delay);
+    info!("Delay: {:?}", delay);
 
     // font size to use (px)
     let font_size_f = matches
@@ -272,7 +275,7 @@ fn main() -> RahmenResult<()> {
         let mut status_line_stream = img_path_stream
             .ok()
             .flat_map(move |(p, _img)| status_line_formatter.format(&p).ok())
-            .inspect(|loc| println!("Status line: {}", loc));
+            .inspect(|loc| info!("Status line: {}", loc));
         if show_time {
             status_line_stream = status_line_stream.unary_notify(
                 Pipeline,
@@ -460,14 +463,14 @@ fn main() -> RahmenResult<()> {
                         Ok(Render::Image(key, anchor, ref img)) => {
                             has_update = true;
                             display.render(key, anchor, img.as_ref()).err().map(|err| {
-                                println!("Render failed: {}", err);
+                                error!("Render failed: {}", err);
                                 terminate = true;
                             });
                         }
                         Ok(Render::Blank(key, anchor, size)) => {
                             has_update = true;
                             display.blank(key, anchor, size).err().map(|err| {
-                                println!("Blank failed: {}", err);
+                                error!("Blank failed: {}", err);
                                 terminate = true;
                             });
                         }
@@ -495,16 +498,16 @@ fn main() -> RahmenResult<()> {
                 .expect("Framebuffer output missing");
             let framebuffer = framebuffer::Framebuffer::new(path_to_device).unwrap();
             let _ = framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Graphics)
-                .map_err(|_e| println!("Failed to set graphics mode."));
+                .map_err(|_e| warn!("Failed to set graphics mode."));
             ctrlc::set_handler(|| {
                 let _ = framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Text)
-                    .map_err(|_e| println!("Failed to set graphics mode."));
+                    .map_err(|_e| warn!("Failed to set graphics mode."));
                 std::process::exit(0);
             })
             .unwrap();
             FramebufferDisplay::new(framebuffer).main_loop(display_fn);
             let _ = framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Text)
-                .map_err(|_e| println!("Failed to set graphics mode."));
+                .map_err(|_e| warn!("Failed to set graphics mode."));
         }
         #[cfg(feature = "fltk")]
         "fltk" => FltkDisplay::new().main_loop(display_fn),

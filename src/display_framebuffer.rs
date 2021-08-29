@@ -58,7 +58,7 @@ impl Display for FramebufferDisplay {
     }
 
     fn blank(&mut self, _key: usize, anchor: Vector, size: Vector) -> RahmenResult<()> {
-        let _t = crate::Timer::new(|e| println!("Blanking {}ms", e.as_millis()));
+        let _t = crate::Timer::new(|e| debug!("Blanking {}ms", e.as_millis()));
         self.match_dimensions()?;
         let black = image::FlatSamples::with_monocolor(&Bgra([0; 4]), size.x() as _, size.y() as _);
         self.image

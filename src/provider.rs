@@ -54,7 +54,7 @@ fn load_jpeg<P: AsRef<Path>>(path: P, max_size: Option<usize>) -> RahmenResult<D
         }
         Ok(img)
     } else {
-        eprintln!("Failed to decode image: {:?}", path.as_ref());
+        error!("Failed to decode image: {:?}", path.as_ref());
         Err(RahmenError::Retry)
     }
 }
@@ -64,8 +64,8 @@ pub fn load_image_from_path<P: AsRef<Path>>(
     path: P,
     max_size: Option<usize>,
 ) -> RahmenResult<DynamicImage> {
-    let _t = crate::Timer::new(|e| println!("Loading {}ms", e.as_millis()));
-    println!("Loading {:?}", path.as_ref());
+    let _t = crate::Timer::new(|e| debug!("Loading {}ms", e.as_millis()));
+    info!("Loading {:?}", path.as_ref());
     match image::ImageFormat::from_path(&path)? {
         image::ImageFormat::Jpeg => load_jpeg(path, max_size),
         format => {
