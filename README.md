@@ -89,6 +89,7 @@ rendering images.
 Rahmen depends on various libraries, which should be available on most Linux distributions. Specifically, it needs:
 
 * `libgexiv2-dev`
+* `libfontconfig1-dev`
 * `python3-dev` (Rahmen embeds a Python interpreter for optional status-line post-processing)
 
 Rahmen will run if there's no configuration file, but will use minimal defaults (see below), and no metadata will be
