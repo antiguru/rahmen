@@ -2,8 +2,8 @@
 
 use image::DynamicImage;
 
-use crate::errors::RahmenResult;
 use crate::Vector;
+use crate::errors::RahmenResult;
 
 /// Trait describing the interface to display an image
 pub trait Display {

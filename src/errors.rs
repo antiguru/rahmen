@@ -34,7 +34,7 @@ pub enum RahmenError {
 pub type RahmenResult<T> = Result<T, RahmenError>;
 
 impl fmt::Display for RahmenError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
             RahmenError::CaseUnknown(err) => write!(f, "Unknown case: {}", err),
             RahmenError::ConfigError(err) => err.fmt(f),

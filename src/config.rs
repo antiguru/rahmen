@@ -1,5 +1,7 @@
 //! Configuration data for Rahmen
 
+use serde::Deserialize;
+
 /// An element of the status line
 #[derive(Debug, Deserialize, Clone)]
 pub struct Element {

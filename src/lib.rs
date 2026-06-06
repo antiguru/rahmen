@@ -17,9 +17,6 @@
 )]
 
 #[macro_use]
-extern crate serde_derive;
-
-#[macro_use]
 extern crate log;
 
 use pathfinder_geometry::vector::Vector2I;

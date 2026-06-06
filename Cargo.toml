@@ -2,7 +2,8 @@
 name = "rahmen"
 version = "0.2.0"
 authors = ["Moritz Hoffmann <antiguru@gmail.com>", "sys3175 <https://github.com/sys3175>"]
-edition = "2018"
+edition = "2024"
+rust-version = "1.85"
 license = "GPL"
 description = "Rahmen is a lightweight image presenter"
 readme = "README.md"
@@ -17,36 +18,34 @@ name = "rahmen"
 debug = true
 
 [dependencies]
-chrono = "0.4.19"
-clap = { version = "3.0.0-beta.4", default-features = false, features = ["color", "std"] }
-config = "0.11"
-convert_case = "0.4.0"
-ctrlc = "3.2.0"
-env_logger = "0.9.0"
-fltk = { version = "=1.0.12", optional = true, features = ["fltk-shared"] }
-font-kit = "0.10.1"
-framebuffer = "0.3.0"
-glob = "0.3.0"
-itertools = "0.10.1"
-log = "0.4.14"
-memmap = "0.7.0"
-mozjpeg = { version = "0.9.1", default-features = false }
-pathfinder_geometry = "0.5.1"
-regex = "1.5.4"
-rexiv2 = "0.9.1"
-serde = "1.0.130"
-serde_derive = "1.0.130"
-timely = { git = "https://github.com/TimelyDataflow/timely-dataflow" }
-xdg = "2.2.0"
+chrono = "0.4"
+clap = { version = "4", default-features = false, features = ["std", "color", "help", "usage", "error-context"] }
+config = { version = "0.15", default-features = false, features = ["toml"] }
+convert_case = "0.11"
+ctrlc = "3"
+env_logger = "0.11"
+fltk = { version = "1.5", optional = true, features = ["fltk-shared"] }
+font-kit = "0.14"
+framebuffer = "0.3"
+glob = "0.3"
+itertools = "0.14"
+log = "0.4"
+mozjpeg = { version = "0.10", default-features = false }
+pathfinder_geometry = "0.5"
+regex = "1"
+rexiv2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+timely = "0.12"
+xdg = "3"
 
 [dependencies.image]
-version = "0.23.14"
+version = "0.25"
 default-features = false
 # Disable jpeg_rayon
 features = ["jpeg", "png"]
 
 [dependencies.pyo3]
-version = "0.13.2"
+version = "0.28"
 features = ["auto-initialize"]
 
 [package.metadata.deb]

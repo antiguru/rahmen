@@ -5,16 +5,17 @@ use crate::errors::{RahmenError, RahmenResult};
 
 use crate::Vector;
 use framebuffer::Framebuffer;
-use image::{Bgra, DynamicImage, GenericImage, ImageBuffer};
+use image::{DynamicImage, GenericImage, Rgba, RgbaImage};
 use std::time::Duration;
 
-type BgraImage = ImageBuffer<Bgra<u8>, Vec<u8>>;
-
-/// A display driver for Linux framebuffers
+/// A display driver for Linux framebuffers.
+///
+/// The backing buffer is an [`RgbaImage`] whose bytes are kept in the framebuffer's native
+/// BGRA channel order (the dedicated `Bgra` pixel type was removed from the `image` crate).
 #[derive(Debug)]
 pub struct FramebufferDisplay {
     framebuffer: Framebuffer,
-    image: BgraImage,
+    image: RgbaImage,
 }
 
 impl FramebufferDisplay {
@@ -38,7 +39,7 @@ impl FramebufferDisplay {
 
     fn match_dimensions(&mut self) -> RahmenResult<()> {
         if self.image.dimensions() != self.dimensions() {
-            self.image = BgraImage::from_raw(
+            self.image = RgbaImage::from_raw(
                 self.dimensions().0,
                 self.dimensions().1,
                 vec![0u8; (self.dimensions().0 * self.dimensions().1 * 4) as usize],
@@ -52,17 +53,26 @@ impl FramebufferDisplay {
 impl Display for FramebufferDisplay {
     fn render(&mut self, _key: usize, anchor: Vector, img: &DynamicImage) -> RahmenResult<()> {
         self.match_dimensions()?;
+        // Convert to RGBA and swap the red/blue channels to obtain the framebuffer's BGRA order.
+        let mut bgra = img.to_rgba8();
+        for pixel in bgra.pixels_mut() {
+            pixel.0.swap(0, 2);
+        }
         self.image
-            .copy_from(&img.to_bgra8(), anchor.x() as _, anchor.y() as _)?;
+            .copy_from(&bgra, anchor.x() as _, anchor.y() as _)?;
         Ok(())
     }
 
     fn blank(&mut self, _key: usize, anchor: Vector, size: Vector) -> RahmenResult<()> {
         let _t = crate::Timer::new(|e| debug!("Blanking {}ms", e.as_millis()));
         self.match_dimensions()?;
-        let black = image::FlatSamples::with_monocolor(&Bgra([0; 4]), size.x() as _, size.y() as _);
-        self.image
-            .copy_from(&black.as_view().unwrap(), anchor.x() as _, anchor.y() as _)?;
+        let black =
+            image::FlatSamples::with_monocolor(&Rgba([0u8; 4]), size.x() as _, size.y() as _);
+        self.image.copy_from(
+            &black.as_view::<Rgba<u8>>().unwrap(),
+            anchor.x() as _,
+            anchor.y() as _,
+        )?;
         Ok(())
     }
 
