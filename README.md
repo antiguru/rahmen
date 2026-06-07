@@ -141,7 +141,7 @@ you don't like this.)
 Select the display provider [default: framebuffer] [possible values: framebuffer]
 ```
 
-(If compiled with the FLTK option, the FLTK display provider will also be available, use `fltk` as value.)
+(If compiled with the `minifb` feature, a windowed display provider will also be available, use `minifb` as value.)
 
 ```shell
         --font_size <font_size>                
@@ -442,11 +442,14 @@ the debug symbols from the binary:
 
 `arm-linux-gnueabihf-strip target/arm-unknown-linux-gnueabihf/release/rahmen`
 
-## FLTK support
+## Windowed display (minifb)
 
-The FLTK renders a window on various platforms, which can be used for development.
+For development and testing, Rahmen can render into a desktop window instead of the Linux
+framebuffer. This is provided by the optional `minifb` feature, which loads X11/Wayland at runtime
+via `dlopen` and therefore needs no extra build-time system libraries.
 
-The feature `fltk` is not enabled by default. Pass `--features fltk` to `cargo build` to enable.
+The `minifb` feature is not enabled by default. Pass `--features minifb` to `cargo build` to enable
+it, then run with `--display minifb`.
 
 ## License
 

@@ -25,9 +25,9 @@ use std::time::{Duration, Instant};
 pub mod config;
 pub mod dataflow;
 pub mod display;
-#[cfg(feature = "fltk")]
-pub mod display_fltk;
 pub mod display_framebuffer;
+#[cfg(feature = "minifb")]
+pub mod display_minifb;
 pub mod errors;
 pub mod font;
 pub mod provider;
