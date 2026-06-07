@@ -54,16 +54,21 @@ impl FltkDisplay {
             image: Default::default(),
         }
     }
+}
 
+impl Default for FltkDisplay {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FltkDisplay {
     /// Main loop to handle FLTK events and call back into Rahmen's logic
     pub fn main_loop<F: FnMut(&mut dyn Display) -> RahmenResult<()>>(&mut self, mut callback: F) {
         while callback(self).is_ok() && self.window.shown() {
-            match fltk::app::wait_for(Duration::from_millis(50).as_secs_f64()) {
-                Err(e) => {
-                    error!("FLTK error: {}", e);
-                    // break;
-                }
-                _ => {}
+            if let Err(e) = fltk::app::wait_for(Duration::from_millis(50).as_secs_f64()) {
+                error!("FLTK error: {}", e);
+                // break;
             }
         }
     }

@@ -5,12 +5,13 @@ use std::io::BufReader;
 use std::path::Path;
 
 use convert_case::{Case, Casing};
-use image::{DynamicImage, Pixel};
+use image::{DynamicImage, RgbImage};
 use itertools::Itertools;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use regex::Regex;
 use rexiv2::Metadata;
+use serde::Deserialize;
 
 use crate::config::{Element, Replacement};
 use crate::errors::{RahmenError, RahmenResult};
@@ -41,22 +42,17 @@ fn load_jpeg<P: AsRef<Path>>(path: P, max_size: Option<usize>) -> RahmenResult<D
         }
         d.scale(scale);
     }
-    let mut decompress_started = d.to_colorspace(mozjpeg::ColorSpace::JCS_EXT_BGR)?;
+    let mut decompress_started = d.to_colorspace(mozjpeg::ColorSpace::JCS_EXT_RGB)?;
+    let width = decompress_started.width();
     let height = decompress_started.height();
-    let mut img = DynamicImage::new_bgr8(decompress_started.width() as _, height as _);
-    let buffer: Option<Vec<[u8; 3]>> = decompress_started.read_scanlines();
-    let rgb_img = img.as_mut_bgr8().unwrap();
-    if let Some(buffer) = buffer {
-        for (row, row_buffer) in buffer.chunks(buffer.len() / height).enumerate() {
-            for (col, pixel) in row_buffer.iter().enumerate() {
-                *rgb_img.get_pixel_mut(col as _, row as _) = *image::Bgr::from_slice(pixel);
-            }
-        }
-        Ok(img)
-    } else {
-        error!("Failed to decode image: {:?}", path.as_ref());
-        Err(RahmenError::Retry)
-    }
+    // mozjpeg yields tightly packed RGB scanlines, which map directly onto an `RgbImage`.
+    let pixels: Vec<u8> = decompress_started.read_scanlines::<u8>()?;
+    RgbImage::from_raw(width as _, height as _, pixels)
+        .map(DynamicImage::ImageRgb8)
+        .ok_or_else(|| {
+            error!("Failed to decode image: {:?}", path.as_ref());
+            RahmenError::Retry
+        })
 }
 
 /// Load an image from a path
@@ -69,7 +65,7 @@ pub fn load_image_from_path<P: AsRef<Path>>(
     match image::ImageFormat::from_path(&path)? {
         image::ImageFormat::Jpeg => load_jpeg(path, max_size),
         format => {
-            image::io::Reader::with_format(BufReader::new(std::fs::File::open(&path)?), format)
+            image::ImageReader::with_format(BufReader::new(std::fs::File::open(&path)?), format)
                 .decode()
                 .map_err(Into::into)
         }
@@ -85,14 +81,14 @@ pub struct LineSettings {
     pub uniquify: bool,
 }
 
-/// The following are the ops concerning the status line (text being displayed below the image)
+// The following are the ops concerning the status line (text being displayed below the image)
 
 /// Tries to convert a string slice to a Case
-pub fn str_to_case(s: String) -> RahmenResult<Case> {
+pub fn str_to_case(s: String) -> RahmenResult<Case<'static>> {
     let case_str = s.to_case(Case::Flat);
     for case in Case::all_cases() {
         if case_str == format!("{:?}", case).to_case(Case::Flat) {
-            return Ok(case);
+            return Ok(*case);
         }
     }
     Err(RahmenError::CaseUnknown(s))
@@ -103,7 +99,7 @@ pub fn str_to_case(s: String) -> RahmenResult<Case> {
 enum StatusLineTransformation {
     RegexReplace(Box<(Regex, String)>),
     Capitalize,
-    ChangeCase(Case, Case),
+    ChangeCase(Case<'static>, Case<'static>),
 }
 
 /// runtime transformation ops for the metadata values (the parameters are gathered in the try_from function)
@@ -228,9 +224,9 @@ impl StatusLineFormatter {
         }
         // read and store the Python code (if it exists)
         let py_postprocess_fn = if let Some(postprocess_path) = py_postprocess {
-            Some(Python::with_gil(|py| {
-                let module = py.import(postprocess_path.as_ref())?;
-                module.call0("export").map(|obj| obj.into_py(py))
+            Some(Python::attach(|py| -> PyResult<Py<PyAny>> {
+                let module = py.import(postprocess_path.as_str())?;
+                Ok(module.getattr("export")?.call0()?.unbind())
             })?)
         } else {
             None
@@ -268,9 +264,11 @@ impl StatusLineFormatter {
         // and produces a Vec<String> of either the items returned from the Python code (if there's some code),
         // or just the input
         line_elements = if let Some(code) = &self.py_postprocess_fn {
-            Python::with_gil(|py| -> PyResult<Vec<String>> {
-                let tags = PyList::new(py, &line_elements);
-                code.call1(py, (tags, &self.separator))?.extract(py)
+            Python::attach(|py| -> PyResult<Vec<String>> {
+                let tags = PyList::new(py, &line_elements)?;
+                code.bind(py)
+                    .call1((tags, self.separator.as_str()))?
+                    .extract()
             })
             .unwrap()
         } else {

@@ -12,7 +12,9 @@ pub struct GlobProvider<I: Iterator<Item = PathBuf>> {
 }
 
 /// Create a new `GlobProvider`
-pub fn create(pattern: &str) -> RahmenResult<GlobProvider<impl Iterator<Item = PathBuf>>> {
+pub fn create(
+    pattern: &str,
+) -> RahmenResult<GlobProvider<impl Iterator<Item = PathBuf> + 'static>> {
     Ok(GlobProvider {
         path_iter: glob(pattern)
             .expect("Incorrect pattern")

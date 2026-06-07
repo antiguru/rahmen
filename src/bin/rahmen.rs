@@ -1,15 +1,16 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
-use std::str::FromStr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use clap::{App, Arg};
+use clap::{Arg, Command, value_parser};
 use font_kit::loaders::freetype::Font;
 use image::{DynamicImage, GenericImageView};
 use log::{error, info, warn};
-use pyo3::{types::PyList, PyTryInto, Python};
+use pyo3::prelude::*;
+use pyo3::types::PyList;
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::capture::Event;
 use timely::dataflow::operators::{
@@ -21,6 +22,7 @@ use timely::order::Product;
 use timely::worker::Config;
 
 use pathfinder_geometry::rect::RectI;
+use rahmen::Vector;
 use rahmen::config::Settings;
 use rahmen::dataflow::{Configuration, FormatText, ResizeImage};
 use rahmen::display::Display;
@@ -29,12 +31,11 @@ use rahmen::display_fltk::FltkDisplay;
 use rahmen::display_framebuffer::FramebufferDisplay;
 use rahmen::errors::{RahmenError, RahmenResult};
 use rahmen::font::FontRenderer;
-use rahmen::provider::{load_image_from_path, Provider, StatusLineFormatter};
+use rahmen::provider::{Provider, StatusLineFormatter, load_image_from_path};
 use rahmen::provider_list::ListProvider;
-use rahmen::Vector;
 
-static SPLASH: &'static [u8] = include_bytes!("rahmen.png");
-const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+static SPLASH: &[u8] = include_bytes!("rahmen.png");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// dataflow control, this is used as result R part
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -69,7 +70,8 @@ fn suppress_err<T>(result: RahmenResult<T>) -> RunResult<T> {
     })
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+// `DynamicImage` only implements `PartialEq` (not `Eq`) since it can hold floating-point pixels.
+#[derive(Clone, Debug, PartialEq)]
 enum Render {
     Image(usize, Vector, Arc<DynamicImage>),
     Blank(usize, Vector, Vector),
@@ -84,66 +86,52 @@ fn main() -> RahmenResult<()> {
     env_logger::init();
 
     // read command line args
-    let matches = App::new("Rahmen client")
+    let matches = Command::new("Rahmen client")
         .arg(
             Arg::new("display")
                 .short('d')
                 .long("display")
-                .about("Select the display provider")
+                .help("Select the display provider")
                 .value_name("display")
-                .takes_value(true)
-                .possible_values(&[
+                .value_parser([
                     #[cfg(feature = "fltk")]
                     "fltk",
                     "framebuffer",
                 ])
                 .default_value("framebuffer"),
         )
-        .arg(Arg::new("input").takes_value(true).required(true).index(1))
-        .arg(
-            Arg::new("output")
-                .short('o')
-                .long("output")
-                .takes_value(true),
-        )
+        .arg(Arg::new("input").required(true).index(1))
+        .arg(Arg::new("output").short('o').long("output"))
         .arg(
             Arg::new("time")
                 .short('t')
                 .long("time")
-                .takes_value(true)
-                .validator(|v| f64::from_str(v)),
+                .value_parser(value_parser!(f64)),
         )
         .arg(
             Arg::new("buffer_max_size")
                 .long("buffer_max_size")
-                .takes_value(true)
-                .validator(|v| f64::from_str(v))
-                .default_value(format!("{}", 4000 * 4000).as_str()),
+                .value_parser(value_parser!(usize))
+                .default_value("16000000"),
         )
         .arg(
             Arg::new("font")
                 .long("font")
-                .takes_value(true)
-                .validator(|f| File::open(f))
                 .default_value("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"),
         )
         .arg(
             Arg::new("font_size")
                 .long("font_size")
-                .takes_value(true)
-                .validator(|v| f32::from_str(v)),
+                .value_parser(value_parser!(f32)),
         )
-        .arg(
-            Arg::new("config")
-                .long("config")
-                .short('c')
-                .takes_value(true)
-                .validator(|f| File::open(f)),
-        )
+        .arg(Arg::new("config").long("config").short('c'))
         .get_matches();
 
     // evaluate input arg
-    let input = matches.value_of("input").expect("Input missing");
+    let input = matches
+        .get_one::<String>("input")
+        .expect("Input missing")
+        .as_str();
     // box is used bec of dynamic typing for provider
     let mut provider: Box<dyn Provider<_>> = if input.eq("-") {
         info!("Reading from stdin");
@@ -157,10 +145,10 @@ fn main() -> RahmenResult<()> {
     };
 
     // look for config file
-    let dirs = xdg::BaseDirectories::new().unwrap();
+    let dirs = xdg::BaseDirectories::new();
     let settings: Settings = if let Some(path) = matches
-        .value_of("config")
-        .map(Into::into)
+        .get_one::<String>("config")
+        .map(PathBuf::from)
         .or_else(|| dirs.find_config_file("rahmen.toml"))
         .or_else(|| {
             #[cfg(unix)]
@@ -172,9 +160,10 @@ fn main() -> RahmenResult<()> {
             #[cfg(not(unix))]
             None
         }) {
-        let mut c = config::Config::default();
-        c.merge(config::File::from(path))?;
-        c.try_into()?
+        config::Config::builder()
+            .add_source(config::File::from(path))
+            .build()?
+            .try_deserialize()?
     } else {
         warn!("Config file not found, continuing with default settings");
         Default::default()
@@ -183,18 +172,14 @@ fn main() -> RahmenResult<()> {
     // Note: contrary to the documentation, the Python system path will not contain the directory from which we're called,
     // so this has to be indicated in the configuration file
     if let Some(python_paths) = settings.py_path {
-        Python::with_gil(|py| {
-            let syspath: &PyList = py
-                .import("sys")
-                .unwrap()
-                .get("path")
-                .unwrap()
-                .try_into()
-                .unwrap();
+        Python::attach(|py| -> PyResult<()> {
+            let syspath = py.import("sys")?.getattr("path")?.cast_into::<PyList>()?;
             for path in &python_paths {
-                syspath.insert(0, path).unwrap();
+                syspath.insert(0, path)?;
             }
-        });
+            Ok(())
+        })
+        .expect("Failed to configure Python sys.path");
     }
 
     // build the status line, using the settings from the config file for the individual
@@ -208,19 +193,17 @@ fn main() -> RahmenResult<()> {
     )?;
 
     // continue evaluating the command line args
-    let buffer_max_size: usize = matches
-        .value_of("buffer_max_size")
-        .expect("Missing buffer_max_size")
-        .parse()
-        .unwrap();
+    let buffer_max_size: usize = *matches
+        .get_one::<usize>("buffer_max_size")
+        .expect("Missing buffer_max_size");
 
-    let font = Font::from_path(matches.value_of("font").unwrap(), 0).unwrap();
+    let font =
+        Font::from_path(matches.get_one::<String>("font").expect("Missing font"), 0).unwrap();
     let font_renderer = FontRenderer::with_font(font);
 
     let duration_millis = (matches
-        .value_of("time")
-        .map(str::parse)
-        .transpose()?
+        .get_one::<f64>("time")
+        .copied()
         .or(settings.delay)
         .unwrap_or(90.)
         * 1000f64) as u64;
@@ -229,9 +212,8 @@ fn main() -> RahmenResult<()> {
 
     // font size to use (px)
     let font_size_f = matches
-        .value_of("font_size")
-        .map(str::parse)
-        .transpose()?
+        .get_one::<f32>("font_size")
+        .copied()
         .or(settings.font_size)
         .unwrap_or(30.);
 
@@ -291,8 +273,8 @@ fn main() -> RahmenResult<()> {
                 move |input, output, not: &mut Notificator<Duration>| {
                     input.for_each(|cap, data| {
                         data.swap(&mut buffer);
-                        if let Some(text) = buffer.drain(..).last() {
-                            *stash.entry(cap.time().clone()).or_default() = text;
+                        if let Some(text) = buffer.drain(..).next_back() {
+                            *stash.entry(*cap.time()).or_default() = text;
                             not.notify_at(cap.retain());
                         }
                     });
@@ -340,10 +322,7 @@ fn main() -> RahmenResult<()> {
                 move |input, output, not| {
                     input.for_each(|cap, data| {
                         data.swap(&mut buffer);
-                        stash
-                            .entry(*cap.time())
-                            .or_default()
-                            .extend(buffer.drain(..));
+                        stash.entry(*cap.time()).or_default().append(&mut buffer);
                         not.notify_at(cap.retain());
                     });
                     not.for_each(|cap, _, _not| {
@@ -404,11 +383,11 @@ fn main() -> RahmenResult<()> {
                     input_buffer
                         .entry(*time.time())
                         .or_default()
-                        .extend(buffer.drain(..));
+                        .append(&mut buffer);
                     not.notify_at(time.retain());
                 });
                 not.for_each(|time, _count, _not| {
-                    if let Some(updates) = input_buffer.remove(&time.time()) {
+                    if let Some(updates) = input_buffer.remove(time.time()) {
                         output
                             .session(&time)
                             .give_iterator(updates.into_iter().flat_map(|(key, anchor, img)| {
@@ -481,17 +460,17 @@ fn main() -> RahmenResult<()> {
                     match result {
                         Ok(Render::Image(key, anchor, ref img)) => {
                             has_update = true;
-                            display.render(key, anchor, img.as_ref()).err().map(|err| {
+                            if let Err(err) = display.render(key, anchor, img.as_ref()) {
                                 error!("Render failed: {}", err);
                                 terminate = true;
-                            });
+                            }
                         }
                         Ok(Render::Blank(key, anchor, size)) => {
                             has_update = true;
-                            display.blank(key, anchor, size).err().map(|err| {
+                            if let Err(err) = display.blank(key, anchor, size) {
                                 error!("Blank failed: {}", err);
                                 terminate = true;
-                            });
+                            }
                         }
                         Err(RunControl::Terminate) => terminate = true,
                         _ => {}
@@ -510,10 +489,14 @@ fn main() -> RahmenResult<()> {
         }
     };
 
-    match matches.value_of("display").expect("Display missing") {
+    match matches
+        .get_one::<String>("display")
+        .expect("Display missing")
+        .as_str()
+    {
         "framebuffer" => {
             let path_to_device = matches
-                .value_of("output")
+                .get_one::<String>("output")
                 .expect("Framebuffer output missing");
             let framebuffer = framebuffer::Framebuffer::new(path_to_device).unwrap();
             let _ = framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Graphics)

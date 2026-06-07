@@ -162,7 +162,7 @@ impl<S: Scope> ResizeImage<S> for ImageStream<S> {
         let mut current_screen_size = None;
         let mut current_image = None;
         self.binary_notify(
-            &configuration_stream,
+            configuration_stream,
             Pipeline,
             Pipeline,
             "Resize image",
