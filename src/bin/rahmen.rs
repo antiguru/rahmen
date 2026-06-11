@@ -26,9 +26,9 @@ use rahmen::Vector;
 use rahmen::config::Settings;
 use rahmen::dataflow::{Configuration, FormatText, ResizeImage};
 use rahmen::display::Display;
-#[cfg(feature = "fltk")]
-use rahmen::display_fltk::FltkDisplay;
 use rahmen::display_framebuffer::FramebufferDisplay;
+#[cfg(feature = "minifb")]
+use rahmen::display_minifb::MinifbDisplay;
 use rahmen::errors::{RahmenError, RahmenResult};
 use rahmen::font::FontRenderer;
 use rahmen::provider::{Provider, StatusLineFormatter, load_image_from_path};
@@ -94,8 +94,8 @@ fn main() -> RahmenResult<()> {
                 .help("Select the display provider")
                 .value_name("display")
                 .value_parser([
-                    #[cfg(feature = "fltk")]
-                    "fltk",
+                    #[cfg(feature = "minifb")]
+                    "minifb",
                     "framebuffer",
                 ])
                 .default_value("framebuffer"),
@@ -511,8 +511,8 @@ fn main() -> RahmenResult<()> {
             let _ = framebuffer::Framebuffer::set_kd_mode(framebuffer::KdMode::Text)
                 .map_err(|_e| warn!("Failed to set graphics mode."));
         }
-        #[cfg(feature = "fltk")]
-        "fltk" => FltkDisplay::new().main_loop(display_fn),
+        #[cfg(feature = "minifb")]
+        "minifb" => MinifbDisplay::new()?.main_loop(display_fn),
         _ => panic!("Unknown display"),
     };
 

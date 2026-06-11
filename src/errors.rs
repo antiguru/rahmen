@@ -28,6 +28,8 @@ pub enum RahmenError {
     Rexiv2Error(rexiv2::Rexiv2Error),
     /// Pseudo-error to indicate program termination
     Terminate,
+    /// Errors from the windowed (minifb) display
+    WindowError(String),
 }
 
 /// Result type for `RahmenError`
@@ -46,6 +48,7 @@ impl fmt::Display for RahmenError {
             RahmenError::Retry => write!(f, "Retry"),
             RahmenError::Rexiv2Error(err) => err.fmt(f),
             RahmenError::Terminate => write!(f, "Terminate"),
+            RahmenError::WindowError(err) => write!(f, "Window error: {}", err),
         }
     }
 }
@@ -63,6 +66,7 @@ impl Error for RahmenError {
             RahmenError::Retry => None,
             RahmenError::Rexiv2Error(err) => err.source(),
             RahmenError::Terminate => None,
+            RahmenError::WindowError(_err) => None,
         }
     }
 }

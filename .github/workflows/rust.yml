@@ -36,3 +36,11 @@ jobs:
 
       - name: Run tests
         run: cargo test --verbose
+
+      # The optional windowed display (minifb) loads X11/Wayland via dlopen, so it builds
+      # without extra system libraries. Check it here so it does not bit-rot.
+      - name: Clippy (minifb feature)
+        run: cargo clippy --features minifb --all-targets -- -D warnings
+
+      - name: Build (minifb feature)
+        run: cargo build --features minifb --verbose
