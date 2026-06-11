@@ -4,9 +4,16 @@ version = "0.2.0"
 authors = ["Moritz Hoffmann <antiguru@gmail.com>", "sys3175 <https://github.com/sys3175>"]
 edition = "2024"
 rust-version = "1.85"
-license = "GPL"
+license = "GPL-3.0-only"
 description = "Rahmen is a lightweight image presenter"
 readme = "README.md"
+repository = "https://github.com/antiguru/rahmen"
+homepage = "https://github.com/antiguru/rahmen"
+documentation = "https://docs.rs/rahmen"
+keywords = ["slideshow", "image", "framebuffer", "exif", "picture-frame"]
+categories = ["multimedia::images", "command-line-utilities"]
+# Development-only files that don't belong in the published crate.
+exclude = [".github/", "rustfmt.toml", "test.py"]
 
 [workspace]
 members = ["rahmen-exiv2"]
@@ -35,7 +42,7 @@ log = "0.4"
 minifb = { version = "0.28", optional = true }
 mozjpeg = { version = "0.10", default-features = false }
 pathfinder_geometry = "0.5"
-rahmen-exiv2 = { path = "rahmen-exiv2" }
+rahmen-exiv2 = { path = "rahmen-exiv2", version = "0.2.0" }
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 timely = "0.12"
