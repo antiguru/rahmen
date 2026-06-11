@@ -3,7 +3,7 @@ name = "rahmen"
 version = "0.2.0"
 authors = ["Moritz Hoffmann <antiguru@gmail.com>", "sys3175 <https://github.com/sys3175>"]
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.86"
 license = "GPL-3.0-only"
 description = "Rahmen is a lightweight image presenter"
 readme = "README.md"
@@ -45,7 +45,7 @@ pathfinder_geometry = "0.5"
 rahmen-exiv2 = { path = "rahmen-exiv2", version = "0.2.0" }
 regex = "1"
 serde = { version = "1", features = ["derive"] }
-timely = "0.12"
+timely = "0.30"
 xdg = "3"
 
 [dependencies.image]

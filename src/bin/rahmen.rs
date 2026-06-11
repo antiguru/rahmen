@@ -11,13 +11,15 @@ use image::{DynamicImage, GenericImageView};
 use log::{error, info, warn};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use timely::communication::Allocator;
+use timely::container::CapacityContainerBuilder;
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::capture::Event;
+use timely::dataflow::operators::vec::{Branch, Filter, Map, ResultStream};
 use timely::dataflow::operators::{
-    Branch, Capture, Concat, ConnectLoop, Enter, Filter, Inspect, Leave, LoopVariable, Map,
-    Notificator, Operator, Probe, ResultStream,
+    Capture, Concat, ConnectLoop, Enter, Inspect, Leave, LoopVariable, Notificator, Operator, Probe,
 };
-use timely::dataflow::{InputHandle, ProbeHandle, Scope};
+use timely::dataflow::{InputHandle, ProbeHandle};
 use timely::order::Product;
 use timely::worker::Config;
 
@@ -221,13 +223,15 @@ fn main() -> RahmenResult<()> {
     let time_format = settings.time_format.unwrap_or("%H:%M:%S".into());
 
     // initialization for timely dataflow
-    let allocator = timely::communication::allocator::Thread::new();
-    let mut worker = timely::worker::Worker::new(Config::default(), allocator);
+    let allocator =
+        Allocator::Thread(timely::communication::allocator::thread::Thread::default());
+    let mut worker = timely::worker::Worker::new(Config::default(), allocator, Some(Instant::now()));
 
     // input: #1 timeline #2 screen resolution
-    let mut input_configuration: InputHandle<_, Configuration> = InputHandle::new();
+    let mut input_configuration: InputHandle<Duration, CapacityContainerBuilder<Vec<Configuration>>> =
+        InputHandle::new();
     // to gather information about progress
-    let mut probe = ProbeHandle::new();
+    let probe = ProbeHandle::new();
 
     let output = worker.dataflow(|scope| {
         let configuration_stream = input_configuration.to_stream(scope);
@@ -235,9 +239,10 @@ fn main() -> RahmenResult<()> {
         let img_path_stream = scope.scoped::<Product<_, u32>, _, _>("File loading", |inner| {
             let (handle, cycle) = inner.loop_variable(1);
             let (ok, err) = configuration_stream
+                .clone()
                 .filter(|c| matches!(c, Configuration::Tick))
                 .enter(inner)
-                .concat(&cycle)
+                .concat(cycle)
                 // obtain next path
                 .map(move |_| fatal_err(provider.next_image()))
                 // Load image
@@ -249,18 +254,18 @@ fn main() -> RahmenResult<()> {
                 })
                 .branch(|_t, d| d.as_ref().err() == Some(&RunControl::Suppressed));
             err.map(|_| Configuration::Tick).connect_loop(handle);
-            ok.leave()
+            ok.leave(scope)
         });
-        let err_stream = img_path_stream.err();
+        let err_stream = img_path_stream.clone().err();
 
-        let mut buffer = vec![];
         let mut stash: HashMap<Duration, String> = HashMap::new();
         let mut current_text = None;
 
         let mut status_line_stream = img_path_stream
+            .clone()
             .ok()
             .flat_map(move |(p, _img)| status_line_formatter.format(&p).ok())
-            .concat(&configuration_stream.flat_map(|c| match c {
+            .concat(configuration_stream.clone().flat_map(|c| match c {
                 Configuration::Greeting(text) => Some(text),
                 _ => None,
             }))
@@ -272,10 +277,9 @@ fn main() -> RahmenResult<()> {
                 Some(Duration::from_secs(0)),
                 move |input, output, not: &mut Notificator<Duration>| {
                     input.for_each(|cap, data| {
-                        data.swap(&mut buffer);
-                        if let Some(text) = buffer.drain(..).next_back() {
+                        if let Some(text) = data.drain(..).next_back() {
                             *stash.entry(*cap.time()).or_default() = text;
-                            not.notify_at(cap.retain());
+                            not.notify_at(cap.retain(0));
                         }
                     });
                     not.for_each(|cap, cnt, not| {
@@ -310,20 +314,18 @@ fn main() -> RahmenResult<()> {
 
         let adjusted_configuration_stream = {
             let mut stash: HashMap<_, Vec<_>> = HashMap::new();
-            let mut buffer = vec![];
             // Hack: adjust screen size for the resize operator to reserve space for the status line
             let mut current_font_size = None;
             let mut current_font_canvas_vstretch = None;
 
-            configuration_stream.unary_notify(
+            configuration_stream.clone().unary_notify(
                 Pipeline,
                 "Adjust configuration",
                 None,
                 move |input, output, not| {
                     input.for_each(|cap, data| {
-                        data.swap(&mut buffer);
-                        stash.entry(*cap.time()).or_default().append(&mut buffer);
-                        not.notify_at(cap.retain());
+                        stash.entry(*cap.time()).or_default().append(data);
+                        not.notify_at(cap.retain(0));
                     });
                     not.for_each(|cap, _, _not| {
                         if let Some(updates) = stash.remove(cap.time()) {
@@ -361,9 +363,10 @@ fn main() -> RahmenResult<()> {
         };
 
         let img_stream = img_path_stream
+            .clone()
             .ok()
             .map(|(_, img)| img)
-            .concat(&configuration_stream.flat_map(|c| match c {
+            .concat(configuration_stream.clone().flat_map(|c| match c {
                 Configuration::Splash(img) => Some(img),
                 _ => None,
             }))
@@ -372,19 +375,14 @@ fn main() -> RahmenResult<()> {
         let mut size_stash: HashMap<usize, _> = HashMap::new();
         let mut input_buffer: HashMap<_, Vec<(_, _, _)>> = HashMap::new();
 
-        let composed_img_stream = img_stream.concat(&text_img_stream).unary_notify(
+        let composed_img_stream = img_stream.concat(text_img_stream).unary_notify(
             Pipeline,
             "Infer blanking",
             None,
             move |input, output, not| {
-                let mut buffer = vec![];
                 input.for_each(|time, data| {
-                    data.swap(&mut buffer);
-                    input_buffer
-                        .entry(*time.time())
-                        .or_default()
-                        .append(&mut buffer);
-                    not.notify_at(time.retain());
+                    input_buffer.entry(*time.time()).or_default().append(data);
+                    not.notify_at(time.retain(0));
                 });
                 not.for_each(|time, _count, _not| {
                     if let Some(updates) = input_buffer.remove(time.time()) {
@@ -408,8 +406,8 @@ fn main() -> RahmenResult<()> {
 
         err_stream
             .map(Err)
-            .concat(&composed_img_stream.map(Ok))
-            .probe_with(&mut probe)
+            .concat(composed_img_stream.map(Ok))
+            .probe_with(&probe)
             .capture()
     });
 
