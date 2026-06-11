@@ -1,0 +1,36 @@
+name: Release-plz
+
+permissions:
+  pull-requests: write
+  contents: write
+  id-token: write
+
+on:
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: release-plz
+
+jobs:
+  release-plz:
+    name: Release-plz
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      # Required so release-plz can verify the build during `cargo publish`.
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libexiv2-dev libfontconfig1-dev python3-dev
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Run release-plz
+        uses: MarcoIeni/release-plz-action@v0.5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
