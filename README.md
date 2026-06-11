@@ -357,6 +357,43 @@ env \
   cargo deb --target arm-unknown-linux-gnueabihf
 ```
 
+### Troubleshooting: `rustc` is "not applicable to the toolchain"
+
+When building on the Raspberry Pi you may hit:
+
+```
+error: process didn't exit successfully: `rustc -vV` (exit status: 1)
+--- stderr
+error: the 'rustc' binary, normally provided by the 'rustc' component, is not
+applicable to the 'stable-armv7-unknown-linux-gnueabihf' toolchain
+```
+
+This is not a Rahmen build error — it means your active `rustup` toolchain has
+the cross `rust-std` target installed but no usable host `rustc`/`cargo`, so
+Cargo's call to `rustc -vV` fails. It commonly happens after running
+`rustup target add armv7-unknown-linux-gnueabihf` (which only adds the cross
+standard library, not the host tools) or when `rustup`'s default host triple
+does not match the toolchain.
+
+Inspect the current state and reinstall the toolchain with its host tools:
+
+```shell
+# Show the active/default toolchain and host triple
+rustup show
+
+# Reinstall the toolchain with host tools (rustc + cargo), not just a target std
+rustup toolchain uninstall stable
+rustup toolchain install stable --profile default
+rustup default stable
+
+# Verify that rustc is now usable
+rustc -vV
+```
+
+If `rustup show` reports the wrong host triple, set it explicitly first (for a
+32-bit Raspberry Pi this is usually `armv7-unknown-linux-gnueabihf`) with
+`rustup set default-host armv7-unknown-linux-gnueabihf`, then reinstall as above.
+
 ### 4k on the Raspberry Pi 1
 
 The Raspberry Pi 1 supports 4k resolution at reduced frame rates. The following configuration works on a screen we have
