@@ -223,13 +223,15 @@ fn main() -> RahmenResult<()> {
     let time_format = settings.time_format.unwrap_or("%H:%M:%S".into());
 
     // initialization for timely dataflow
-    let allocator =
-        Allocator::Thread(timely::communication::allocator::thread::Thread::default());
-    let mut worker = timely::worker::Worker::new(Config::default(), allocator, Some(Instant::now()));
+    let allocator = Allocator::Thread(timely::communication::allocator::thread::Thread::default());
+    let mut worker =
+        timely::worker::Worker::new(Config::default(), allocator, Some(Instant::now()));
 
     // input: #1 timeline #2 screen resolution
-    let mut input_configuration: InputHandle<Duration, CapacityContainerBuilder<Vec<Configuration>>> =
-        InputHandle::new();
+    let mut input_configuration: InputHandle<
+        Duration,
+        CapacityContainerBuilder<Vec<Configuration>>,
+    > = InputHandle::new();
     // to gather information about progress
     let probe = ProbeHandle::new();
 
