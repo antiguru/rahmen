@@ -10,11 +10,11 @@ use itertools::Itertools;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use regex::Regex;
-use rexiv2::Metadata;
 use serde::Deserialize;
 
 use crate::config::{Element, Replacement};
 use crate::errors::{RahmenError, RahmenResult};
+use crate::exiv2::Metadata;
 
 /// Provider trait to produce images, or other types
 pub trait Provider<D> {

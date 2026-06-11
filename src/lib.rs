@@ -30,6 +30,9 @@ pub mod display_framebuffer;
 pub mod display_minifb;
 pub mod errors;
 pub mod font;
+
+/// Metadata access backed by libexiv2, re-exported as a module path.
+pub use rahmen_exiv2 as exiv2;
 pub mod provider;
 pub mod provider_glob;
 pub mod provider_list;

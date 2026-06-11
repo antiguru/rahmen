@@ -24,8 +24,8 @@ pub enum RahmenError {
     RegexError(regex::Error),
     /// Pseudo-error to indicate a retry condition
     Retry,
-    /// Errors from rexiv2
-    Rexiv2Error(rexiv2::Rexiv2Error),
+    /// Errors from the exiv2 metadata wrapper
+    Exiv2Error(crate::exiv2::Exiv2Error),
     /// Pseudo-error to indicate program termination
     Terminate,
     /// Errors from the windowed (minifb) display
@@ -46,7 +46,7 @@ impl fmt::Display for RahmenError {
             RahmenError::PythonError(err) => write!(f, "Python error: {}", err),
             RahmenError::RegexError(err) => err.fmt(f),
             RahmenError::Retry => write!(f, "Retry"),
-            RahmenError::Rexiv2Error(err) => err.fmt(f),
+            RahmenError::Exiv2Error(err) => err.fmt(f),
             RahmenError::Terminate => write!(f, "Terminate"),
             RahmenError::WindowError(err) => write!(f, "Window error: {}", err),
         }
@@ -64,7 +64,7 @@ impl Error for RahmenError {
             RahmenError::PythonError(err) => err.source(),
             RahmenError::RegexError(err) => err.source(),
             RahmenError::Retry => None,
-            RahmenError::Rexiv2Error(err) => err.source(),
+            RahmenError::Exiv2Error(err) => err.source(),
             RahmenError::Terminate => None,
             RahmenError::WindowError(_err) => None,
         }
@@ -107,8 +107,8 @@ impl From<regex::Error> for RahmenError {
     }
 }
 
-impl From<rexiv2::Rexiv2Error> for RahmenError {
-    fn from(err: rexiv2::Rexiv2Error) -> Self {
-        RahmenError::Rexiv2Error(err)
+impl From<crate::exiv2::Exiv2Error> for RahmenError {
+    fn from(err: crate::exiv2::Exiv2Error) -> Self {
+        RahmenError::Exiv2Error(err)
     }
 }
