@@ -6,18 +6,19 @@ use std::sync::Arc;
 use crate::font::FontRenderer;
 use crate::{Timer, Vector};
 use image::{DynamicImage, GenericImageView};
+use timely::dataflow::Stream;
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::Operator;
-use timely::dataflow::{Scope, Stream};
+use timely::progress::Timestamp;
 
 /// A stream of images
-pub type ImageStream<S> = Stream<S, Arc<DynamicImage>>;
+pub type ImageStream<'a, T> = Stream<'a, T, Vec<Arc<DynamicImage>>>;
 
 /// A keyed stream of offset and image
-pub type ImagePosStream<S> = Stream<S, (usize, Vector, Arc<DynamicImage>)>;
+pub type ImagePosStream<'a, T> = Stream<'a, T, Vec<(usize, Vector, Arc<DynamicImage>)>>;
 
 /// A configuration stream
-pub type ConfigurationStream<S> = Stream<S, Configuration>;
+pub type ConfigurationStream<'a, T> = Stream<'a, T, Vec<Configuration>>;
 
 /// A configuration element to be passed in a configuration stream
 #[derive(Debug, Clone)]
@@ -37,33 +38,31 @@ pub enum Configuration {
 }
 
 /// Format text for the status line trait
-pub trait FormatText<S: Scope> {
+pub trait FormatText<'a, T: Timestamp + std::hash::Hash> {
     /// Format text stream operation
     fn format_text(
         &self,
-        configuration_stream: &ConfigurationStream<S>,
+        configuration_stream: &ConfigurationStream<'a, T>,
         font_renderer: FontRenderer,
         key: usize,
-    ) -> ImagePosStream<S>;
+    ) -> ImagePosStream<'a, T>;
 }
 
-impl<S: Scope> FormatText<S> for Stream<S, Vec<String>> {
+impl<'a, T: Timestamp + std::hash::Hash> FormatText<'a, T> for Stream<'a, T, Vec<Vec<String>>> {
     fn format_text(
         &self,
-        configuration_stream: &ConfigurationStream<S>,
+        configuration_stream: &ConfigurationStream<'a, T>,
         mut font_renderer: FontRenderer,
         key: usize,
-    ) -> ImagePosStream<S> {
+    ) -> ImagePosStream<'a, T> {
         let mut configuration_stash = HashMap::new();
         let mut text_stash = HashMap::new();
         let mut current_screen_dimension = None;
         let mut current_font_size = None;
         let mut current_font_canvas_vstretch = None;
         let mut current_text = None;
-        let mut in_buffer1 = vec![];
-        let mut in_buffer2 = vec![];
-        self.binary_notify(
-            configuration_stream,
+        self.clone().binary_notify(
+            configuration_stream.clone(),
             Pipeline,
             Pipeline,
             "Format text",
@@ -71,21 +70,19 @@ impl<S: Scope> FormatText<S> for Stream<S, Vec<String>> {
             move |in1, in2, out, not| {
                 let _t = Timer::new(|e| debug!("Render font op {}ms", e.as_millis()));
                 in1.for_each(|time, data| {
-                    data.swap(&mut in_buffer1);
-                    for text in in_buffer1.drain(..) {
+                    for text in data.drain(..) {
                         text_stash.insert(time.time().clone(), text);
                     }
-                    not.notify_at(time.retain());
+                    not.notify_at(time.retain(0));
                 });
                 in2.for_each(|time, data| {
-                    data.swap(&mut in_buffer2);
-                    for configuration in in_buffer2.drain(..) {
+                    for configuration in data.drain(..) {
                         configuration_stash
                             .entry(time.time().clone())
                             .or_insert_with(Vec::new)
                             .push(configuration);
                     }
-                    not.notify_at(time.retain());
+                    not.notify_at(time.retain(0));
                 });
                 not.for_each(|time, _cnt, _not| {
                     if let Some(configurations) = configuration_stash.remove(time.time()) {
@@ -140,29 +137,27 @@ impl<S: Scope> FormatText<S> for Stream<S, Vec<String>> {
 }
 
 /// Resize an image to match its viewport size
-pub trait ResizeImage<S: Scope> {
+pub trait ResizeImage<'a, T: Timestamp + std::hash::Hash> {
     /// Resize an image
     fn resize_image(
         &self,
-        configuration_stream: &ConfigurationStream<S>,
+        configuration_stream: &ConfigurationStream<'a, T>,
         key: usize,
-    ) -> ImagePosStream<S>;
+    ) -> ImagePosStream<'a, T>;
 }
 
-impl<S: Scope> ResizeImage<S> for ImageStream<S> {
+impl<'a, T: Timestamp + std::hash::Hash> ResizeImage<'a, T> for ImageStream<'a, T> {
     fn resize_image(
         &self,
-        configuration_stream: &ConfigurationStream<S>,
+        configuration_stream: &ConfigurationStream<'a, T>,
         key: usize,
-    ) -> ImagePosStream<S> {
-        let mut buffer1 = vec![];
-        let mut buffer2 = vec![];
+    ) -> ImagePosStream<'a, T> {
         let mut img_stash = HashMap::new();
         let mut configuration_stash = HashMap::new();
         let mut current_screen_size = None;
         let mut current_image = None;
-        self.binary_notify(
-            configuration_stream,
+        self.clone().binary_notify(
+            configuration_stream.clone(),
             Pipeline,
             Pipeline,
             "Resize image",
@@ -170,21 +165,19 @@ impl<S: Scope> ResizeImage<S> for ImageStream<S> {
             move |in1, in2, out, not| {
                 let _t = Timer::new(|e| debug!("Resize image op {}ms", e.as_millis()));
                 in1.for_each(|time, data| {
-                    data.swap(&mut buffer1);
-                    for img in buffer1.drain(..) {
+                    for img in data.drain(..) {
                         img_stash.insert(time.time().clone(), img);
                     }
-                    not.notify_at(time.retain());
+                    not.notify_at(time.retain(0));
                 });
                 in2.for_each(|time, data| {
-                    data.swap(&mut buffer2);
-                    for configuration in buffer2.drain(..) {
+                    for configuration in data.drain(..) {
                         configuration_stash
                             .entry(time.time().clone())
                             .or_insert_with(Vec::new)
                             .push(configuration);
                     }
-                    not.notify_at(time.retain());
+                    not.notify_at(time.retain(0));
                 });
                 not.for_each(|time, _cnt, _not| {
                     if let Some(configurations) = configuration_stash.remove(time.time()) {
