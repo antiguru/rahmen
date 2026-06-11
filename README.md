@@ -88,7 +88,7 @@ rendering images.
 
 Rahmen depends on various libraries, which should be available on most Linux distributions. Specifically, it needs:
 
-* `libgexiv2-dev`
+* `libexiv2-dev` (plus a C++ compiler, to build the bundled exiv2 wrapper)
 * `libfontconfig1-dev`
 * `python3-dev` (Rahmen embeds a Python interpreter for optional status-line post-processing)
 
@@ -378,7 +378,7 @@ max_framebuffer_height=2160
 
 ### Previous attempts to cross-compile
 
-Cross-compilation is a mess. The instructions below worked until we decided to include a dependency on `libgexiv2` to
+Cross-compilation is a mess. The instructions below worked until we decided to include a dependency on `libexiv2` to
 extract image metadata. This has some trouble cross-compiling and eventually, we decided not to spend more time on it.
 
 Preparation:
@@ -414,7 +414,7 @@ Preparation:
 
    ```shell
    dpkg --add-architecture armhf
-   apt install libgexiv2-dev:armhf libfontconfig1-dev:armhf
+   apt install libexiv2-dev:armhf libfontconfig1-dev:armhf
    ```
 
 Now, issue the following command to cross-compile the binary.

@@ -8,6 +8,9 @@ license = "GPL"
 description = "Rahmen is a lightweight image presenter"
 readme = "README.md"
 
+[workspace]
+members = ["rahmen-exiv2"]
+
 [features]
 default = []
 
@@ -32,8 +35,8 @@ log = "0.4"
 minifb = { version = "0.28", optional = true }
 mozjpeg = { version = "0.10", default-features = false }
 pathfinder_geometry = "0.5"
+rahmen-exiv2 = { path = "rahmen-exiv2" }
 regex = "1"
-rexiv2 = "0.10"
 serde = { version = "1", features = ["derive"] }
 timely = "0.12"
 xdg = "3"
