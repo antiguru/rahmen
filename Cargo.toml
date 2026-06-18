@@ -1,6 +1,6 @@
 [package]
 name = "rahmen"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Moritz Hoffmann <antiguru@gmail.com>", "sys3175 <https://github.com/sys3175>"]
 edition = "2024"
 rust-version = "1.85"
@@ -42,7 +42,7 @@ log = "0.4"
 minifb = { version = "0.28", optional = true }
 mozjpeg = { version = "0.10", default-features = false }
 pathfinder_geometry = "0.5"
-rahmen-exiv2 = { path = "rahmen-exiv2", version = "0.2.0" }
+rahmen-exiv2 = { path = "rahmen-exiv2", version = "0.2.1" }
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 timely = "0.12"
