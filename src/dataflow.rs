@@ -211,3 +211,6 @@ impl<'a, T: Timestamp + std::hash::Hash> ResizeImage<'a, T> for ImageStream<'a, 
         )
     }
 }
+
+#[cfg(test)]
+mod tests;
