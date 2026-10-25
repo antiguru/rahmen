@@ -317,3 +317,30 @@ def test_modify_does_not_wrap_negative_index():
 
 def test_timeline_does_not_wrap_short_list():
     assert put_out('|2012-08-13|Creator') == 'USA|2012-08-13|Creator'
+
+
+def test_slide_country_rules_mutate_in_place():
+    for country, remaining in [
+        ('South Korea', ['South Korea', 'Date', 'Creator']),
+        ('Morocco', ['Morocco', 'Date', 'Creator']),
+        ('Switzerland', ['City ZH', 'Date', 'Creator']),
+    ]:
+        items = ['From Slide', 'Quarter', 'City', 'Kanton Zürich', country, 'Date', 'Creator']
+        assert postprocess.postprocess(items, sep) is items
+        assert items == ['From Slide', 'Creator']
+
+        items = ['From Slide', 'Extra', 'Extra', 'Info', 'Quarter', 'City',
+                 'Kanton Zürich', country, 'Date', 'Creator']
+        assert postprocess.postprocess(items, sep) is items
+        assert items == ['From Slide'] + remaining
+
+
+def test_processing_preserves_list_identity():
+    for items, expected in [
+        ([], []),
+        (['Title', 'Date', 'Creator'], ['Title', 'Date', 'Creator']),
+        (['Zurich City', 'Date', 'Creator'], ['Zürich', 'Date', 'Creator']),
+        (['', '2012-08-13', 'Creator'], ['USA', '2012-08-13', 'Creator']),
+    ]:
+        assert postprocess.postprocess(items, sep) is items
+        assert items == expected

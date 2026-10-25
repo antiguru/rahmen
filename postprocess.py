@@ -211,7 +211,6 @@ glob_replacements = {'Zurich': 'Zürich',
 
 # main filter
 def postprocess(items: list[str], sep: str) -> list[str]:
-    outitems = []
     # Create a drop list for this invocation only.
     delx = set()
     # first, replace the global stuff
@@ -221,23 +220,22 @@ def postprocess(items: list[str], sep: str) -> list[str]:
     # if 'Hartmut' in items[len(items)-1]:
     items = pp_metadata_from_timespan(items)
     # now the specific filters
-    for ix, it in enumerate(items):
-        if ix == 0 and 'From Slide' in it:
-            pp_dia(items, delx)
-            outitems = items
-        if len(items) >= 7 and ix == len(items) - 3 and it == "South Korea":
-            outitems = pp_s_korea(items, it, ix, delx)
-        if len(items) >= 7 and ix == len(items) - 3 and it == "Morocco":
-            outitems = pp_morocco(items, it, ix, delx)
-        if len(items) >= 7 and ix == len(items) - 3 and it == "Switzerland":
-            outitems = pp_ch_cantons(items, ix, delx)
+    if items and 'From Slide' in items[0]:
+        pp_dia(items, delx)
+    if len(items) >= 7:
+        ix = len(items) - 3
+        country = items[ix]
+        if country == "South Korea":
+            pp_s_korea(items, country, ix, delx)
+        elif country == "Morocco":
+            pp_morocco(items, country, ix, delx)
+        elif country == "Switzerland":
+            pp_ch_cantons(items, ix, delx)
 
-    if outitems:
-        # only now, we remove the dropped items
-        for x in sorted(delx, reverse=True):
-            if has_indices(outitems, x):
-                del outitems[x]
-        items = outitems
+    # only now, we remove the dropped items
+    for x in sorted(delx, reverse=True):
+        if has_indices(items, x):
+            del items[x]
 
     # if you return a list of items, the final processing will cause empties to be filtered out and
     # multiple items to be returned only once (unconditionally), and finally join them to a line using the
