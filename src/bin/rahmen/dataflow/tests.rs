@@ -437,3 +437,47 @@ fn viewport_shrink_clips_inferred_blanks() {
     }
     assert!(graph.close().is_empty());
 }
+
+#[test]
+fn blocked_provider_does_not_block_clock_progress() {
+    use std::sync::mpsc;
+    let (entered_tx, entered_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel();
+    let (progress_tx, progress_rx) = mpsc::channel();
+    struct Blocked {
+        entered: mpsc::Sender<()>,
+        release: mpsc::Receiver<()>,
+    }
+    impl Provider<PathBuf> for Blocked {
+        fn next_image(&mut self) -> RahmenResult<Option<PathBuf>> {
+            self.entered.send(()).unwrap();
+            self.release.recv().unwrap();
+            Ok(None)
+        }
+    }
+    let ui = std::thread::spawn(move || {
+        let mut graph = Graph::new(vec![], false, true);
+        let formatter = StatusLineFormatter::new(std::iter::empty(), None, ", ".into()).unwrap();
+        let font = FontRenderer::with_font(
+            Font::from_path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 0).unwrap(),
+        );
+        // Build the production graph with a provider whose I/O is held by the test.
+        graph.output = build(
+            &mut graph.worker, &mut graph.input, &graph.probe,
+            Box::new(Blocked { entered: entered_tx, release: release_rx }),
+            formatter, font,
+            Options { buffer_max_size: 16_000_000, show_time: true, time_format: "FIXED".into() },
+        );
+        graph.configure();
+        graph.input.send(Configuration::Greeting("HELLO".into()));
+        graph.input.send(Configuration::Tick);
+        graph.advance(2000);
+        progress_tx.send(()).unwrap();
+        graph.close();
+    });
+    entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    let progressed = progress_rx.recv_timeout(Duration::from_millis(200)).is_ok();
+    release_tx.send(()).unwrap();
+    ui.join().unwrap();
+    assert!(progressed, "UI clock frontier stalled on provider I/O");
+}
