@@ -30,7 +30,7 @@ impl Provider<PathBuf> for Paths {
 }
 
 struct Graph {
-    worker: Worker<Allocator>,
+    worker: Worker,
     input: InputHandle<Duration, CapacityContainerBuilder<Vec<Configuration>>>,
     probe: ProbeHandle<Duration>,
     output: std::sync::mpsc::Receiver<Event<Duration, Vec<RunResult<Render>>>>,

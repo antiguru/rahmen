@@ -69,7 +69,7 @@ pub(super) struct Options {
 }
 
 pub(super) fn build(
-    worker: &mut Worker<Allocator>,
+    worker: &mut Worker,
     input_configuration: &mut InputHandle<Duration, CapacityContainerBuilder<Vec<Configuration>>>,
     probe: &ProbeHandle<Duration>,
     mut provider: Box<dyn Provider<PathBuf>>,
@@ -254,7 +254,6 @@ pub(super) fn build(
             .concat(composed_img_stream.map(Ok))
             .probe_with(probe)
             .capture()
-    });
     })
 }
 

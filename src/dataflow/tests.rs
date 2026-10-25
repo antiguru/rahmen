@@ -16,8 +16,8 @@ fn font() -> FontRenderer {
     )
 }
 
-fn advance<A: timely::communication::Allocate>(
-    worker: &mut timely::worker::Worker<A>,
+fn advance(
+    worker: &mut timely::worker::Worker,
     probe: &timely::dataflow::ProbeHandle<u64>,
     time: u64,
 ) {
