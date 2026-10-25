@@ -16,9 +16,9 @@ display_time = true
 # separator = "|"
 
 # use this Python script for postprocessing
-py_postprocess = "postprocess"
+# py_postprocess = "postprocess"
 # look for it in this path
-py_path = ["."]
+# py_path = ["."]
 
 # status line metadata (in this order) as provided by the exiv2 library
 [[status_line]]
