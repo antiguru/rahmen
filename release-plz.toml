@@ -8,9 +8,7 @@ name = "rahmen"
 changelog_update = true
 # set the path of the changelog to the root of the repository
 changelog_path = "./CHANGELOG.md"
-version_group = "rahmen"
 
 # We want all packages to track the same version.
 [[package]]
 name = "rahmen-exiv2"
-version_group = "rahmen"
