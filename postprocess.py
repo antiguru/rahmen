@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 
 # python code that takes a list of the metadata tags, after they have
 # been processed using the regex definitions,
@@ -11,7 +12,7 @@ import re
 # thus we can move back or forth from any given item and find another that way.
 # Let's say we have defined the field structure Info, Quarter, District_or_City, ProvinceState, Country, Date, Creator,
 # and we have looked for 'USA' and got the index for it. Assuming that 'USA' is in the 'country' field
-# (you'll have to take care that you choose your search terms carefully so that false positives are ruled out),
+# (the country is matched only at its configured position to avoid false positives),
 # the structure is then Info, Quarter, District_or_City, ProvinceState, USA, Date, Creator
 # and the offsets:      ^^^⁻4,^^^-3,   ^^^-2,            ^^^-1          ^^^  ^^^+1 ^^^+2
 # so the 'info' field would be at index-4, the 'creator' field at index+2
@@ -21,59 +22,62 @@ import re
 #
 # this holds the item positions we want to drop
 # dropping cannot be done ad hoc because it would shift the positions
-delx = []
+def append_to_delete(delx, ix):
+    if ix >= 0:
+        delx.add(ix)
 
-def append_to_delete(ix):
-    if ix not in delx:
-        delx.append(ix)
 
-def modify(items, ix_to_check, val_to_check, ix_to_modify, val_to_modify, ix_to_delete=None):
+def has_indices(items, *indices):
+    return all(0 <= ix < len(items) for ix in indices)
+
+
+def modify(items, ix_to_check, val_to_check, ix_to_modify, val_to_modify, ix_to_delete=None, *, delx):
     # modify an item in items if it is not set depending on s/th matching another item,
     # optionally mark item for deletion
     #
     # if this item matches the control value, and
-    if items[ix_to_check] == val_to_check:
+    if has_indices(items, ix_to_check, ix_to_modify) and items[ix_to_check] == val_to_check:
         # if the item to be modified is not set,
         if not items[ix_to_modify]:
             # modify it
             items[ix_to_modify] = val_to_modify
         # optionally mark item[ix] for deletion
-        if ix_to_delete:
-            append_to_delete(ix_to_delete)
+        if ix_to_delete is not None and has_indices(items, ix_to_delete):
+            append_to_delete(delx, ix_to_delete)
 
 
-def pp_s_korea(items, it, ix):
+def pp_s_korea(items, it, ix, delx):
     # look for the item before the country ('South Korea'), it's ProvinceState
     # the structure is then Info, Quarter, District_or_City, ProvinceState, South Korea, Date, Creator
     # the offsets:          ^^^⁻4,^^^-3,   ^^^-2,            ^^^-1          ^^^we start here
     # the following assumes that the province suffix '-do' has already been regexed away
     #
     # ...in the big cities  and in Jeju, the name of the province is the well-known name, so keep it
-    if items[ix - 1] not in ["Seoul", "Jeju", "Busan"]:
+    if has_indices(items, ix - 1) and items[ix - 1] not in ["Seoul", "Jeju", "Busan"]:
         # ...otherwise drop the province
-        append_to_delete(ix - 1)
+        append_to_delete(delx, ix - 1)
     # cut away city quarter overkill
-    quarter_parts = items[ix - 3].split(' ')
+    quarter_parts = items[ix - 3].split(' ') if has_indices(items, ix - 3) else []
     if len(quarter_parts) > 1:
         items[ix - 3] = quarter_parts[0]
     # set some landmark names from the district quarter
     # TODO we could move this to a dict
-    modify(items, ix - 3, 'Sanga', ix - 4, 'Woryeonggyo Bridge', ix - 3)
-    modify(items, ix - 3, 'Pungcheon', ix - 4, 'Hahoe/Byeongsanseowon', ix - 3)
-    modify(items, ix - 3, 'Jinhyeon', ix - 4, 'Bulguksa/Seokguram', ix - 3)
-    modify(items, ix - 3, 'Cheongnyong', ix - 4, 'Beomeosa', ix - 3)
+    modify(items, ix - 3, 'Sanga', ix - 4, 'Woryeonggyo Bridge', ix - 3, delx=delx)
+    modify(items, ix - 3, 'Pungcheon', ix - 4, 'Hahoe/Byeongsanseowon', ix - 3, delx=delx)
+    modify(items, ix - 3, 'Jinhyeon', ix - 4, 'Bulguksa/Seokguram', ix - 3, delx=delx)
+    modify(items, ix - 3, 'Cheongnyong', ix - 4, 'Beomeosa', ix - 3, delx=delx)
     return items
 
 
-def pp_morocco(items, it, ix):
+def pp_morocco(items, it, ix, delx):
     # drop the province, except when it's Marrake([s|c]h)
-    if not 'Marrakech' in items[ix - 1]:
-        append_to_delete(ix - 1)
+    if has_indices(items, ix - 1) and 'Marrakech' not in items[ix - 1]:
+        append_to_delete(delx, ix - 1)
     # set some landmark names from the city
-    modify(items, ix - 2, "M'Semrir", ix - 4, 'Gorges du Dades')
-    modify(items, ix - 2, "Zerkten", ix - 4, "Tizi n'Tichka")
-    modify(items, ix - 2, "Mezguita", ix - 4, "Tamnougalt")
-    modify(items, ix - 2, "Ikniouen", ix - 4, "Jbel Saghro")
+    modify(items, ix - 2, "M'Semrir", ix - 4, 'Gorges du Dades', delx=delx)
+    modify(items, ix - 2, "Zerkten", ix - 4, "Tizi n'Tichka", delx=delx)
+    modify(items, ix - 2, "Mezguita", ix - 4, "Tamnougalt", delx=delx)
+    modify(items, ix - 2, "Ikniouen", ix - 4, "Jbel Saghro", delx=delx)
 
     return items
 
@@ -83,7 +87,9 @@ cantons = {'Zürich': 'ZH', 'Basel-Stadt': 'BS', 'St. Gallen': 'SG'}
 
 
 # Someplace, Canton of Zürich, => Someplace ZH, unless Someplace in 'Canton of Zürich'
-def pp_ch_cantons(items, ix):
+def pp_ch_cantons(items, ix, delx):
+    if not has_indices(items, ix - 2, ix - 1) or not items[ix - 2]:
+        return items
     ct = ''
     for canton in cantons.keys():
         # input fields
@@ -91,13 +97,13 @@ def pp_ch_cantons(items, ix):
         city = items[ix - 2]
         # if the dict term is in the input input_canton
         if canton in input_canton:
-            # and if the city name is not port of the dict canton
+            # and if the city name is not part of the dict canton
             if city not in canton:
                 # append the canton's abbreviation
                 ct = ' ' + cantons.get(canton)
             # mark city and country field for deletion
-            append_to_delete(ix)
-            append_to_delete(ix - 2)
+            append_to_delete(delx, ix)
+            append_to_delete(delx, ix - 2)
             # update input_canton field with city + abbreviation (or '')
             items[ix - 1] = city + ct
     return items
@@ -126,64 +132,60 @@ timespans = (
 
 # add information to image if the image data is inside a timespan
 def pp_metadata_from_timespan(items):
-    # we assume that 'date' is the item before the last (hence the i_start is set to 2 below,
-    # lenght(items)-i_start pointing to that place) and that it's formatted d.m.yyyy
-    # and that 'country' is the item before date
-    # this has to be configured that way in the configuration file
-    # no real error checking is being done here
-    # this assumes the item list is configured like this:
+    # We assume that 'date' is the item before the last (len(items)-2)
+    # and that 'country' is the item before date.
+    # This has to be configured that way in the configuration file.
+    # Invalid or missing dates leave the metadata unchanged.
+    # This assumes the item list is configured like this:
     # ['info', 'sublocation', 'location', 'provincestate', 'country', 'date', 'creator']
-    # we start at date, which is at len()-2                            ^^^-2
-    # so our starting value is 2
+    # We start at date, which is at len()-2                            ^^^-2
+    # Our starting offset is 2, which gives us the position of date.
     i_start = 2
-    # which gives us the position of date
     i_pos = len(items) - i_start
-    # we need at least country|date|creator, so, more items than just counted from or starting point
-    if len(items) > i_start:
-        # let's look at what's at the date position and try to
-        # get the strings for day, month, year (input format m-d-yyyy)
-        # this should give us M, D, YYYY @ 0, 1, 2
-        i_date_list = items[i_pos].split('-')
-        # without 3 items, it's not a correct date (this is only _very_ basic error checking)
-        if len(i_date_list) == 3:
-            # convert the date string to YYYYMMDD to make it sortable (add leading zeros if necessary)
-            i_date = i_date_list[2] + i_date_list[0].zfill(2) + i_date_list[1].zfill(2)
-            for timespan in timespans:
-                # make timespan tuple iterable
-                timespan_iter = iter(timespan)
-                # get first tuple from the timespans
-                # to compare with the item's date
-                start_date = next(timespan_iter)
-                if i_date >= start_date:
-                    end_date = next(timespan_iter)
-                    if i_date <= end_date:
-                        # we have a hit on the timespan
-                        # now, move the position to the item before the date (should be 'country')
-                        i_pos = i_pos - 1
-                        # don't wrap around the item list (this catches and ignores too many items in timespan tuple)
-                        while i_pos >= 0:
-                            # this try block catches the end of the timespan tuple because it will be left if there's
-                            # no more 'next'
-                            try:
-                                # work through the timespan tuple:
-                                # get the next new item from the timespan tuple...
-                                new_item = next(timespan_iter)
-                                # ...set the metadata item from the timespan item if it isn't set already
-                                # (and is not empty)...
-                                if not items[i_pos]:
-                                    items[i_pos] = new_item
-                                # ...move our item pointer to the previous item (we're going backward)
-                                i_pos = i_pos - 1
-                            except StopIteration:
-                                # no more items in tuple, so we're done
-                                break
-    return (items)
+    # We need at least country|date|creator, so more items than our starting offset.
+    if len(items) <= i_start:
+        return items
+    # Get day, month, year from the configured ISO format or the legacy formats.
+    # Each format must contain three numeric components with a four-digit year.
+    date_formats = (
+        (r'[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}', '%Y-%m-%d'),
+        (r'[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{4}', '%d.%m.%Y'),
+        (r'[0-9]{1,2}-[0-9]{1,2}-[0-9]{4}', '%m-%d-%Y'),
+    )
+    for pattern, date_format in date_formats:
+        if re.fullmatch(pattern, items[i_pos]):
+            try:
+                # Validate the calendar date and convert it to sortable YYYYMMDD.
+                i_date = datetime.strptime(items[i_pos], date_format).strftime('%Y%m%d')
+            except ValueError:
+                return items
+            break
+    else:
+        return items
+    # Check start and end dates inclusively, in earliest-start order.
+    for timespan in sorted(timespans, key=lambda span: span[0]):
+        start_date, end_date, *metadata = timespan
+        if start_date <= i_date <= end_date:
+            # We have a hit. Start at the item before date (the country).
+            # Iterate the remaining tuple metadata toward the left of the item list.
+            for offset, new_item in enumerate(metadata, start=1):
+                target = i_pos - offset
+                # Do not wrap around if the timespan contains too many metadata items.
+                if target < 0:
+                    break
+                # Fill unset metadata only, leaving existing entries untouched.
+                # Empty timespan values skip fields without changing them.
+                if not items[target] and new_item:
+                    items[target] = new_item
+            # No more metadata from this tuple. The earliest matching entry wins.
+            break
+    return items
 # consume the rest of the timespan after country
 
 # for slides we delete all info that may have been set from the camera's GPS
-def pp_dia():
-    for i in [1, 2, 3, 4, 5]:
-        append_to_delete(i)
+def pp_dia(items, delx):
+    for i in range(1, min(6, len(items) - 1)):
+        append_to_delete(delx, i)
 
 
 # global replacements: the dictionary has keys (to look up) and replacement values.
@@ -208,37 +210,33 @@ glob_replacements = {'Zurich': 'Zürich',
 
 
 # main filter
-def postprocess(items: [str], sep: str) -> str:
+def postprocess(items: list[str], sep: str) -> list[str]:
     outitems = []
-    # clear the drop list
-    delx.clear()
+    # Create a drop list for this invocation only.
+    delx = set()
     # first, replace the global stuff
     items = pp_glob(items, glob_replacements)
     # get metadata from timespans
     # (if it was me who photographed)
     # if 'Hartmut' in items[len(items)-1]:
     items = pp_metadata_from_timespan(items)
-    print(items)
     # now the specific filters
     for ix, it in enumerate(items):
-        if 'From Slide' in it:
-            pp_dia()
+        if ix == 0 and 'From Slide' in it:
+            pp_dia(items, delx)
             outitems = items
-        if it == "South Korea":
-            outitems = pp_s_korea(items, it, ix)
-        if it == "Morocco":
-            outitems = pp_morocco(items, it, ix)
-        if it == "Switzerland":
-            outitems = pp_ch_cantons(items, ix)
+        if len(items) >= 7 and ix == len(items) - 3 and it == "South Korea":
+            outitems = pp_s_korea(items, it, ix, delx)
+        if len(items) >= 7 and ix == len(items) - 3 and it == "Morocco":
+            outitems = pp_morocco(items, it, ix, delx)
+        if len(items) >= 7 and ix == len(items) - 3 and it == "Switzerland":
+            outitems = pp_ch_cantons(items, ix, delx)
 
-    if not outitems:
-        print("Status line unfiltered.")
-    else:
+    if outitems:
         # only now, we remove the dropped items
         for x in sorted(delx, reverse=True):
-            del outitems[x]
-        print("Status line changed to:")
-        print(outitems)
+            if has_indices(outitems, x):
+                del outitems[x]
         items = outitems
 
     # if you return a list of items, the final processing will cause empties to be filtered out and
