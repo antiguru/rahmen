@@ -10,6 +10,17 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  script-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run Python script tests
+        run: |
+          python3 -m venv "$RUNNER_TEMP/script-tests-venv"
+          "$RUNNER_TEMP/script-tests-venv/bin/python" -m pip install pytest
+          "$RUNNER_TEMP/script-tests-venv/bin/python" -m pytest -q test.py utils/test_picframe.py
+
   build:
     runs-on: ubuntu-latest
     steps:
