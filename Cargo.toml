@@ -37,7 +37,7 @@ env_logger = "0.11"
 font-kit = "0.14"
 framebuffer = "0.3"
 glob = "0.3"
-itertools = "0.14"
+itertools = "0.15"
 log = "0.4"
 minifb = { version = "0.28", optional = true }
 mozjpeg = { version = "0.10", default-features = false }
