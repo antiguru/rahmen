@@ -8,6 +8,7 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 use std::sync::Mutex;
 use std::time::Instant;
+use timely::communication::Allocator;
 use timely::worker::Config;
 
 // Exiv2 initializes native process-wide metadata state. Keep fixture access serial
@@ -277,10 +278,29 @@ fn periodic_clock_emits_later_status_and_releases_notifications_on_close() {
             assert_eq!(img.to_rgb8(), first_pixels);
         }
     }
+    graph
+        .input
+        .send(Configuration::Greeting("NEW STATUS".into()));
+    let changed = graph.advance(2001);
+    assert_eq!(changed.len(), 1);
+    let changed_pixels = image(&changed, 2).2.to_rgb8();
+    assert_ne!(changed_pixels, first_pixels);
+    let recurring = graph.advance(4000);
+    assert!(
+        !recurring.is_empty(),
+        "clock must continue after a status update"
+    );
+    for (_, render) in recurring {
+        if let Ok(Render::Image(_, _, img)) = render {
+            assert_eq!(img.to_rgb8(), changed_pixels);
+        } else {
+            panic!("unexpected clock output: {render:?}");
+        }
+    }
     let final_frames = graph.close();
     assert!(
         final_frames
             .iter()
-            .all(|(t, r)| *t >= Duration::from_secs(2) && matches!(r, Ok(Render::Image(2, _, _))))
+            .all(|(t, r)| *t >= Duration::from_secs(4) && matches!(r, Ok(Render::Image(2, _, _))))
     );
 }
