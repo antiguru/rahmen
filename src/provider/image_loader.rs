@@ -46,3 +46,5 @@ pub fn load_image_from_path<P: AsRef<Path>>(
     }
 }
 
+#[cfg(test)]
+mod tests;
