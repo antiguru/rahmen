@@ -97,7 +97,7 @@ shown.
 
 ## Building
 
-Rahmen targets the Rust 2024 edition and requires Rust 1.86 or newer.
+Rahmen targets the Rust 2024 edition and requires Rust 1.88 or newer.
 
 `cargo build --bin rahmen`
 
