@@ -3,7 +3,7 @@ name = "rahmen"
 version = "0.2.0"
 authors = ["Moritz Hoffmann <antiguru@gmail.com>", "sys3175 <https://github.com/sys3175>"]
 edition = "2024"
-rust-version = "1.88"
+rust-version.workspace = true
 license = "GPL-3.0-only"
 description = "Rahmen is a lightweight image presenter"
 readme = "README.md"
@@ -17,6 +17,9 @@ exclude = [".github/", "rustfmt.toml", "test.py"]
 
 [workspace]
 members = ["rahmen-exiv2"]
+
+[workspace.package]
+rust-version = "1.88"
 
 [features]
 default = []
