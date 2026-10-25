@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use clap::{Arg, Command, value_parser};
-use font_kit::loaders::freetype::Font;
+use font_kit::font::Font;
 use log::{error, info, warn};
 use pyo3::prelude::*;
 use pyo3::types::PyList;

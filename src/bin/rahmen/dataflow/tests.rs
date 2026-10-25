@@ -1,5 +1,5 @@
 use super::*;
-use font_kit::loaders::freetype::Font;
+use font_kit::{family_name::FamilyName, properties::Properties, source::SystemSource};
 use image::{Rgb, RgbImage};
 use rahmen::config::Element;
 use rahmen::errors::RahmenError;
@@ -16,6 +16,16 @@ use timely::worker::Config;
 static METADATA: Mutex<()> = Mutex::new(());
 
 type Frame = (Duration, RunResult<Render>);
+
+fn font() -> FontRenderer {
+    FontRenderer::with_font(
+        SystemSource::new()
+            .select_best_match(&[FamilyName::Monospace], &Properties::new())
+            .unwrap()
+            .load()
+            .unwrap(),
+    )
+}
 
 struct Paths {
     paths: VecDeque<PathBuf>,
@@ -66,9 +76,7 @@ impl Graph {
             ", ".into(),
         )
         .unwrap();
-        let font = FontRenderer::with_font(
-            Font::from_path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 0).unwrap(),
-        );
+        let font = font();
         let output = build(
             &mut worker,
             &mut input,
@@ -359,9 +367,7 @@ fn small_viewport_restores_content(width: u32, height: u32) {
             .pixels()
             .all(|p| *p == Rgb([23, 45, 67]))
     );
-    let mut renderer = FontRenderer::with_font(
-        Font::from_path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 0).unwrap(),
-    );
+    let mut renderer = font();
     assert_eq!(
         image(&restored, 2).2.to_rgb8(),
         renderer

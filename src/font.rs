@@ -2,8 +2,8 @@
 
 use crate::errors::RahmenResult;
 use font_kit::canvas::{Canvas, Format, RasterizationOptions};
+use font_kit::font::Font;
 use font_kit::hinting::HintingOptions;
-use font_kit::loaders::freetype::Font;
 
 use image::{DynamicImage, RgbImage};
 use pathfinder_geometry::rect::RectI;
