@@ -116,12 +116,17 @@ impl<'a, T: Timestamp + std::hash::Hash> FormatText<'a, T> for Stream<'a, T, Vec
                         current_font_canvas_vstretch,
                     ) {
                         // font canvas height, factor controls vertical padding
-                        let canvas_height = font_size * font_canvas_vstretch;
+                        let canvas_height = (font_size * font_canvas_vstretch).ceil() as u32;
+                        let canvas_height = canvas_height.min(dimension.1);
+                        // Keep the text for a later configuration with a visible canvas.
+                        if dimension.0 == 0 || canvas_height == 0 {
+                            return;
+                        }
                         let img = font_renderer
                             .render(
                                 text.iter().map(String::as_str),
                                 font_size,
-                                (dimension.0, canvas_height as _),
+                                (dimension.0, canvas_height),
                             )
                             .unwrap();
                         out.session(&time).give((
@@ -193,6 +198,11 @@ impl<'a, T: Timestamp + std::hash::Hash> ResizeImage<'a, T> for ImageStream<'a, 
                     if let (Some(screen_size), Some(image)) =
                         (current_screen_size, current_image.as_ref())
                     {
+                        // Resizing to zero still produces at least one pixel. Retain the
+                        // image until a later configuration restores visible image space.
+                        if screen_size.0 == 0 || screen_size.1 == 0 {
+                            return;
+                        }
                         let resized = image.resize(
                             screen_size.0,
                             screen_size.1,

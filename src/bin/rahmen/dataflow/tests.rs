@@ -180,11 +180,13 @@ fn splash_greeting_and_configuration_only_updates() {
             .iter()
             .any(|(_, r)| matches!(r, Ok(Render::Blank(1, _, _))))
     );
+    // The old status rectangle lies entirely below the new viewport.
     assert!(
         frames
             .iter()
-            .any(|(_, r)| matches!(r, Ok(Render::Blank(2, _, _))))
+            .all(|(_, r)| !matches!(r, Ok(Render::Blank(2, _, _))))
     );
+    assert_in_bounds(&frames, 80, 60);
     assert!(frames.iter().all(|(t, _)| *t == Duration::from_millis(1)));
     assert!(
         graph.advance(3000).is_empty(),
@@ -303,4 +305,129 @@ fn periodic_clock_emits_later_status_and_releases_notifications_on_close() {
             .iter()
             .all(|(t, r)| *t >= Duration::from_secs(4) && matches!(r, Ok(Render::Image(2, _, _))))
     );
+}
+
+fn assert_in_bounds(frames: &[Frame], width: u32, height: u32) {
+    for (_, frame) in frames {
+        let (position, dimensions) = match frame.as_ref().unwrap() {
+            Render::Image(_, position, image) => (*position, image.dimensions()),
+            Render::Blank(_, position, size) => {
+                assert!(size.x() > 0 && size.y() > 0);
+                (*position, (size.x() as u32, size.y() as u32))
+            }
+        };
+        assert!(dimensions.0 > 0 && dimensions.1 > 0);
+        assert!(position.x() >= 0 && position.y() >= 0);
+        assert!(position.x() as u64 + dimensions.0 as u64 <= width as u64);
+        assert!(position.y() as u64 + dimensions.1 as u64 <= height as u64);
+    }
+}
+
+fn small_viewport_restores_content(width: u32, height: u32) {
+    let mut graph = Graph::new(vec![], false, false);
+    graph.input.send(Configuration::FontSize(12.));
+    graph.input.send(Configuration::FontCanvasVStretch(1.5));
+    graph
+        .input
+        .send(Configuration::ScreenDimensions(width, height));
+    graph
+        .input
+        .send(Configuration::Splash(Arc::new(DynamicImage::ImageRgb8(
+            RgbImage::from_pixel(4, 4, Rgb([23, 45, 67])),
+        ))));
+    graph.input.send(Configuration::Greeting("HELLO".into()));
+    let frames = graph.advance(1);
+    assert_in_bounds(&frames, width, height);
+    assert!(
+        frames
+            .iter()
+            .all(|(_, r)| !matches!(r, Ok(Render::Image(1, _, _))))
+    );
+    if width == 0 || height == 0 {
+        assert!(frames.is_empty());
+    } else {
+        assert_eq!(image(&frames, 2).2.dimensions(), (width, height));
+    }
+    graph.input.send(Configuration::ScreenDimensions(96, 80));
+    let restored = graph.advance(2);
+    assert_in_bounds(&restored, 96, 80);
+    assert_eq!(image(&restored, 1).2.dimensions(), (62, 62));
+    assert!(
+        image(&restored, 1)
+            .2
+            .to_rgb8()
+            .pixels()
+            .all(|p| *p == Rgb([23, 45, 67]))
+    );
+    let mut renderer = FontRenderer::with_font(
+        Font::from_path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 0).unwrap(),
+    );
+    assert_eq!(
+        image(&restored, 2).2.to_rgb8(),
+        renderer
+            .render(["HELLO"].into_iter(), 12., (96, 18))
+            .unwrap()
+            .to_rgb8()
+    );
+    assert!(graph.close().is_empty());
+}
+
+#[test]
+fn viewport_below_status_height_restores_content() {
+    small_viewport_restores_content(96, 10);
+}
+
+#[test]
+fn viewport_exactly_status_height_restores_content() {
+    small_viewport_restores_content(96, 18);
+}
+
+#[test]
+fn viewport_zero_height_restores_content() {
+    small_viewport_restores_content(96, 0);
+}
+
+#[test]
+fn viewport_zero_width_restores_content() {
+    small_viewport_restores_content(0, 80);
+}
+
+#[test]
+fn empty_viewport_clock_progresses_and_closes() {
+    let mut graph = Graph::new(vec![], false, true);
+    graph.input.send(Configuration::FontSize(12.));
+    graph.input.send(Configuration::FontCanvasVStretch(1.5));
+    graph.input.send(Configuration::ScreenDimensions(0, 0));
+    graph.input.send(Configuration::Greeting("HELLO".into()));
+    assert!(graph.advance(1).is_empty());
+    assert!(graph.advance(2000).is_empty());
+    assert!(graph.close().is_empty());
+}
+
+#[test]
+fn viewport_shrink_clips_inferred_blanks() {
+    let mut graph = Graph::new(vec![], false, false);
+    graph.configure();
+    graph
+        .input
+        .send(Configuration::Splash(Arc::new(DynamicImage::ImageRgb8(
+            RgbImage::from_pixel(4, 4, Rgb([23, 45, 67])),
+        ))));
+    graph.input.send(Configuration::Greeting("HELLO".into()));
+    assert_in_bounds(&graph.advance(1), 96, 80);
+    for (i, (width, height)) in [(96, 10), (96, 18), (96, 0), (0, 80)]
+        .into_iter()
+        .enumerate()
+    {
+        graph
+            .input
+            .send(Configuration::ScreenDimensions(width, height));
+        assert_in_bounds(&graph.advance(2 + i as u64 * 2), width, height);
+        graph.input.send(Configuration::ScreenDimensions(96, 80));
+        let restored = graph.advance(3 + i as u64 * 2);
+        assert_in_bounds(&restored, 96, 80);
+        assert_eq!(image(&restored, 1).2.dimensions(), (62, 62));
+        assert_eq!(image(&restored, 2).2.dimensions(), (96, 18));
+    }
+    assert!(graph.close().is_empty());
 }
