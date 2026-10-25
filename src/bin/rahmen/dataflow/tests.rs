@@ -47,7 +47,7 @@ impl Graph {
         let provider = Box::new(Paths { paths: paths.into(), error, calls: calls.clone() });
         let formatter = StatusLineFormatter::new(
             std::iter::once(Element {
-                exif_tags: vec!["Exif.Image.Artist".into()],
+                exif_tags: vec!["Iptc.Application2.City".into()],
                 case_conversion: None,
                 capitalize: None,
                 replace: None,
@@ -83,7 +83,7 @@ impl Graph {
     }
 
     fn close(mut self) -> Vec<Frame> {
-        std::mem::replace(&mut self.input, InputHandle::new()).close();
+        std::mem::take(&mut self.input).close();
         for _ in 0..10_000 {
             if !self.worker.step() {
                 assert!(self.probe.done());
