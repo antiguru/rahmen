@@ -75,35 +75,35 @@ def test_skorea2():
 
 def test_skorea3():
     # tests landmark adding
-    input = "|Pungcheon|Location|ProvinceState|South Korea|1.11.2001|Creator"
-    assert put_out(input) == "Hahoe/Byeongsanseowon|Location|South Korea|1.11.2001|Creator"
+    input = "|Pungcheon|Location|ProvinceState|South Korea|2.11.2001|Creator"
+    assert put_out(input) == "Hahoe/Byeongsanseowon|Location|South Korea|2.11.2001|Creator"
 
 
 # Morocco test
 def test_morocco():
     # we omit the province
-    # the Morocco function should return Name|SubLocation|Location|Marokko|1.11.2001|Creator
-    input = "Name|SubLocation|Location|ProvinceState|Morocco|1.11.2001|Creator"
-    assert put_out(input) == "Name|SubLocation|Location|Morocco|1.11.2001|Creator"
+    # the Morocco function should return Name|SubLocation|Location|Marokko|2.11.2001|Creator
+    input = "Name|SubLocation|Location|ProvinceState|Morocco|2.11.2001|Creator"
+    assert put_out(input) == "Name|SubLocation|Location|Morocco|2.11.2001|Creator"
 
 
 def test_morocco2():
     # tests landmark adding
-    input = "|SubLocation|M'Semrir|ProvinceState|Morocco|1.11.2001|Creator"
-    assert put_out(input) == "Gorges du Dades|SubLocation|M'Semrir|Morocco|1.11.2001|Creator"
+    input = "|SubLocation|M'Semrir|ProvinceState|Morocco|2.11.2001|Creator"
+    assert put_out(input) == "Gorges du Dades|SubLocation|M'Semrir|Morocco|2.11.2001|Creator"
 
 
 def test_morocco3():
     # Marrakesh should keep the province
-    input = "|SubLocation|Marrakech|Marrakech|Morocco|1.11.2001|Creator"
-    assert put_out(input) == "|SubLocation|Marrakech|Marrakech|Morocco|1.11.2001|Creator"
+    input = "|SubLocation|Marrakech|Marrakech|Morocco|2.11.2001|Creator"
+    assert put_out(input) == "|SubLocation|Marrakech|Marrakech|Morocco|2.11.2001|Creator"
 
 
 # Schweiz tests
 def test_ch1():
     # generally, we do not change anything...
-    # the Switzerland function should return "Name|SubLocation|Location|ProvinceState|Switzerland|1.11.2001|Creator" unchanged
-    input = "Name|SubLocation|Location|ProvinceState|Switzerland|1.11.2001|Creator"
+    # the Switzerland function should return "Name|SubLocation|Location|ProvinceState|Switzerland|2.11.2001|Creator" unchanged
+    input = "Name|SubLocation|Location|ProvinceState|Switzerland|2.11.2001|Creator"
     assert put_out(input) == input
 
 
@@ -195,3 +195,152 @@ def test_timeline8():
 # '19141008': {'19141008': {'USA': {'PA': {'Philadelphia': {'30th Street Station':{ 'Something':{ 'This here is too much': None}}}}}}},
 #        input = "||||8.10.1914|Creator"
 #        print(put_out(input))
+
+
+def test_timeline_date_formats():
+    for date in ['2012-08-13', '13.08.2012', '08-13-2012']:
+        assert put_out('|||||' + date + '|Creator') == '||New York|NY|USA|' + date + '|Creator'
+
+
+def test_timeline_invalid_dates():
+    for date in ['', '2012-02-30', '02-30-2012', '30.02.2012', '2012-13-01',
+                 'not-a-date', '2012-08-13-extra', '2012-08-13 12:00']:
+        original = '|||||' + date + '|Creator'
+        assert put_out(original) == original
+
+
+def test_timeline_overlap_earliest_start_wins():
+    original = postprocess.timespans
+    try:
+        postprocess.timespans = (
+            ('20120812', '20120815', 'Later', 'Later state'),
+            ('20120810', '20120815', 'Earlier'),
+        )
+        assert put_out('|||||08-13-2012|Creator') == '||||Earlier|08-13-2012|Creator'
+    finally:
+        postprocess.timespans = original
+
+
+def test_timeline_preserves_existing_metadata():
+    assert put_out('Title|Quarter|City|State|Country|2012-08-13|Creator') == (
+        'Title|Quarter|City|State|Country|2012-08-13|Creator')
+
+
+def test_short_country_lists():
+    for country in ['South Korea', 'Morocco', 'Switzerland']:
+        for items in [[], [country], [country, 'Creator'], [country, 'Date', 'Creator'],
+                      ['', country, 'Date', 'Creator'],
+                      ['Quarter details', 'City', 'Province', country, 'Date', 'Creator']]:
+            assert postprocess.postprocess(items.copy(), sep) == items
+
+
+def test_country_names_outside_country_field():
+    for country in ['South Korea', 'Morocco', 'Switzerland']:
+        original = country + '|Quarter|City|Kanton Zürich|Country|Date|' + country
+        assert put_out(original) == original
+
+
+def test_swiss_missing_city():
+    original = 'Title|Quarter||Kanton Zürich|Switzerland|Date|Creator'
+    assert put_out(original) == original
+
+
+def test_modify_deletes_zero_index():
+    items = ['City', 'Control']
+    deletions = set()
+    postprocess.modify(items, 1, 'Control', 0, 'Replacement', 0, delx=deletions)
+    assert items == ['City', 'Control']
+    assert deletions == {0}
+
+
+def test_short_slide_list():
+    assert put_out('From Slide') == 'From Slide'
+
+
+def test_processing_is_silent():
+    import contextlib
+    import io
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        assert postprocess.export()(['Title', 'Date', 'Creator'], sep) == ['Title', 'Date', 'Creator']
+    assert output.getvalue() == ''
+
+
+def test_slide_date_formats():
+    for date in ['2001-11-01', '1.11.2001', '11-01-2001']:
+        assert put_out('|Quarter|City|Province|Country|' + date + '|Creator') == 'From Slide|Creator'
+
+
+def test_timeline_rejects_invalid_calendar_date_in_span():
+    original = postprocess.timespans
+    try:
+        postprocess.timespans = (('20120201', '20120301', 'Country'),)
+        for date in ['2012-02-30', '02-30-2012', '30.02.2012']:
+            assert put_out('||' + date + '|Creator') == '||' + date + '|Creator'
+        assert put_out('||2012-02-29|Creator') == '|Country|2012-02-29|Creator'
+    finally:
+        postprocess.timespans = original
+
+
+def test_processing_deletions_are_isolated():
+    original = postprocess.pp_s_korea
+    nested_items = ['Title', 'Date', 'Creator']
+    try:
+        def nested_processing(*args):
+            result = original(*args)
+            assert postprocess.postprocess(nested_items.copy(), sep) == nested_items
+            return result
+        postprocess.pp_s_korea = nested_processing
+        assert put_out('Title|Quarter|City|Province|South Korea|Date|Creator') == (
+            'Title|Quarter|City|South Korea|Date|Creator')
+        assert postprocess.postprocess(nested_items.copy(), sep) == nested_items
+    finally:
+        postprocess.pp_s_korea = original
+
+
+def test_slide_marker_outside_title():
+    for index in range(1, 7):
+        items = ['Title', 'Quarter', 'City', 'Province', 'Country', 'Date', 'Creator']
+        items[index] = 'From Slide archive'
+        assert postprocess.postprocess(items.copy(), sep) == items
+    assert put_out('Title From Slide archive|Quarter|City|Province|Country|Date|Creator') == (
+        'Title From Slide archive|Creator')
+
+
+def test_modify_does_not_wrap_negative_index():
+    items = ['Control', '']
+    deletions = set()
+    postprocess.modify(items, 0, 'Control', -1, 'Replacement', 0, delx=deletions)
+    assert items == ['Control', '']
+    assert deletions == set()
+
+
+def test_timeline_does_not_wrap_short_list():
+    assert put_out('|2012-08-13|Creator') == 'USA|2012-08-13|Creator'
+
+
+def test_slide_country_rules_mutate_in_place():
+    for country, remaining in [
+        ('South Korea', ['South Korea', 'Date', 'Creator']),
+        ('Morocco', ['Morocco', 'Date', 'Creator']),
+        ('Switzerland', ['City ZH', 'Date', 'Creator']),
+    ]:
+        items = ['From Slide', 'Quarter', 'City', 'Kanton Zürich', country, 'Date', 'Creator']
+        assert postprocess.postprocess(items, sep) is items
+        assert items == ['From Slide', 'Creator']
+
+        items = ['From Slide', 'Extra', 'Extra', 'Info', 'Quarter', 'City',
+                 'Kanton Zürich', country, 'Date', 'Creator']
+        assert postprocess.postprocess(items, sep) is items
+        assert items == ['From Slide'] + remaining
+
+
+def test_processing_preserves_list_identity():
+    for items, expected in [
+        ([], []),
+        (['Title', 'Date', 'Creator'], ['Title', 'Date', 'Creator']),
+        (['Zurich City', 'Date', 'Creator'], ['Zürich', 'Date', 'Creator']),
+        (['', '2012-08-13', 'Creator'], ['USA', '2012-08-13', 'Creator']),
+    ]:
+        assert postprocess.postprocess(items, sep) is items
+        assert items == expected
