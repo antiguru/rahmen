@@ -55,7 +55,7 @@ default-features = false
 features = ["jpeg", "png"]
 
 [dependencies.pyo3]
-version = "0.28"
+version = "0.29"
 features = ["auto-initialize"]
 
 [package.metadata.deb]
