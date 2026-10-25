@@ -1,4 +1,5 @@
 mod dataflow;
+mod font;
 mod input;
 
 use dataflow::{Render, RunControl};
@@ -8,7 +9,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use clap::{Arg, Command, value_parser};
-use font_kit::loaders::freetype::Font;
 use log::{error, info, warn};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -69,7 +69,7 @@ fn main() -> RahmenResult<()> {
         .arg(
             Arg::new("font")
                 .long("font")
-                .default_value("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"),
+                .help("Use a font file instead of the system sans-serif font"),
         )
         .arg(
             Arg::new("font_size")
@@ -139,8 +139,7 @@ fn main() -> RahmenResult<()> {
         .get_one::<usize>("buffer_max_size")
         .expect("Missing buffer_max_size");
 
-    let font =
-        Font::from_path(matches.get_one::<String>("font").expect("Missing font"), 0).unwrap();
+    let font = font::load(matches.get_one::<String>("font").map(String::as_str));
     let font_renderer = FontRenderer::with_font(font);
 
     let duration_millis = (matches

@@ -111,15 +111,18 @@ pub(super) fn build(
         let mut stash: HashMap<Duration, String> = HashMap::new();
         let mut current_text = None;
 
-        let mut status_line_stream = img_path_stream
+        let status_line_stream = img_path_stream
             .clone()
             .ok()
             .flat_map(move |(p, _img)| status_line_formatter.format(&p).ok())
             .concat(configuration_stream.clone().flat_map(|c| match c {
                 Configuration::Greeting(text) => Some(text),
                 _ => None,
-            }))
-            .inspect(|loc| info!("Status line: {}", loc));
+            }));
+        let mut status_line_stream =
+            Inspect::<Duration, Vec<String>>::inspect(status_line_stream, |loc| {
+                info!("Status line: {}", loc)
+            });
         if show_time {
             status_line_stream = status_line_stream.unary_notify(
                 Pipeline,

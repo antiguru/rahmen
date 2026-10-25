@@ -1,5 +1,5 @@
 use super::*;
-use font_kit::loaders::freetype::Font;
+use font_kit::{family_name::FamilyName, properties::Properties, source::SystemSource};
 use image::{Rgb, RgbImage};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -12,7 +12,11 @@ type Frames = Rc<RefCell<Vec<(u64, usize, Vector, Arc<DynamicImage>)>>>;
 
 fn font() -> FontRenderer {
     FontRenderer::with_font(
-        Font::from_path("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 0).unwrap(),
+        SystemSource::new()
+            .select_best_match(&[FamilyName::SansSerif], &Properties::new())
+            .unwrap()
+            .load()
+            .unwrap(),
     )
 }
 

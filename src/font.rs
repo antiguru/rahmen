@@ -2,10 +2,10 @@
 
 use crate::errors::RahmenResult;
 use font_kit::canvas::{Canvas, Format, RasterizationOptions};
+use font_kit::font::Font;
 use font_kit::hinting::HintingOptions;
-use font_kit::loaders::freetype::Font;
 
-use image::{DynamicImage, RgbImage};
+use image::DynamicImage;
 use pathfinder_geometry::rect::RectI;
 use pathfinder_geometry::transform2d::Transform2F;
 use pathfinder_geometry::vector::{Vector2F, Vector2I};
@@ -36,7 +36,13 @@ impl FontRenderer {
     ) -> RahmenResult<DynamicImage> {
         let hinting = HintingOptions::Full(size);
         let rasterization = RasterizationOptions::GrayscaleAa;
-        let format = Format::Rgb24;
+        // CoreText overwrites the canvas when converting each glyph to RGB24.
+        // Render into its native format and convert once after all glyphs.
+        let format = if cfg!(any(target_os = "macos", target_os = "ios")) {
+            Format::Rgba32
+        } else {
+            Format::Rgb24
+        };
 
         let metrics = self.font.metrics();
         // width of character, larger values of optional factor (eg size * 1.1) increase spacing
@@ -90,8 +96,39 @@ impl FontRenderer {
                 }
             }
         }
-        Ok(DynamicImage::ImageRgb8(
-            RgbImage::from_raw(canvas.size.x() as _, canvas.size.y() as _, canvas.pixels).unwrap(),
-        ))
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        let image = DynamicImage::ImageRgba8(
+            image::RgbaImage::from_raw(canvas.size.x() as _, canvas.size.y() as _, canvas.pixels)
+                .unwrap(),
+        )
+        .to_rgb8();
+        #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+        let image =
+            image::RgbImage::from_raw(canvas.size.x() as _, canvas.size.y() as _, canvas.pixels)
+                .unwrap();
+        Ok(DynamicImage::ImageRgb8(image))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use font_kit::{family_name::FamilyName, properties::Properties, source::SystemSource};
+
+    #[test]
+    fn rendering_preserves_previous_lines() {
+        let font = SystemSource::new()
+            .select_best_match(&[FamilyName::SansSerif], &Properties::new())
+            .unwrap()
+            .load()
+            .unwrap();
+        let mut renderer = FontRenderer::with_font(font);
+        let two_lines = renderer
+            .render(["M", "M"].into_iter(), 16., (64, 64))
+            .unwrap();
+        let last_line = renderer
+            .render(["", "M"].into_iter(), 16., (64, 64))
+            .unwrap();
+        assert!(two_lines.to_rgb8() != last_line.to_rgb8());
     }
 }
