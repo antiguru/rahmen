@@ -1,7 +1,7 @@
 mod dataflow;
+mod input;
 
 use dataflow::{Render, RunControl};
-use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -26,8 +26,7 @@ use rahmen::display_framebuffer::FramebufferDisplay;
 use rahmen::display_minifb::MinifbDisplay;
 use rahmen::errors::{RahmenError, RahmenResult};
 use rahmen::font::FontRenderer;
-use rahmen::provider::{Provider, StatusLineFormatter};
-use rahmen::provider_list::ListProvider;
+use rahmen::provider::StatusLineFormatter;
 
 static SPLASH: &[u8] = include_bytes!("rahmen.png");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -85,17 +84,7 @@ fn main() -> RahmenResult<()> {
         .get_one::<String>("input")
         .expect("Input missing")
         .as_str();
-    // box is used bec of dynamic typing for provider
-    let provider: Box<dyn Provider<_>> = if input.eq("-") {
-        info!("Reading from stdin");
-        Box::new(ListProvider::new(BufReader::new(std::io::stdin())))
-    } else if let Ok(file) = File::open(input) {
-        info!("Reading from file");
-        Box::new(ListProvider::new(BufReader::new(file)))
-    } else {
-        info!("Reading from pattern {}", input);
-        Box::new(rahmen::provider_glob::create(input)?)
-    };
+    let provider = input::select(input, BufReader::new(std::io::stdin()))?;
 
     // look for config file
     let dirs = xdg::BaseDirectories::new();
