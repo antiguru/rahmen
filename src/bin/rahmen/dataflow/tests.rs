@@ -180,11 +180,13 @@ fn splash_greeting_and_configuration_only_updates() {
             .iter()
             .any(|(_, r)| matches!(r, Ok(Render::Blank(1, _, _))))
     );
+    // The old status rectangle lies entirely below the new viewport.
     assert!(
         frames
             .iter()
-            .any(|(_, r)| matches!(r, Ok(Render::Blank(2, _, _))))
+            .all(|(_, r)| !matches!(r, Ok(Render::Blank(2, _, _))))
     );
+    assert_in_bounds(&frames, 80, 60);
     assert!(frames.iter().all(|(t, _)| *t == Duration::from_millis(1)));
     assert!(
         graph.advance(3000).is_empty(),
