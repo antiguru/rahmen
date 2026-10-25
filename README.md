@@ -153,12 +153,12 @@ The font size to use in px.
 
 ```shell
         --font <font>
-            [default: /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf]
 ```
 
-Rahmen will display information from the image's metadata (see above) in a single line below the image in the given
-font. If the font is not found, the program exits. If you don't want to install lots of fonts, just point this option to
-a TrueType font file.
+Rahmen displays image metadata in a single line below the image using the system's default sans-serif font.
+It locates an installed font automatically when `--font` is omitted.
+Pass `--font` with a font file path to override this selection.
+If the requested file cannot be loaded or no system sans-serif font is available, the program exits.
 
 ```shell
     -o, --output <output>                      
