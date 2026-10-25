@@ -297,3 +297,66 @@ fn late_image_is_available_immediately_and_metadata_failure_is_not_terminal() {
     drop(p);
     assert!(entered.recv_timeout(Duration::from_secs(5)).is_err());
 }
+
+#[test]
+fn python_postprocessor_created_on_ui_thread_runs_on_worker() {
+    use pyo3::prelude::*;
+    use pyo3::types::PyModule;
+    let _guard = METADATA.lock().unwrap();
+    Python::attach(|py| {
+        let module = PyModule::from_code(
+            py,
+            c"def export():\n    return lambda values, separator: ['worker:' + values[0]]\n",
+            c"prefetch_test.py",
+            c"_rahmen_prefetch_test",
+        )
+        .unwrap();
+        py.import("sys")
+            .unwrap()
+            .getattr("modules")
+            .unwrap()
+            .set_item("_rahmen_prefetch_test", module)
+            .unwrap();
+    });
+    let formatter = StatusLineFormatter::new(
+        std::iter::once(Element {
+            exif_tags: vec!["Iptc.Application2.City".into()],
+            case_conversion: None,
+            capitalize: None,
+            replace: None,
+        }),
+        Some("_rahmen_prefetch_test".into()),
+        ", ".into(),
+    )
+    .unwrap();
+    let (tx, paths) = mpsc::channel();
+    let (entered, rx) = mpsc::channel();
+    let loader = Loader::new(
+        Box::new(Controlled {
+            calls: Arc::new(AtomicUsize::new(0)),
+            entered,
+            paths,
+        }),
+        formatter,
+        16_000_000,
+    );
+    let mut p = Prefetch::new(loader, Duration::ZERO);
+    p.presented(Duration::ZERO);
+    rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    tx.send(Ok(Some(fixture()))).unwrap();
+    wait_ready(&mut p);
+    let Some(Outcome::Image(prepared)) = p.take_due(Duration::from_secs(1)) else {
+        panic!("worker failed Python processing")
+    };
+    assert_eq!(prepared.status.as_deref(), Some("worker:Zurich"));
+    drop(p);
+    assert!(rx.recv_timeout(Duration::from_secs(5)).is_err());
+    Python::attach(|py| {
+        py.import("sys")
+            .unwrap()
+            .getattr("modules")
+            .unwrap()
+            .del_item("_rahmen_prefetch_test")
+            .unwrap();
+    });
+}
