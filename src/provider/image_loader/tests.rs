@@ -38,7 +38,7 @@ fn jpeg_selects_largest_scale_using_rgb_bytes() {
 #[test]
 fn jpeg_rounds_nonmultiple_dimensions_before_counting_bytes() {
     let file = Fixture::new(17, 19, ImageFormat::Jpeg);
-    for (budget, dimensions) in [(27, (3, 3)), (90, (5, 6)), (969, (17, 19))] {
+    for (budget, dimensions) in [(27, (3, 3)), (75, (5, 5)), (969, (17, 19))] {
         let decoded = load_image_from_path(&file.0, Some(budget)).unwrap();
         assert_eq!(decoded.dimensions(), dimensions);
         assert!(decoded.as_bytes().len() <= budget);
@@ -71,4 +71,10 @@ fn unlimited_preserves_original_dimensions() {
         assert_eq!(decoded.dimensions(), (17, 19));
         assert_eq!(decoded.as_bytes().len(), 969);
     }
+}
+
+#[test]
+fn dimension_byte_arithmetic_rejects_overflow() {
+    assert!(super::check_budget(usize::MAX, 2, 3, None).is_err());
+    assert!(super::check_budget(usize::MAX / 2, 1, 3, Some(usize::MAX)).is_err());
 }
