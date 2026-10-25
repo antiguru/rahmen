@@ -211,6 +211,10 @@ fn unexpected_worker_panic_is_a_terminal_outcome() {
         Loader::new(&mut worker, Box::new(Panics), formatter(), 16_000_000),
         Duration::ZERO,
     );
+    // Drain the initial activation so only the unwind notification can expose disconnect.
+    for _ in 0..10 {
+        worker.step();
+    }
     p.presented(Duration::ZERO);
     wait_ready(&mut p, &mut worker);
     assert!(p.take_due(Duration::from_millis(999)).is_none());
@@ -455,5 +459,25 @@ fn completion_wakes_parked_consumer_without_ui_polling() {
         Some(Outcome::Terminate)
     ));
     drop(p);
+    close_consumer(&mut worker);
+}
+
+#[test]
+fn completion_before_first_consumer_activation_is_not_lost() {
+    let mut worker = worker();
+    let (sender, results) = mpsc::sync_channel(1);
+    let slot = Rc::new(RefCell::new(Slot::Loading));
+    let (consumer, activator) = register_consumer(&mut worker, results, Rc::clone(&slot));
+    let sender = ResultSender {
+        sender: Some(sender),
+        activator,
+    };
+    assert!(sender.send(Outcome::Terminate));
+    for _ in 0..10 {
+        worker.step();
+    }
+    assert!(matches!(*slot.borrow(), Slot::Ready(Outcome::Terminate)));
+    *slot.borrow_mut() = Slot::Stopped;
+    consumer.activate();
     close_consumer(&mut worker);
 }

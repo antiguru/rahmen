@@ -7,10 +7,10 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{self, SyncSender, TryRecvError};
+use std::sync::mpsc::{self, Receiver, SyncSender, TryRecvError};
 use std::time::Duration;
 use timely::dataflow::operators::generic::builder_raw::OperatorBuilder;
-use timely::scheduling::Activator;
+use timely::scheduling::{Activator, SyncActivator};
 use timely::worker::Worker;
 
 #[derive(Clone, Debug)]
@@ -42,32 +42,11 @@ impl Loader {
         let (requests, request_rx) = mpsc::sync_channel(1);
         let (result_tx, results) = mpsc::sync_channel(1);
         let slot = Rc::new(RefCell::new(Slot::Dormant));
-        let consumer_slot = Rc::clone(&slot);
-        // This consumer has no output ports and therefore holds no capabilities.
-        // A pending load cannot hold back the rendering graph's clock frontier.
-        let consumer = worker.dataflow::<Duration, _, _>(|scope| {
-            let builder = OperatorBuilder::new("Prepared image receiver".into(), scope);
-            let address = builder.operator_info().address;
-            let consumer = scope.worker().activator_for(address);
-            builder.build(move |_| {
-                let mut slot = consumer_slot.borrow_mut();
-                if matches!(*slot, Slot::Stopped) {
-                    return false;
-                }
-                if matches!(*slot, Slot::Loading) {
-                    match results.try_recv() {
-                        Ok(outcome) => *slot = Slot::Ready(outcome),
-                        Err(TryRecvError::Disconnected) => {
-                            error!("Image worker disconnected, terminating");
-                            *slot = Slot::Ready(Outcome::Terminate);
-                        }
-                        Err(TryRecvError::Empty) => {}
-                    }
-                }
-                true
-            });
-            consumer
-        });
+        let (consumer, activator) = register_consumer(worker, results, Rc::clone(&slot));
+        let result_tx = ResultSender {
+            sender: Some(result_tx),
+            activator,
+        };
         let stop = Arc::new(AtomicBool::new(false));
         let stopping = stop.clone();
         // Dropping the handle detaches the worker. Closing the UI must not join I/O.
@@ -101,7 +80,7 @@ impl Loader {
                         Err(_) => continue,
                     }
                 };
-                if stopping.load(Ordering::Acquire) || result_tx.send(outcome).is_err() {
+                if stopping.load(Ordering::Acquire) || !result_tx.send(outcome) {
                     return;
                 }
             }
@@ -112,6 +91,60 @@ impl Loader {
             consumer,
             stop,
         }
+    }
+}
+
+// A zero-output consumer never holds a timestamp capability while I/O is pending.
+fn register_consumer(
+    worker: &mut Worker,
+    results: Receiver<Outcome>,
+    consumer_slot: Rc<RefCell<Slot>>,
+) -> (Activator, SyncActivator) {
+    // This consumer has no output ports and therefore holds no capabilities.
+    // A pending load cannot hold back the rendering graph's clock frontier.
+    worker.dataflow::<Duration, _, _>(|scope| {
+        let builder = OperatorBuilder::new("Prepared image receiver".into(), scope);
+        let address = builder.operator_info().address;
+        let consumer = scope.worker().activator_for(Rc::clone(&address));
+        let activator = scope.worker().sync_activator_for(address.to_vec());
+        builder.build(move |_| {
+            let mut slot = consumer_slot.borrow_mut();
+            if matches!(*slot, Slot::Stopped) {
+                return false;
+            }
+            if matches!(*slot, Slot::Loading) {
+                match results.try_recv() {
+                    Ok(outcome) => *slot = Slot::Ready(outcome),
+                    Err(TryRecvError::Disconnected) => {
+                        error!("Image worker disconnected, terminating");
+                        *slot = Slot::Ready(Outcome::Terminate);
+                    }
+                    Err(TryRecvError::Empty) => {}
+                }
+            }
+            true
+        });
+        (consumer, activator)
+    })
+}
+
+struct ResultSender {
+    sender: Option<SyncSender<Outcome>>,
+    activator: SyncActivator,
+}
+
+impl ResultSender {
+    fn send(&self, outcome: Outcome) -> bool {
+        // Publish before waking the consumer, including when its first activation is pending.
+        self.sender.as_ref().unwrap().send(outcome).is_ok() && self.activator.activate().is_ok()
+    }
+}
+
+impl Drop for ResultSender {
+    fn drop(&mut self) {
+        // Disconnect first so a wake during normal exit or unwinding observes the closed channel.
+        drop(self.sender.take());
+        let _ = self.activator.activate();
     }
 }
 
