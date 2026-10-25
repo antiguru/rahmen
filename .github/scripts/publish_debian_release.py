@@ -10,9 +10,6 @@ import tomllib
 from urllib.parse import quote
 
 
-CHECKSUM = "SHA256SUMS-trixie-armhf"
-
-
 def validated_version():
     """Return the root package version when the release tag matches it."""
     with Path("Cargo.toml").open("rb") as manifest:
@@ -29,6 +26,9 @@ def validated_version():
 def publish(assets):
     """Upload the checked Debian packages and checksum file to an existing tag."""
     tag, version = validated_version()
+    variant = os.environ.get("PACKAGE_VARIANT", "trixie-armhf")
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", variant):
+        raise ValueError("Invalid Debian package variant")
     event = os.environ.get("GITHUB_EVENT_NAME", "")
     if event.startswith("pull_request"):
         raise ValueError("Pull requests cannot publish release assets")
@@ -46,7 +46,7 @@ def publish(assets):
             digest = hashlib.file_digest(contents, "sha256").hexdigest()
         records.append(f"{digest}  {package.name}\n")
     expected = "".join(records)
-    checksum = assets / CHECKSUM
+    checksum = assets / f"SHA256SUMS-{variant}"
     if checksum.read_text() != expected:
         raise ValueError("Debian package checksums do not match")
 
