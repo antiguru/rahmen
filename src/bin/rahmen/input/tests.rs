@@ -94,3 +94,27 @@ fn pattern_expands_matching_paths() {
     assert_eq!(provider.next_image().unwrap(), Some(second));
     assert_eq!(provider.next_image().unwrap(), None);
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn named_pipe_preserves_list_entries_and_exhaustion() {
+    let fixture = Fixture::new();
+    let path = fixture.0.join("images.fifo");
+    assert!(
+        std::process::Command::new("mkfifo")
+            .arg(&path)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let writer_path = path.clone();
+    let writer = std::thread::spawn(move || {
+        std::fs::write(writer_path, "first.png\nsecond.jpg\n").unwrap();
+    });
+    let result = select(path.to_str().unwrap(), Cursor::new(Vec::new()));
+    writer.join().unwrap();
+    let mut provider = result.unwrap();
+    assert_eq!(provider.next_image().unwrap(), Some("first.png".into()));
+    assert_eq!(provider.next_image().unwrap(), Some("second.jpg".into()));
+    assert_eq!(provider.next_image().unwrap(), None);
+}
