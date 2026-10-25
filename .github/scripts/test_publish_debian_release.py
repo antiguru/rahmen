@@ -37,6 +37,8 @@ class PublicationTests(unittest.TestCase):
             '    status = os.environ.get("GH_STATUS", "200")\n'
             '    print("HTTP/2.0 " + status + " Status\\n\\n{}")\n'
             '    sys.exit(0 if status == "200" else 1)\n'
+            'if sys.argv[1:3] == os.environ.get("GH_FAIL_COMMAND", "").split():\n'
+            '    sys.exit(1)\n'
         )
         gh.chmod(0o755)
         self.env = dict(
@@ -146,6 +148,19 @@ class PublicationTests(unittest.TestCase):
         result = self.run_helper()
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(len(self.calls()), 1)
+
+    def test_failed_tag_verification_does_not_upload(self):
+        self.env.update(GH_STATUS="404", GH_FAIL_COMMAND="release create")
+        result = self.run_helper()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(len(self.calls()), 2)
+        self.assertIn("--verify-tag", self.calls()[-1])
+
+    def test_failed_upload_fails_publication(self):
+        self.env["GH_FAIL_COMMAND"] = "release upload"
+        result = self.run_helper()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(len(self.calls()), 2)
 
     def test_validate_outputs_manifest_version(self):
         output = self.root / "outputs"
