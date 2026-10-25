@@ -83,7 +83,7 @@ impl Graph {
     }
 
     fn close(mut self) -> Vec<Frame> {
-        self.input.close();
+        std::mem::replace(&mut self.input, InputHandle::new()).close();
         for _ in 0..10_000 {
             if !self.worker.step() {
                 assert!(self.probe.done());
