@@ -2,11 +2,16 @@ use image::DynamicImage;
 use log::error;
 use rahmen::errors::RahmenResult;
 use rahmen::provider::{Provider, StatusLineFormatter, load_image_from_path};
+use std::cell::RefCell;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{self, Receiver, SyncSender, TryRecvError};
+use std::sync::mpsc::{self, SyncSender, TryRecvError};
 use std::time::Duration;
+use timely::dataflow::operators::generic::builder_raw::OperatorBuilder;
+use timely::scheduling::Activator;
+use timely::worker::Worker;
 
 #[derive(Clone, Debug)]
 pub(super) struct Prepared {
@@ -22,18 +27,47 @@ pub(super) enum Outcome {
 
 pub(super) struct Loader {
     requests: SyncSender<()>,
-    results: Receiver<Outcome>,
+    slot: Rc<RefCell<Slot>>,
+    consumer: Activator,
     stop: Arc<AtomicBool>,
 }
 
 impl Loader {
     pub fn new(
+        worker: &mut Worker,
         mut provider: Box<dyn Provider<PathBuf> + Send>,
         formatter: StatusLineFormatter,
         buffer_max_size: usize,
     ) -> Self {
         let (requests, request_rx) = mpsc::sync_channel(1);
         let (result_tx, results) = mpsc::sync_channel(1);
+        let slot = Rc::new(RefCell::new(Slot::Dormant));
+        let consumer_slot = Rc::clone(&slot);
+        // This consumer has no output ports and therefore holds no capabilities.
+        // A pending load cannot hold back the rendering graph's clock frontier.
+        let consumer = worker.dataflow::<Duration, _, _>(|scope| {
+            let builder = OperatorBuilder::new("Prepared image receiver".into(), scope);
+            let address = builder.operator_info().address;
+            let consumer = scope.worker().activator_for(address);
+            builder.build(move |_| {
+                let mut slot = consumer_slot.borrow_mut();
+                if matches!(*slot, Slot::Stopped) {
+                    return false;
+                }
+                if matches!(*slot, Slot::Loading) {
+                    match results.try_recv() {
+                        Ok(outcome) => *slot = Slot::Ready(outcome),
+                        Err(TryRecvError::Disconnected) => {
+                            error!("Image worker disconnected, terminating");
+                            *slot = Slot::Ready(Outcome::Terminate);
+                        }
+                        Err(TryRecvError::Empty) => {}
+                    }
+                }
+                true
+            });
+            consumer
+        });
         let stop = Arc::new(AtomicBool::new(false));
         let stopping = stop.clone();
         // Dropping the handle detaches the worker. Closing the UI must not join I/O.
@@ -74,7 +108,8 @@ impl Loader {
         });
         Self {
             requests,
-            results,
+            slot,
+            consumer,
             stop,
         }
     }
@@ -83,6 +118,8 @@ impl Loader {
 impl Drop for Loader {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Release);
+        *self.slot.borrow_mut() = Slot::Stopped;
+        self.consumer.activate();
     }
 }
 
@@ -96,7 +133,6 @@ enum Slot {
 
 pub(super) struct Prefetch {
     loader: Loader,
-    slot: Slot,
     deadline: Duration,
     delay: Duration,
 }
@@ -105,50 +141,38 @@ impl Prefetch {
     pub fn new(loader: Loader, delay: Duration) -> Self {
         Self {
             loader,
-            slot: Slot::Dormant,
             deadline: Duration::ZERO,
             delay,
         }
     }
 
     pub fn loading(&self) -> bool {
-        matches!(self.slot, Slot::Loading)
-    }
-
-    pub fn poll(&mut self) {
-        if self.loading() {
-            match self.loader.results.try_recv() {
-                Ok(outcome) => self.slot = Slot::Ready(outcome),
-                Err(TryRecvError::Disconnected) => {
-                    error!("Image worker disconnected, terminating");
-                    self.slot = Slot::Ready(Outcome::Terminate);
-                }
-                Err(TryRecvError::Empty) => {}
-            }
-        }
+        matches!(*self.loader.slot.borrow(), Slot::Loading)
     }
 
     pub fn take_due(&mut self, now: Duration) -> Option<Outcome> {
-        if now < self.deadline || !matches!(self.slot, Slot::Ready(_)) {
+        let mut slot = self.loader.slot.borrow_mut();
+        if now < self.deadline || !matches!(*slot, Slot::Ready(_)) {
             return None;
         }
-        let Slot::Ready(outcome) = std::mem::replace(&mut self.slot, Slot::Presenting) else {
+        let Slot::Ready(outcome) = std::mem::replace(&mut *slot, Slot::Presenting) else {
             unreachable!()
         };
         if matches!(outcome, Outcome::Terminate) {
-            self.slot = Slot::Stopped;
+            *slot = Slot::Stopped;
         }
         Some(outcome)
     }
 
     pub fn presented(&mut self, now: Duration) {
-        let interval = match self.slot {
+        let mut slot = self.loader.slot.borrow_mut();
+        let interval = match *slot {
             Slot::Dormant => Duration::from_secs(1),
             Slot::Presenting => self.delay,
             _ => return,
         };
         self.deadline = now.saturating_add(interval);
-        self.slot = match self.loader.requests.try_send(()) {
+        *slot = match self.loader.requests.try_send(()) {
             Ok(()) => Slot::Loading,
             Err(_) => Slot::Ready(Outcome::Terminate),
         };

@@ -175,7 +175,12 @@ fn main() -> RahmenResult<()> {
     let probe = ProbeHandle::new();
 
     let mut input_updates = InputHandle::new();
-    let loader = prefetch::Loader::new(provider, status_line_formatter, buffer_max_size);
+    let loader = prefetch::Loader::new(
+        &mut worker,
+        provider,
+        status_line_formatter,
+        buffer_max_size,
+    );
     let prefetch = prefetch::Prefetch::new(loader, delay);
     let output = dataflow::build(
         &mut worker,

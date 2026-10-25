@@ -40,16 +40,30 @@ fn fixture() -> PathBuf {
 }
 type ControlledPrefetch = (
     Prefetch,
+    Worker,
     mpsc::Sender<RahmenResult<Option<PathBuf>>>,
     mpsc::Receiver<()>,
     Arc<AtomicUsize>,
 );
 
+fn worker() -> Worker {
+    Worker::new(
+        timely::worker::Config::default(),
+        timely::communication::Allocator::Thread(Default::default()),
+        Some(Instant::now()),
+    )
+}
+
 fn controlled() -> ControlledPrefetch {
+    controlled_on(worker())
+}
+
+fn controlled_on(mut worker: Worker) -> ControlledPrefetch {
     let (tx, paths) = mpsc::channel();
     let (entered, rx) = mpsc::channel();
     let calls = Arc::new(AtomicUsize::new(0));
     let loader = Loader::new(
+        &mut worker,
         Box::new(Controlled {
             calls: calls.clone(),
             entered,
@@ -60,15 +74,16 @@ fn controlled() -> ControlledPrefetch {
     );
     (
         Prefetch::new(loader, Duration::from_secs(10)),
+        worker,
         tx,
         rx,
         calls,
     )
 }
-fn wait_ready(p: &mut Prefetch) {
+fn wait_ready(p: &mut Prefetch, worker: &mut Worker) {
     let end = Instant::now() + Duration::from_secs(5);
     while p.loading() {
-        p.poll();
+        worker.step();
         assert!(Instant::now() < end, "worker failed to return");
         std::thread::yield_now();
     }
@@ -77,7 +92,7 @@ fn wait_ready(p: &mut Prefetch) {
 #[test]
 fn eager_prefetch_has_one_slot_and_preserves_real_image_metadata() {
     let _guard = METADATA.lock().unwrap();
-    let (mut p, tx, entered, calls) = controlled();
+    let (mut p, mut worker, tx, entered, calls) = controlled();
     p.presented(Duration::ZERO);
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     assert!(p.loading());
@@ -85,11 +100,11 @@ fn eager_prefetch_has_one_slot_and_preserves_real_image_metadata() {
         .unwrap();
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     tx.send(Ok(Some(fixture()))).unwrap();
-    wait_ready(&mut p);
+    wait_ready(&mut p, &mut worker);
     assert_eq!(calls.load(Ordering::SeqCst), 2, "failed decode must retry");
     assert!(p.take_due(Duration::from_millis(999)).is_none());
     for _ in 0..100 {
-        p.poll();
+        worker.step();
     }
     assert_eq!(
         calls.load(Ordering::SeqCst),
@@ -105,7 +120,7 @@ fn eager_prefetch_has_one_slot_and_preserves_real_image_metadata() {
     p.presented(Duration::from_secs(3));
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     tx.send(Ok(None)).unwrap();
-    wait_ready(&mut p);
+    wait_ready(&mut p, &mut worker);
     assert!(
         p.take_due(Duration::from_secs(12)).is_none(),
         "delay starts after presentation"
@@ -119,7 +134,7 @@ fn eager_prefetch_has_one_slot_and_preserves_real_image_metadata() {
 #[test]
 fn late_terminal_and_provider_error_wait_for_deadline() {
     for error in [false, true] {
-        let (mut p, tx, entered, _) = controlled();
+        let (mut p, mut worker, tx, entered, _) = controlled();
         p.presented(Duration::ZERO);
         entered.recv_timeout(Duration::from_secs(5)).unwrap();
         assert!(p.take_due(Duration::from_secs(2)).is_none());
@@ -129,7 +144,7 @@ fn late_terminal_and_provider_error_wait_for_deadline() {
             Ok(None)
         })
         .unwrap();
-        wait_ready(&mut p);
+        wait_ready(&mut p, &mut worker);
         assert!(matches!(
             p.take_due(Duration::from_secs(2)),
             Some(Outcome::Terminate)
@@ -139,18 +154,20 @@ fn late_terminal_and_provider_error_wait_for_deadline() {
 
 #[test]
 fn close_during_blocked_provider_does_not_wait_or_retry() {
-    let (mut p, tx, entered, calls) = controlled();
+    let (mut p, mut worker, tx, entered, calls) = controlled();
     p.presented(Duration::ZERO);
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     let (closed_tx, closed_rx) = mpsc::channel();
-    let thread = std::thread::spawn(move || {
-        drop(p);
-        closed_tx.send(()).unwrap();
+    let release = std::thread::spawn(move || {
+        let closed = closed_rx.recv_timeout(Duration::from_secs(1)).is_ok();
+        tx.send(Ok(Some(PathBuf::from("does-not-exist.jpg"))))
+            .unwrap();
+        closed
     });
-    let closed = closed_rx.recv_timeout(Duration::from_secs(1)).is_ok();
-    tx.send(Ok(Some(PathBuf::from("does-not-exist.jpg"))))
-        .unwrap();
-    thread.join().unwrap();
+    drop(p);
+    close_consumer(&mut worker);
+    let _ = closed_tx.send(());
+    let closed = release.join().unwrap();
     assert!(closed, "UI close waited for provider");
     assert!(entered.recv_timeout(Duration::from_secs(5)).is_err());
     assert_eq!(calls.load(Ordering::SeqCst), 1);
@@ -159,22 +176,22 @@ fn close_during_blocked_provider_does_not_wait_or_retry() {
 #[test]
 fn zero_delay_still_requires_presentation_before_next_load() {
     let _guard = METADATA.lock().unwrap();
-    let (mut p, tx, entered, calls) = controlled();
+    let (mut p, mut worker, tx, entered, calls) = controlled();
     p.delay = Duration::ZERO;
     p.presented(Duration::ZERO);
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     tx.send(Ok(Some(fixture()))).unwrap();
-    wait_ready(&mut p);
+    wait_ready(&mut p, &mut worker);
     assert!(matches!(
         p.take_due(Duration::from_secs(1)),
         Some(Outcome::Image(_))
     ));
-    p.poll();
+    worker.step();
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     p.presented(Duration::from_secs(1));
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     tx.send(Ok(None)).unwrap();
-    wait_ready(&mut p);
+    wait_ready(&mut p, &mut worker);
     assert!(matches!(
         p.take_due(Duration::from_secs(1)),
         Some(Outcome::Terminate)
@@ -189,12 +206,13 @@ fn unexpected_worker_panic_is_a_terminal_outcome() {
             panic!("controlled provider panic")
         }
     }
+    let mut worker = worker();
     let mut p = Prefetch::new(
-        Loader::new(Box::new(Panics), formatter(), 16_000_000),
+        Loader::new(&mut worker, Box::new(Panics), formatter(), 16_000_000),
         Duration::ZERO,
     );
     p.presented(Duration::ZERO);
-    wait_ready(&mut p);
+    wait_ready(&mut p, &mut worker);
     assert!(p.take_due(Duration::from_millis(999)).is_none());
     assert!(matches!(
         p.take_due(Duration::from_secs(1)),
@@ -205,12 +223,13 @@ fn unexpected_worker_panic_is_a_terminal_outcome() {
 #[test]
 fn close_with_ready_result_releases_worker() {
     let _guard = METADATA.lock().unwrap();
-    let (mut p, tx, entered, calls) = controlled();
+    let (mut p, mut worker, tx, entered, calls) = controlled();
     p.presented(Duration::ZERO);
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     tx.send(Ok(Some(fixture()))).unwrap();
-    wait_ready(&mut p);
+    wait_ready(&mut p, &mut worker);
     drop(p);
+    close_consumer(&mut worker);
     assert!(entered.recv_timeout(Duration::from_secs(5)).is_err());
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
@@ -229,7 +248,7 @@ fn close_during_decoder_read_stops_before_retry() {
             .unwrap()
             .success()
     );
-    let (mut p, tx, entered, calls) = controlled();
+    let (mut p, mut worker, tx, entered, calls) = controlled();
     p.presented(Duration::ZERO);
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     tx.send(Ok(Some(path.clone()))).unwrap();
@@ -244,14 +263,16 @@ fn close_during_decoder_read_stops_before_retry() {
     });
     opened_rx.recv_timeout(Duration::from_secs(5)).unwrap();
     let (closed_tx, closed_rx) = mpsc::channel();
-    let closer = std::thread::spawn(move || {
-        drop(p);
-        closed_tx.send(()).unwrap();
+    let release = std::thread::spawn(move || {
+        let closed = closed_rx.recv_timeout(Duration::from_secs(1)).is_ok();
+        release_tx.send(()).unwrap();
+        closed
     });
-    let closed = closed_rx.recv_timeout(Duration::from_secs(1)).is_ok();
-    release_tx.send(()).unwrap();
+    drop(p);
+    close_consumer(&mut worker);
+    let _ = closed_tx.send(());
+    let closed = release.join().unwrap();
     writer.join().unwrap();
-    closer.join().unwrap();
     assert!(closed, "close joined decoder I/O");
     assert!(entered.recv_timeout(Duration::from_secs(5)).is_err());
     assert_eq!(calls.load(Ordering::SeqCst), 1);
@@ -275,7 +296,7 @@ fn late_image_is_available_immediately_and_metadata_failure_is_not_terminal() {
     image::RgbImage::new(2, 2)
         .write_to(&mut encoded, image::ImageFormat::Png)
         .unwrap();
-    let (mut p, tx, entered, _) = controlled();
+    let (mut p, mut worker, tx, entered, _) = controlled();
     p.presented(Duration::ZERO);
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     assert!(p.take_due(Duration::from_secs(20)).is_none());
@@ -286,7 +307,7 @@ fn late_image_is_available_immediately_and_metadata_failure_is_not_terminal() {
         std::fs::remove_file(path).unwrap();
         fifo.write_all(encoded.get_ref()).unwrap();
     });
-    wait_ready(&mut p);
+    wait_ready(&mut p, &mut worker);
     writer.join().unwrap();
     let Some(Outcome::Image(prepared)) = p.take_due(Duration::from_secs(20)) else {
         panic!("late result must be due")
@@ -297,6 +318,7 @@ fn late_image_is_available_immediately_and_metadata_failure_is_not_terminal() {
         "unsupported metadata must retain previous status"
     );
     drop(p);
+    close_consumer(&mut worker);
     assert!(entered.recv_timeout(Duration::from_secs(5)).is_err());
 }
 
@@ -333,7 +355,9 @@ fn python_postprocessor_created_on_ui_thread_runs_on_worker() {
     .unwrap();
     let (tx, paths) = mpsc::channel();
     let (entered, rx) = mpsc::channel();
+    let mut worker = worker();
     let loader = Loader::new(
+        &mut worker,
         Box::new(Controlled {
             calls: Arc::new(AtomicUsize::new(0)),
             entered,
@@ -346,12 +370,13 @@ fn python_postprocessor_created_on_ui_thread_runs_on_worker() {
     p.presented(Duration::ZERO);
     rx.recv_timeout(Duration::from_secs(5)).unwrap();
     tx.send(Ok(Some(fixture()))).unwrap();
-    wait_ready(&mut p);
+    wait_ready(&mut p, &mut worker);
     let Some(Outcome::Image(prepared)) = p.take_due(Duration::from_secs(1)) else {
         panic!("worker failed Python processing")
     };
     assert_eq!(prepared.status.as_deref(), Some("worker:Zurich"));
     drop(p);
+    close_consumer(&mut worker);
     assert!(rx.recv_timeout(Duration::from_secs(5)).is_err());
     Python::attach(|py| {
         py.import("sys")
@@ -361,4 +386,74 @@ fn python_postprocessor_created_on_ui_thread_runs_on_worker() {
             .del_item("_rahmen_prefetch_test")
             .unwrap();
     });
+}
+
+fn close_consumer(worker: &mut Worker) {
+    for _ in 0..100 {
+        if !worker.step() {
+            return;
+        }
+    }
+    panic!("result consumer did not close");
+}
+
+#[test]
+fn completion_wakes_parked_consumer_without_ui_polling() {
+    use timely::logging::{ParkEvent, StartStop, TimelyEvent, TimelyEventBuilder};
+    let worker = worker();
+    let (parked_tx, parked_rx) = mpsc::channel();
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let logged = events.clone();
+    worker
+        .log_register()
+        .unwrap()
+        .insert::<TimelyEventBuilder, _>("timely", move |_, data| {
+            if let Some(data) = data {
+                for (_, event) in data.drain(..) {
+                    if matches!(event, TimelyEvent::Park(ParkEvent::Park(_))) {
+                        let _ = parked_tx.send(());
+                    }
+                    logged.borrow_mut().push(event);
+                }
+            }
+        });
+    let (mut p, mut worker, tx, entered, _) = controlled_on(worker);
+    // Consume registration's initial activation before allowing the loader to finish.
+    for _ in 0..10 {
+        worker.step();
+    }
+    p.presented(Duration::ZERO);
+    entered.recv_timeout(Duration::from_secs(5)).unwrap();
+    let release = std::thread::spawn(move || {
+        parked_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        tx.send(Ok(None)).unwrap();
+    });
+    worker.step_or_park(Some(Duration::from_secs(1)));
+    release.join().unwrap();
+    for _ in 0..10 {
+        worker.step();
+    }
+    assert!(
+        !p.loading(),
+        "completion did not activate the parked result consumer"
+    );
+    let scheduled = events
+        .borrow()
+        .iter()
+        .filter(
+            |event| matches!(event, TimelyEvent::Schedule(s) if s.start_stop == StartStop::Start),
+        )
+        .count();
+    assert!(scheduled > 0, "scheduler logging was not enabled");
+    for _ in 0..100 {
+        worker.step();
+    }
+    assert_eq!(events.borrow().iter().filter(|event| matches!(event, TimelyEvent::Schedule(s) if s.start_stop == StartStop::Start)).count(), scheduled, "idle steps rescheduled the result consumer");
+    assert!(p.take_due(Duration::from_millis(999)).is_none());
+    assert!(matches!(
+        p.take_due(Duration::from_secs(1)),
+        Some(Outcome::Terminate)
+    ));
+    drop(p);
+    close_consumer(&mut worker);
 }

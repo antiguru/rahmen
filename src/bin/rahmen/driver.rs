@@ -30,7 +30,9 @@ pub(super) fn display_loop<'a>(
         let now = clock().max(*input_configuration.time());
         input_configuration.advance_to(now);
         input_updates.advance_to(now);
-        prefetch.poll();
+        // Service external activations even if the rendering probe is already current.
+        // Activation wakes Timely, not the display event loop, so UI cadence is unchanged.
+        worker.step();
         if prefetch.loading() != was_loading {
             was_loading = prefetch.loading();
             input_updates.send(Update::Loading(was_loading));

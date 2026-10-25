@@ -90,6 +90,7 @@ fn blocked_provider_does_not_block_clock_progress() {
             RgbImage::from_pixel(4, 4, Rgb([23, 45, 67])),
         ))));
         let loader = Loader::new(
+            &mut worker,
             Box::new(Blocked {
                 entered: entered_tx,
                 release: release_rx,
@@ -207,6 +208,7 @@ fn with_driver(
         RgbImage::from_pixel(4, 4, Rgb([23, 45, 67])),
     ))));
     let loader = Loader::new(
+        &mut worker,
         provider,
         StatusLineFormatter::new(std::iter::empty(), None, ", ".into()).unwrap(),
         16_000_000,
