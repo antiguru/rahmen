@@ -394,3 +394,26 @@ fn empty_viewport_clock_progresses_and_closes() {
     assert!(graph.advance(2000).is_empty());
     assert!(graph.close().is_empty());
 }
+
+#[test]
+fn viewport_shrink_clips_inferred_blanks() {
+    let mut graph = Graph::new(vec![], false, false);
+    graph.configure();
+    graph
+        .input
+        .send(Configuration::Splash(Arc::new(DynamicImage::ImageRgb8(
+            RgbImage::from_pixel(4, 4, Rgb([23, 45, 67])),
+        ))));
+    graph.input.send(Configuration::Greeting("HELLO".into()));
+    assert_in_bounds(&graph.advance(1), 96, 80);
+    for (i, (width, height)) in [(96, 10), (96, 18), (96, 0), (0, 80)].into_iter().enumerate() {
+        graph.input.send(Configuration::ScreenDimensions(width, height));
+        assert_in_bounds(&graph.advance(2 + i as u64 * 2), width, height);
+        graph.input.send(Configuration::ScreenDimensions(96, 80));
+        let restored = graph.advance(3 + i as u64 * 2);
+        assert_in_bounds(&restored, 96, 80);
+        assert_eq!(image(&restored, 1).2.dimensions(), (62, 62));
+        assert_eq!(image(&restored, 2).2.dimensions(), (96, 18));
+    }
+    assert!(graph.close().is_empty());
+}
