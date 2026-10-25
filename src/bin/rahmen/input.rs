@@ -9,10 +9,10 @@ use rahmen::provider_list::ListProvider;
 
 pub(super) fn select(
     input: &str,
-    stdin: impl BufRead + 'static,
-) -> RahmenResult<Box<dyn Provider<PathBuf>>> {
+    stdin: impl BufRead + Send + 'static,
+) -> RahmenResult<Box<dyn Provider<PathBuf> + Send>> {
     // box is used bec of dynamic typing for provider
-    let provider: Box<dyn Provider<_>> = if input.eq("-") {
+    let provider: Box<dyn Provider<_> + Send> = if input.eq("-") {
         info!("Reading from stdin");
         Box::new(ListProvider::new(stdin))
     } else if let Ok(file) = File::open(input) {

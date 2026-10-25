@@ -1,30 +1,29 @@
 mod dataflow;
+mod driver;
 mod font;
 mod input;
+mod prefetch;
 
-use dataflow::{Render, RunControl};
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use clap::{Arg, Command, value_parser};
-use log::{error, info, warn};
+use log::{info, warn};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use timely::communication::Allocator;
 use timely::container::CapacityContainerBuilder;
-use timely::dataflow::operators::capture::Event;
 use timely::dataflow::{InputHandle, ProbeHandle};
 use timely::worker::Config;
 
 use rahmen::config::Settings;
 use rahmen::dataflow::Configuration;
-use rahmen::display::Display;
 use rahmen::display_framebuffer::FramebufferDisplay;
 #[cfg(feature = "minifb")]
 use rahmen::display_minifb::MinifbDisplay;
-use rahmen::errors::{RahmenError, RahmenResult};
+use rahmen::errors::RahmenResult;
 use rahmen::font::FontRenderer;
 use rahmen::provider::StatusLineFormatter;
 
@@ -140,6 +139,7 @@ fn main() -> RahmenResult<()> {
         .expect("Missing buffer_max_size");
 
     let font = font::load(matches.get_one::<String>("font").map(String::as_str));
+    let loading_marker = dataflow::loading_marker(font.glyph_for_char('◷').is_some());
     let font_renderer = FontRenderer::with_font(font);
 
     let duration_millis = (matches
@@ -174,22 +174,28 @@ fn main() -> RahmenResult<()> {
     // to gather information about progress
     let probe = ProbeHandle::new();
 
+    let mut input_updates = InputHandle::new();
+    let loader = prefetch::Loader::new(
+        &mut worker,
+        provider,
+        status_line_formatter,
+        buffer_max_size,
+    );
+    let prefetch = prefetch::Prefetch::new(loader, delay);
     let output = dataflow::build(
         &mut worker,
         &mut input_configuration,
         &probe,
-        provider,
-        status_line_formatter,
+        &mut input_updates,
         font_renderer,
         dataflow::Options {
-            buffer_max_size,
+            loading_marker,
             show_time,
             time_format,
         },
     );
 
     let start_time = Instant::now();
-    let mut dimensions = None;
 
     input_configuration.send(Configuration::FontSize(font_size_f));
     // enlarge font canvas vertically by this factor (default given here: 1.4)
@@ -203,66 +209,15 @@ fn main() -> RahmenResult<()> {
     }
     input_configuration.send(Configuration::Greeting(format!("Rahmen {}", VERSION)));
 
-    let mut next_image_at = start_time.elapsed() + Duration::from_secs(1);
-
-    let display_fn = |display: &mut dyn Display| {
-        let now = start_time.elapsed();
-
-        if next_image_at < now {
-            input_configuration.send(Configuration::Tick);
-            next_image_at = now + delay;
-        }
-
-        if Some(display.dimensions()) != dimensions {
-            dimensions = Some(display.dimensions());
-            input_configuration.send(Configuration::ScreenDimensions(
-                display.dimensions().0,
-                display.dimensions().1,
-            ));
-        }
-        input_configuration.advance_to(now);
-        while probe.less_than(&now) {
-            worker.step();
-        }
-        let mut has_update = false;
-        let result = match output.try_iter().all(|result| match result {
-            // Continue processing on progress messages
-            Event::Progress(_) => true,
-            // Handle data messages by rending an image and determining whether to terminate
-            Event::Messages(_, r) => {
-                let mut terminate = false;
-                for result in r {
-                    match result {
-                        Ok(Render::Image(key, anchor, ref img)) => {
-                            has_update = true;
-                            if let Err(err) = display.render(key, anchor, img.as_ref()) {
-                                error!("Render failed: {}", err);
-                                terminate = true;
-                            }
-                        }
-                        Ok(Render::Blank(key, anchor, size)) => {
-                            has_update = true;
-                            if let Err(err) = display.blank(key, anchor, size) {
-                                error!("Blank failed: {}", err);
-                                terminate = true;
-                            }
-                        }
-                        Err(RunControl::Terminate) => terminate = true,
-                        _ => {}
-                    }
-                }
-                !terminate
-            }
-        }) {
-            true => Ok(()),
-            false => Err(RahmenError::Terminate),
-        };
-        if result.is_ok() && has_update {
-            display.update()
-        } else {
-            result
-        }
-    };
+    let display_fn = driver::display_loop(
+        &mut worker,
+        &mut input_configuration,
+        &mut input_updates,
+        &probe,
+        output,
+        prefetch,
+        move || start_time.elapsed(),
+    );
 
     match matches
         .get_one::<String>("display")
@@ -292,6 +247,7 @@ fn main() -> RahmenResult<()> {
     };
 
     input_configuration.close();
+    input_updates.close();
     while worker.step() {}
     Ok(())
 }

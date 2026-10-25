@@ -1,57 +1,34 @@
 use image::{DynamicImage, GenericImageView};
-use log::{error, info};
+use log::info;
 use pathfinder_geometry::rect::RectI;
 use rahmen::Vector;
 use rahmen::dataflow::{Configuration, FormatText, ResizeImage};
-use rahmen::errors::RahmenResult;
 use rahmen::font::FontRenderer;
-use rahmen::provider::{Provider, StatusLineFormatter, load_image_from_path};
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use timely::container::CapacityContainerBuilder;
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::capture::Event;
-use timely::dataflow::operators::vec::{Branch, Filter, Map, ResultStream};
-use timely::dataflow::operators::{
-    Capture, Concat, ConnectLoop, Enter, Inspect, Leave, LoopVariable, Notificator, Operator, Probe,
-};
+use timely::dataflow::operators::vec::Map;
+use timely::dataflow::operators::{Capture, Concat, Notificator, Operator, Probe};
 use timely::dataflow::{InputHandle, ProbeHandle};
-use timely::order::Product;
 use timely::worker::Worker;
 
-/// dataflow control, this is used as result R part
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(super) enum RunControl {
-    /// terminate stream processing (by external command)
+use super::prefetch::Prepared;
+pub(super) use super::prefetch::RunControl;
+
+#[derive(Clone, Debug)]
+pub(super) enum Update {
+    Image(Prepared),
+    Loading(bool),
     Terminate,
-    /// stream processing encountered an error, but will continue
-    Suppressed,
 }
 
-/// error handler for display stuff
-fn fatal_err<T>(result: RahmenResult<Option<T>>) -> RunResult<T> {
-    match result {
-        // empty result means we terminate as planned (e.g. end of list)
-        Ok(None) => Err(RunControl::Terminate),
-        // we process the result
-        Ok(Some(t)) => Ok(t),
-        // display error and terminate
-        Err(e) => {
-            error!("Encountered error, terminating: {}", e);
-            Err(RunControl::Terminate)
-        }
-    }
-}
-
-/// to keep running the dataflow when there's a stream error
-fn suppress_err<T>(result: RahmenResult<T>) -> RunResult<T> {
-    result.map_err(|e| {
-        // just notify about error but keep processing
-        error!("Encountered error, suppressing: {}", e);
-        RunControl::Suppressed
-    })
+#[derive(Clone)]
+enum StatusUpdate {
+    Text(String),
+    Loading(bool),
 }
 
 // `DynamicImage` only implements `PartialEq` (not `Eq`) since it can hold floating-point pixels.
@@ -64,7 +41,7 @@ pub(super) enum Render {
 type RunResult<T> = Result<T, RunControl>;
 
 pub(super) struct Options {
-    pub buffer_max_size: usize,
+    pub loading_marker: &'static str,
     pub show_time: bool,
     pub time_format: String,
 }
@@ -73,92 +50,87 @@ pub(super) fn build(
     worker: &mut Worker,
     input_configuration: &mut InputHandle<Duration, CapacityContainerBuilder<Vec<Configuration>>>,
     probe: &ProbeHandle<Duration>,
-    mut provider: Box<dyn Provider<PathBuf>>,
-    status_line_formatter: StatusLineFormatter,
+    input_updates: &mut InputHandle<Duration, CapacityContainerBuilder<Vec<Update>>>,
     font_renderer: FontRenderer,
     options: Options,
 ) -> std::sync::mpsc::Receiver<Event<Duration, Vec<RunResult<Render>>>> {
     let Options {
-        buffer_max_size,
+        loading_marker,
         show_time,
         time_format,
     } = options;
     worker.dataflow(|scope| {
         let configuration_stream = input_configuration.to_stream(scope);
 
-        let img_path_stream = scope.scoped::<Product<_, u32>, _, _>("File loading", |inner| {
-            let (handle, cycle) = inner.loop_variable(1);
-            let (ok, err) = configuration_stream
-                .clone()
-                .filter(|c| matches!(c, Configuration::Tick))
-                .enter(inner)
-                .concat(cycle)
-                // obtain next path
-                .map(move |_| fatal_err(provider.next_image()))
-                // Load image
-                .and_then(move |ref path| {
-                    suppress_err(
-                        load_image_from_path(path, Some(buffer_max_size))
-                            .map(|img| (path.clone(), Arc::new(img))),
-                    )
-                })
-                .branch(|_t, d| d.as_ref().err() == Some(&RunControl::Suppressed));
-            err.map(|_| Configuration::Tick).connect_loop(handle);
-            ok.leave(scope)
+        let updates = input_updates.to_stream(scope);
+        let err_stream = updates.clone().flat_map(|update| match update {
+            Update::Terminate => Some(RunControl::Terminate),
+            _ => None,
         });
-        let err_stream = img_path_stream.clone().err();
-
-        let mut stash: HashMap<Duration, String> = HashMap::new();
+        let mut stash: HashMap<Duration, Vec<StatusUpdate>> = HashMap::new();
         let mut current_text = None;
-
-        let status_line_stream = img_path_stream
+        let mut loading = false;
+        let mut next_tick = show_time.then_some(Duration::ZERO);
+        let status_line_stream = updates
             .clone()
-            .ok()
-            .flat_map(move |(p, _img)| status_line_formatter.format(&p).ok())
+            .flat_map(|update| match update {
+                Update::Image(prepared) => prepared.status.map(StatusUpdate::Text),
+                Update::Loading(loading) => Some(StatusUpdate::Loading(loading)),
+                Update::Terminate => None,
+            })
             .concat(configuration_stream.clone().flat_map(|c| match c {
-                Configuration::Greeting(text) => Some(text),
+                Configuration::Greeting(text) => Some(StatusUpdate::Text(text)),
                 _ => None,
-            }));
-        let mut status_line_stream =
-            Inspect::<Duration, Vec<String>>::inspect(status_line_stream, |loc| {
-                info!("Status line: {}", loc)
-            });
-        if show_time {
-            status_line_stream = status_line_stream.unary_notify(
+            }))
+            .unary_notify(
                 Pipeline,
-                "Show time",
-                Some(Duration::from_secs(0)),
+                "Show time and loading",
+                next_tick,
                 move |input, output, not: &mut Notificator<Duration>| {
                     input.for_each(|cap, data| {
-                        if let Some(text) = data.drain(..).next_back() {
-                            *stash.entry(*cap.time()).or_default() = text;
-                            not.notify_at(cap.retain(0));
-                        }
+                        stash.entry(*cap.time()).or_default().append(data);
+                        not.notify_at(cap.retain(0));
                     });
-                    not.for_each(|cap, cnt, not| {
-                        let request_notification = if let Some(text) = stash.remove(cap.time()) {
-                            current_text = Some(text);
-                            cnt == 2
-                        } else {
-                            true
-                        };
-                        let now = chrono::Local::now();
-                        let delay = std::cmp::max(50, 1000 - now.timestamp_subsec_millis() as u64);
-                        if request_notification && !not.frontier(0).is_empty() {
-                            let mut next_time = *cap.time() + Duration::from_millis(delay);
-                            while !not.frontier(0).less_equal(&next_time) {
-                                next_time += Duration::from_secs(1);
+                    not.for_each(|cap, _, not| {
+                        if let Some(updates) = stash.remove(cap.time()) {
+                            for update in updates {
+                                match update {
+                                    StatusUpdate::Text(text) => {
+                                        info!("Status line: {}", text);
+                                        current_text = Some(text);
+                                    }
+                                    StatusUpdate::Loading(value) => loading = value,
+                                }
                             }
-                            not.notify_at(cap.delayed(&next_time));
+                        }
+                        let now = chrono::Local::now();
+                        // Only the outstanding periodic notification schedules another tick.
+                        // Text/loading notifications at the same time cannot multiply the clock.
+                        if next_tick == Some(*cap.time()) {
+                            next_tick = None;
+                            if !not.frontier(0).is_empty() {
+                                let delay =
+                                    std::cmp::max(50, 1000 - now.timestamp_subsec_millis() as u64);
+                                let mut next = *cap.time() + Duration::from_millis(delay);
+                                while !not.frontier(0).less_equal(&next) {
+                                    next += Duration::from_secs(1);
+                                }
+                                next_tick = Some(next);
+                                not.notify_at(cap.delayed(&next));
+                            }
                         }
                         if let Some(text) = &current_text {
-                            let time_text = format!("[{}] {}", now.format(&time_format), text);
-                            output.session(&cap).give(time_text);
+                            let timestamp = show_time.then(|| now.format(&time_format).to_string());
+                            output.session(&cap).give(status_text(
+                                timestamp.as_deref(),
+                                text,
+                                loading,
+                                loading_marker,
+                            ));
                         }
                     });
                 },
             );
-        }
         let status_line_stream =
             status_line_stream.map(|s| s.split('\n').map(Into::into).collect());
 
@@ -216,10 +188,11 @@ pub(super) fn build(
             )
         };
 
-        let img_stream = img_path_stream
-            .clone()
-            .ok()
-            .map(|(_, img)| img)
+        let img_stream = updates
+            .flat_map(|update| match update {
+                Update::Image(prepared) => Some(prepared.image),
+                _ => None,
+            })
             .concat(configuration_stream.clone().flat_map(|c| match c {
                 Configuration::Splash(img) => Some(img),
                 _ => None,
@@ -300,6 +273,21 @@ pub(super) fn build(
             .probe_with(probe)
             .capture()
     })
+}
+
+pub(super) fn loading_marker(has_glyph: bool) -> &'static str {
+    if has_glyph { "◷" } else { "[loading]" }
+}
+
+fn status_text(timestamp: Option<&str>, text: &str, loading: bool, marker: &str) -> String {
+    let prefix = timestamp
+        .map(|time| format!("[{time}] "))
+        .unwrap_or_default();
+    if loading {
+        format!("{prefix}{marker} {text}")
+    } else {
+        format!("{prefix}{text}")
+    }
 }
 
 fn compute_blanking(key: usize, rect: RectI, old_rect: RectI) -> Vec<Render> {
