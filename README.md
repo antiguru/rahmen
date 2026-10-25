@@ -97,7 +97,7 @@ shown.
 
 ## Building
 
-Rahmen targets the Rust 2024 edition and requires Rust 1.85 or newer.
+Rahmen targets the Rust 2024 edition and requires Rust 1.88 or newer.
 
 `cargo build --bin rahmen`
 
@@ -135,9 +135,11 @@ OPTIONS:
 --buffer_max_size <buffer_max_size>    [default: 16000000]
 ```
 
-The buffer size (in Bytes) determines the downscaling of images. All images that are larger than the buffer size in
-Bytes will be scaled down to the buffer size. This should be larger than your monitor to avoid scaling
-artefacts/jaggies.
+The buffer size limits the decoded pixel bytes of each loaded image, including all color channels.
+JPEG images use the largest decoder scale that fits, down to one eighth of each original dimension.
+Images that cannot fit, including PNG images that would require downscaling, are skipped with a load error.
+Decoder allocation limits also apply to non-JPEG images and can reject files whose pixels fit but whose decoder needs more memory.
+This is not a global process memory limit, so leave room for decoder state, metadata, rendering, and other loaded images.
 
 Rule of thumb: `long side of the monitor ^ 2 * 2`, e.g. for a 1600 * 1200 monitor: `1600 * 1600 * 2 = 5120000`.
 

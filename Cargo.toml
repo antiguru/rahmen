@@ -3,7 +3,7 @@ name = "rahmen"
 version = "0.2.0"
 authors = ["Moritz Hoffmann <antiguru@gmail.com>", "sys3175 <https://github.com/sys3175>"]
 edition = "2024"
-rust-version = "1.85"
+rust-version.workspace = true
 license = "GPL-3.0-only"
 description = "Rahmen is a lightweight image presenter"
 readme = "README.md"
@@ -18,6 +18,9 @@ exclude = [".github/", "rustfmt.toml", "test.py"]
 [workspace]
 members = ["rahmen-exiv2"]
 
+[workspace.package]
+rust-version = "1.88"
+
 [features]
 default = []
 
@@ -31,7 +34,7 @@ debug = "line-tables-only"
 chrono = "0.4"
 clap = { version = "4", default-features = false, features = ["std", "color", "help", "usage", "error-context"] }
 config = { version = "0.15", default-features = false, features = ["toml"] }
-convert_case = "0.11"
+convert_case = "0.12"
 ctrlc = "3"
 env_logger = "0.11"
 font-kit = "0.14"
@@ -39,13 +42,13 @@ framebuffer = "0.3"
 glob = "0.3"
 itertools = "0.15"
 log = "0.4"
-minifb = { version = "0.28", optional = true }
+minifb = { version = "0.29", optional = true }
 mozjpeg = { version = "0.10", default-features = false }
 pathfinder_geometry = "0.5"
 rahmen-exiv2 = { path = "rahmen-exiv2", version = "0.2.0" }
 regex = "1"
 serde = { version = "1", features = ["derive"] }
-timely = "0.12"
+timely = "0.31"
 xdg = "3"
 
 [dependencies.image]
@@ -55,7 +58,7 @@ default-features = false
 features = ["jpeg", "png"]
 
 [dependencies.pyo3]
-version = "0.29"
+version = "0.30"
 features = ["auto-initialize"]
 
 [package.metadata.deb]
@@ -72,3 +75,6 @@ assets = [
     ["rahmen.toml", "etc/", "644"],
     ["target/release/rahmen", "usr/bin/", "755"],
 ]
+
+[dev-dependencies]
+memmap2 = "0.9"
