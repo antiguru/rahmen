@@ -225,17 +225,35 @@ pub(super) fn build(
 
         let mut size_stash: HashMap<usize, _> = HashMap::new();
         let mut input_buffer: HashMap<_, Vec<(_, _, _)>> = HashMap::new();
+        let mut viewport_stash: HashMap<_, Vec<_>> = HashMap::new();
+        let mut viewport = None;
 
-        let composed_img_stream = img_stream.concat(text_img_stream).unary_notify(
+        let composed_img_stream = img_stream.concat(text_img_stream).binary_notify(
+            configuration_stream.clone(),
+            Pipeline,
             Pipeline,
             "Infer blanking",
             None,
-            move |input, output, not| {
+            move |input, configuration, output, not| {
                 input.for_each(|time, data| {
                     input_buffer.entry(*time.time()).or_default().append(data);
                     not.notify_at(time.retain(0));
                 });
+                configuration.for_each(|time, data| {
+                    viewport_stash.entry(*time.time()).or_default().append(data);
+                    not.notify_at(time.retain(0));
+                });
                 not.for_each(|time, _count, _not| {
+                    if let Some(configurations) = viewport_stash.remove(time.time()) {
+                        for configuration in configurations {
+                            if let Configuration::ScreenDimensions(width, height) = configuration {
+                                viewport = Some(RectI::new(
+                                    Vector::new(0, 0),
+                                    Vector::new(width as _, height as _),
+                                ));
+                            }
+                        }
+                    }
                     if let Some(updates) = input_buffer.remove(time.time()) {
                         output
                             .session(&time)
@@ -248,6 +266,24 @@ pub(super) fn build(
                                     .insert(key, rect)
                                     .into_iter()
                                     .flat_map(move |old_rect| compute_blanking(key, rect, old_rect))
+                                    .filter_map(|render| {
+                                        // Old rectangles can extend beyond a newly reduced viewport.
+                                        if let Render::Blank(key, origin, size) = render {
+                                            let clipped =
+                                                RectI::new(origin, size).intersection(viewport?)?;
+                                            (clipped.width() > 0 && clipped.height() > 0).then(
+                                                || {
+                                                    Render::Blank(
+                                                        key,
+                                                        clipped.origin(),
+                                                        clipped.size(),
+                                                    )
+                                                },
+                                            )
+                                        } else {
+                                            Some(render)
+                                        }
+                                    })
                                     .chain(Some(Render::Image(key, anchor, img)))
                             }));
                     }

@@ -336,7 +336,11 @@ fn small_viewport_restores_content(width: u32, height: u32) {
     graph.input.send(Configuration::Greeting("HELLO".into()));
     let frames = graph.advance(1);
     assert_in_bounds(&frames, width, height);
-    assert!(frames.iter().all(|(_, r)| !matches!(r, Ok(Render::Image(1, _, _)))));
+    assert!(
+        frames
+            .iter()
+            .all(|(_, r)| !matches!(r, Ok(Render::Image(1, _, _))))
+    );
     if width == 0 || height == 0 {
         assert!(frames.is_empty());
     } else {
@@ -358,7 +362,10 @@ fn small_viewport_restores_content(width: u32, height: u32) {
     );
     assert_eq!(
         image(&restored, 2).2.to_rgb8(),
-        renderer.render(["HELLO"].into_iter(), 12., (96, 18)).unwrap().to_rgb8()
+        renderer
+            .render(["HELLO"].into_iter(), 12., (96, 18))
+            .unwrap()
+            .to_rgb8()
     );
     assert!(graph.close().is_empty());
 }
@@ -406,8 +413,13 @@ fn viewport_shrink_clips_inferred_blanks() {
         ))));
     graph.input.send(Configuration::Greeting("HELLO".into()));
     assert_in_bounds(&graph.advance(1), 96, 80);
-    for (i, (width, height)) in [(96, 10), (96, 18), (96, 0), (0, 80)].into_iter().enumerate() {
-        graph.input.send(Configuration::ScreenDimensions(width, height));
+    for (i, (width, height)) in [(96, 10), (96, 18), (96, 0), (0, 80)]
+        .into_iter()
+        .enumerate()
+    {
+        graph
+            .input
+            .send(Configuration::ScreenDimensions(width, height));
         assert_in_bounds(&graph.advance(2 + i as u64 * 2), width, height);
         graph.input.send(Configuration::ScreenDimensions(96, 80));
         let restored = graph.advance(3 + i as u64 * 2);
