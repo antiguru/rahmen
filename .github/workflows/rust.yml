@@ -21,7 +21,7 @@ jobs:
           sudo apt-get install -y pkg-config libexiv2-dev libfontconfig1-dev python3-dev
 
       - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           components: rustfmt, clippy
 
