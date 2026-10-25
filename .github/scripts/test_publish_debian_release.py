@@ -50,6 +50,7 @@ class PublicationTests(unittest.TestCase):
             GITHUB_REF="refs/tags/rahmen-v0.2.0",
             RELEASE_TAG="rahmen-v0.2.0",
             REQUESTED_RELEASE_TAG="",
+            PACKAGE_VARIANT="trixie-armhf",
         )
 
     def write_checksum(self):
@@ -73,6 +74,31 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(calls[1][:3], ["release", "upload", "rahmen-v0.2.0"])
         self.assertEqual(set(calls[1][3:-1]), {str(self.package), str(self.checksum)})
         self.assertEqual(calls[1][-1], "--clobber")
+
+    def test_alternate_variant_selects_its_own_checksum_file(self):
+        original_checksum = self.checksum
+        self.checksum = self.assets / "SHA256SUMS-bookworm-armhf"
+        original_checksum.rename(self.checksum)
+        original_checksum.write_text("unrelated checksum file")
+        self.env["PACKAGE_VARIANT"] = "bookworm-armhf"
+        result = self.run_helper()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(str(self.checksum), self.calls()[-1])
+        self.assertNotIn(str(original_checksum), self.calls()[-1])
+
+    def test_variant_requires_its_own_checksum_file(self):
+        self.env["PACKAGE_VARIANT"] = "bookworm-armhf"
+        result = self.run_helper()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.calls(), [])
+
+    def test_invalid_variant_has_no_github_side_effects(self):
+        for variant in ("", "../trixie-armhf", "trixie/armhf", "trixie-armhf\ninjected"):
+            with self.subTest(variant=variant):
+                self.env["PACKAGE_VARIANT"] = variant
+                result = self.run_helper()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(self.calls(), [])
 
     def test_new_release_verifies_tag_and_generates_notes(self):
         self.env["GH_STATUS"] = "404"
