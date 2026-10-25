@@ -16,7 +16,12 @@ pub(super) fn select(
         info!("Reading from stdin");
         Box::new(ListProvider::new(stdin))
     } else if let Ok(file) = File::open(input) {
-        let reader = image::ImageReader::new(BufReader::new(file)).with_guessed_format()?;
+        let is_regular_file = file.metadata()?.is_file();
+        let mut reader = image::ImageReader::new(BufReader::new(file));
+        // Format probing seeks, so pipe-backed lists must bypass it.
+        if is_regular_file {
+            reader = reader.with_guessed_format()?;
+        }
         if reader.format().is_some() {
             info!("Reading single image {}", input);
             Box::new(SingleImage(Some(PathBuf::from(input))))
