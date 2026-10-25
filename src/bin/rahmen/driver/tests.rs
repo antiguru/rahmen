@@ -74,9 +74,7 @@ fn blocked_provider_does_not_block_clock_progress() {
             &mut input,
             &probe,
             &mut updates,
-            FontRenderer::with_font(
-                crate::font::load(None),
-            ),
+            FontRenderer::with_font(crate::font::load(None)),
             Options {
                 loading_marker: "◷",
                 show_time: true,
@@ -192,9 +190,7 @@ fn with_driver(
         &mut input,
         &probe,
         &mut updates,
-        FontRenderer::with_font(
-            crate::font::load(None),
-        ),
+        FontRenderer::with_font(crate::font::load(None)),
         Options {
             loading_marker: "◷",
             show_time: true,
@@ -317,9 +313,7 @@ fn early_image_waits_and_final_interval_starts_after_display_update() {
             display.update_cost = Duration::ZERO;
             // Observe EOF readiness through the disappearing marker, without advancing the deadline.
             display.clock.set(Duration::from_secs(4));
-            let mut renderer = FontRenderer::with_font(
-                crate::font::load(None),
-            );
+            let mut renderer = FontRenderer::with_font(crate::font::load(None));
             let ready_status = renderer
                 .render(["[FIXED] "].into_iter(), 12., (240, 18))
                 .unwrap();
