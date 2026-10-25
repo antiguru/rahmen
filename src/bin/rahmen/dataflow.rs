@@ -194,12 +194,13 @@ pub(super) fn build(
                                         Configuration::ScreenDimensions(width, height) => {
                                             Configuration::ScreenDimensions(
                                                 width,
-                                                height
-                                                    - (current_font_size.unwrap_or(0.)
+                                                height.saturating_sub(
+                                                    (current_font_size.unwrap_or(0.)
                                                         * current_font_canvas_vstretch
                                                             .unwrap_or(1.0))
                                                     .ceil()
                                                         as u32,
+                                                ),
                                             )
                                         }
                                         configuration => configuration,
