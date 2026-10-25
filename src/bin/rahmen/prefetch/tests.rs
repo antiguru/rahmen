@@ -23,20 +23,45 @@ impl Provider<PathBuf> for Controlled {
 }
 
 pub(super) fn formatter() -> StatusLineFormatter {
-    StatusLineFormatter::new(std::iter::once(Element {
-        exif_tags: vec!["Iptc.Application2.City".into()],
-        case_conversion: None, capitalize: None, replace: None,
-    }), None, ", ".into()).unwrap()
+    StatusLineFormatter::new(
+        std::iter::once(Element {
+            exif_tags: vec!["Iptc.Application2.City".into()],
+            case_conversion: None,
+            capitalize: None,
+            replace: None,
+        }),
+        None,
+        ", ".into(),
+    )
+    .unwrap()
 }
 fn fixture() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("rahmen-exiv2/testdata/tagged.jpg")
 }
-fn controlled() -> (Prefetch, mpsc::Sender<RahmenResult<Option<PathBuf>>>, mpsc::Receiver<()>, Arc<AtomicUsize>) {
+fn controlled() -> (
+    Prefetch,
+    mpsc::Sender<RahmenResult<Option<PathBuf>>>,
+    mpsc::Receiver<()>,
+    Arc<AtomicUsize>,
+) {
     let (tx, paths) = mpsc::channel();
     let (entered, rx) = mpsc::channel();
     let calls = Arc::new(AtomicUsize::new(0));
-    let loader = Loader::new(Box::new(Controlled { calls: calls.clone(), entered, paths }), formatter(), 16_000_000);
-    (Prefetch::new(loader, Duration::from_secs(10)), tx, rx, calls)
+    let loader = Loader::new(
+        Box::new(Controlled {
+            calls: calls.clone(),
+            entered,
+            paths,
+        }),
+        formatter(),
+        16_000_000,
+    );
+    (
+        Prefetch::new(loader, Duration::from_secs(10)),
+        tx,
+        rx,
+        calls,
+    )
 }
 fn wait_ready(p: &mut Prefetch) {
     let end = Instant::now() + Duration::from_secs(5);
@@ -54,15 +79,24 @@ fn eager_prefetch_has_one_slot_and_preserves_real_image_metadata() {
     p.presented(Duration::ZERO);
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     assert!(p.loading());
-    tx.send(Ok(Some(PathBuf::from("does-not-exist.jpg")))).unwrap();
+    tx.send(Ok(Some(PathBuf::from("does-not-exist.jpg"))))
+        .unwrap();
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     tx.send(Ok(Some(fixture()))).unwrap();
     wait_ready(&mut p);
     assert_eq!(calls.load(Ordering::SeqCst), 2, "failed decode must retry");
     assert!(p.take_due(Duration::from_millis(999)).is_none());
-    for _ in 0..100 { p.poll(); }
-    assert_eq!(calls.load(Ordering::SeqCst), 2, "ready slot must stop provider advancement");
-    let Outcome::Image(prepared) = p.take_due(Duration::from_secs(1)).unwrap() else { panic!("missing decoded image") };
+    for _ in 0..100 {
+        p.poll();
+    }
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        2,
+        "ready slot must stop provider advancement"
+    );
+    let Outcome::Image(prepared) = p.take_due(Duration::from_secs(1)).unwrap() else {
+        panic!("missing decoded image")
+    };
     assert_eq!((prepared.image.width(), prepared.image.height()), (4, 4));
     assert_eq!(prepared.status.as_deref(), Some("Zurich"));
     assert!(p.take_due(Duration::from_secs(99)).is_none());
@@ -70,8 +104,14 @@ fn eager_prefetch_has_one_slot_and_preserves_real_image_metadata() {
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     tx.send(Ok(None)).unwrap();
     wait_ready(&mut p);
-    assert!(p.take_due(Duration::from_secs(12)).is_none(), "delay starts after presentation");
-    assert!(matches!(p.take_due(Duration::from_secs(13)), Some(Outcome::Terminate)));
+    assert!(
+        p.take_due(Duration::from_secs(12)).is_none(),
+        "delay starts after presentation"
+    );
+    assert!(matches!(
+        p.take_due(Duration::from_secs(13)),
+        Some(Outcome::Terminate)
+    ));
 }
 
 #[test]
@@ -81,9 +121,17 @@ fn late_terminal_and_provider_error_wait_for_deadline() {
         p.presented(Duration::ZERO);
         entered.recv_timeout(Duration::from_secs(5)).unwrap();
         assert!(p.take_due(Duration::from_secs(2)).is_none());
-        tx.send(if error { Err(RahmenError::Retry) } else { Ok(None) }).unwrap();
+        tx.send(if error {
+            Err(RahmenError::Retry)
+        } else {
+            Ok(None)
+        })
+        .unwrap();
         wait_ready(&mut p);
-        assert!(matches!(p.take_due(Duration::from_secs(2)), Some(Outcome::Terminate)));
+        assert!(matches!(
+            p.take_due(Duration::from_secs(2)),
+            Some(Outcome::Terminate)
+        ));
     }
 }
 
@@ -93,9 +141,13 @@ fn close_during_blocked_provider_does_not_wait_or_retry() {
     p.presented(Duration::ZERO);
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     let (closed_tx, closed_rx) = mpsc::channel();
-    let thread = std::thread::spawn(move || { drop(p); closed_tx.send(()).unwrap(); });
+    let thread = std::thread::spawn(move || {
+        drop(p);
+        closed_tx.send(()).unwrap();
+    });
     let closed = closed_rx.recv_timeout(Duration::from_secs(1)).is_ok();
-    tx.send(Ok(Some(PathBuf::from("does-not-exist.jpg")))).unwrap();
+    tx.send(Ok(Some(PathBuf::from("does-not-exist.jpg"))))
+        .unwrap();
     thread.join().unwrap();
     assert!(closed, "UI close waited for provider");
     assert!(entered.recv_timeout(Duration::from_secs(5)).is_err());
@@ -111,27 +163,41 @@ fn zero_delay_still_requires_presentation_before_next_load() {
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     tx.send(Ok(Some(fixture()))).unwrap();
     wait_ready(&mut p);
-    assert!(matches!(p.take_due(Duration::from_secs(1)), Some(Outcome::Image(_))));
+    assert!(matches!(
+        p.take_due(Duration::from_secs(1)),
+        Some(Outcome::Image(_))
+    ));
     p.poll();
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     p.presented(Duration::from_secs(1));
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     tx.send(Ok(None)).unwrap();
     wait_ready(&mut p);
-    assert!(matches!(p.take_due(Duration::from_secs(1)), Some(Outcome::Terminate)));
+    assert!(matches!(
+        p.take_due(Duration::from_secs(1)),
+        Some(Outcome::Terminate)
+    ));
 }
 
 #[test]
 fn unexpected_worker_panic_is_a_terminal_outcome() {
     struct Panics;
     impl Provider<PathBuf> for Panics {
-        fn next_image(&mut self) -> RahmenResult<Option<PathBuf>> { panic!("controlled provider panic") }
+        fn next_image(&mut self) -> RahmenResult<Option<PathBuf>> {
+            panic!("controlled provider panic")
+        }
     }
-    let mut p = Prefetch::new(Loader::new(Box::new(Panics), formatter(), 16_000_000), Duration::ZERO);
+    let mut p = Prefetch::new(
+        Loader::new(Box::new(Panics), formatter(), 16_000_000),
+        Duration::ZERO,
+    );
     p.presented(Duration::ZERO);
     wait_ready(&mut p);
     assert!(p.take_due(Duration::from_millis(999)).is_none());
-    assert!(matches!(p.take_due(Duration::from_secs(1)), Some(Outcome::Terminate)));
+    assert!(matches!(
+        p.take_due(Duration::from_secs(1)),
+        Some(Outcome::Terminate)
+    ));
 }
 
 #[test]
@@ -154,7 +220,13 @@ fn close_during_decoder_read_stops_before_retry() {
     let dir = std::env::temp_dir().join(format!("rahmen-prefetch-decode-{}", std::process::id()));
     std::fs::create_dir(&dir).unwrap();
     let path = dir.join("blocked.png");
-    assert!(std::process::Command::new("mkfifo").arg(&path).status().unwrap().success());
+    assert!(
+        std::process::Command::new("mkfifo")
+            .arg(&path)
+            .status()
+            .unwrap()
+            .success()
+    );
     let (mut p, tx, entered, calls) = controlled();
     p.presented(Duration::ZERO);
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -170,7 +242,10 @@ fn close_during_decoder_read_stops_before_retry() {
     });
     opened_rx.recv_timeout(Duration::from_secs(5)).unwrap();
     let (closed_tx, closed_rx) = mpsc::channel();
-    let closer = std::thread::spawn(move || { drop(p); closed_tx.send(()).unwrap(); });
+    let closer = std::thread::spawn(move || {
+        drop(p);
+        closed_tx.send(()).unwrap();
+    });
     let closed = closed_rx.recv_timeout(Duration::from_secs(1)).is_ok();
     release_tx.send(()).unwrap();
     writer.join().unwrap();
@@ -179,4 +254,28 @@ fn close_during_decoder_read_stops_before_retry() {
     assert!(entered.recv_timeout(Duration::from_secs(5)).is_err());
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn late_image_is_available_immediately_and_metadata_failure_is_not_terminal() {
+    let _guard = METADATA.lock().unwrap();
+    let path = std::env::temp_dir().join(format!("rahmen-prefetch-{}.bmp", std::process::id()));
+    image::RgbImage::new(2, 2).save(&path).unwrap();
+    let (mut p, tx, entered, _) = controlled();
+    p.presented(Duration::ZERO);
+    entered.recv_timeout(Duration::from_secs(5)).unwrap();
+    assert!(p.take_due(Duration::from_secs(20)).is_none());
+    tx.send(Ok(Some(path.clone()))).unwrap();
+    wait_ready(&mut p);
+    let Some(Outcome::Image(prepared)) = p.take_due(Duration::from_secs(20)) else {
+        panic!("late result must be due")
+    };
+    assert_eq!((prepared.image.width(), prepared.image.height()), (2, 2));
+    assert!(
+        prepared.status.is_none(),
+        "unsupported metadata must retain previous status"
+    );
+    drop(p);
+    assert!(entered.recv_timeout(Duration::from_secs(5)).is_err());
+    std::fs::remove_file(path).unwrap();
 }

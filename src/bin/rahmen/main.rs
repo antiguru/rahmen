@@ -205,8 +205,13 @@ fn main() -> RahmenResult<()> {
     input_configuration.send(Configuration::Greeting(format!("Rahmen {}", VERSION)));
 
     let display_fn = driver::display_loop(
-        &mut worker, &mut input_configuration, &mut input_updates, &probe, output,
-        prefetch, move || start_time.elapsed(),
+        &mut worker,
+        &mut input_configuration,
+        &mut input_updates,
+        &probe,
+        output,
+        prefetch,
+        move || start_time.elapsed(),
     );
 
     match matches

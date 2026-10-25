@@ -166,14 +166,24 @@ fn completed_image_and_metadata_share_promotion_time() {
     let mut graph = Graph::new(false);
     graph.configure();
     graph.updates.send(Update::Image(Prepared {
-        image: Arc::new(DynamicImage::ImageRgb8(RgbImage::from_pixel(4, 4, Rgb([23, 45, 67])))),
+        image: Arc::new(DynamicImage::ImageRgb8(RgbImage::from_pixel(
+            4,
+            4,
+            Rgb([23, 45, 67]),
+        ))),
         status: Some("Zurich".into()),
     }));
     let frames = graph.advance(1);
     assert_eq!(frames.len(), 2);
     assert_eq!(*image(&frames, 1).0, Duration::ZERO);
     assert_eq!(*image(&frames, 2).0, Duration::ZERO);
-    assert!(image(&frames, 1).2.to_rgb8().pixels().all(|p| *p == Rgb([23, 45, 67])));
+    assert!(
+        image(&frames, 1)
+            .2
+            .to_rgb8()
+            .pixels()
+            .all(|p| *p == Rgb([23, 45, 67]))
+    );
     assert!(graph.close().is_empty());
 }
 
@@ -181,7 +191,10 @@ fn completed_image_and_metadata_share_promotion_time() {
 fn terminal_update_terminates_and_progresses() {
     let mut graph = Graph::new(false);
     graph.updates.send(Update::Terminate);
-    assert_eq!(graph.advance(1), vec![(Duration::ZERO, Err(RunControl::Terminate))]);
+    assert_eq!(
+        graph.advance(1),
+        vec![(Duration::ZERO, Err(RunControl::Terminate))]
+    );
     assert!(graph.close().is_empty());
 }
 
@@ -360,10 +373,22 @@ fn viewport_shrink_clips_inferred_blanks() {
 
 #[test]
 fn marker_placement_and_font_fallback() {
-    assert_eq!(status_text(Some("21:30:05"), "Zurich", true, loading_marker(true)), "[21:30:05] ◷ Zurich");
-    assert_eq!(status_text(None, "Zurich", true, loading_marker(true)), "◷ Zurich");
-    assert_eq!(status_text(Some("21:30:05"), "Zurich", true, loading_marker(false)), "[21:30:05] [loading] Zurich");
-    assert_eq!(status_text(None, "Zurich", false, loading_marker(false)), "Zurich");
+    assert_eq!(
+        status_text(Some("21:30:05"), "Zurich", true, loading_marker(true)),
+        "[21:30:05] ◷ Zurich"
+    );
+    assert_eq!(
+        status_text(None, "Zurich", true, loading_marker(true)),
+        "◷ Zurich"
+    );
+    assert_eq!(
+        status_text(Some("21:30:05"), "Zurich", true, loading_marker(false)),
+        "[21:30:05] [loading] Zurich"
+    );
+    assert_eq!(
+        status_text(None, "Zurich", false, loading_marker(false)),
+        "Zurich"
+    );
 }
 
 #[test]
@@ -379,12 +404,42 @@ fn simultaneous_loading_and_text_updates_keep_one_periodic_clock() {
     let pixels = image(&changed, 2).2.to_rgb8();
     for millis in [2000, 4000, 6000] {
         let frames = graph.advance(millis);
-        assert_eq!(frames.len(), 1, "periodic clock must have exactly one outstanding tick");
+        assert_eq!(
+            frames.len(),
+            1,
+            "periodic clock must have exactly one outstanding tick"
+        );
         assert_eq!(image(&frames, 2).2.to_rgb8(), pixels);
     }
     graph.updates.send(Update::Loading(false));
     let ready = graph.advance(6001);
     assert_ne!(image(&ready, 2).2.to_rgb8(), pixels);
     assert_eq!(graph.advance(8000).len(), 1);
+    graph.close();
+}
+
+#[test]
+fn missing_metadata_preserves_previous_status() {
+    let mut graph = Graph::new(false);
+    graph.configure();
+    graph.input.send(Configuration::Greeting("PREVIOUS".into()));
+    graph.advance(1);
+    graph.updates.send(Update::Image(Prepared {
+        image: Arc::new(DynamicImage::ImageRgb8(RgbImage::new(4, 4))),
+        status: None,
+    }));
+    let frames = graph.advance(2);
+    assert_eq!(frames.len(), 1);
+    assert!(matches!(frames[0].1, Ok(Render::Image(1, _, _))));
+    graph.input.send(Configuration::ScreenDimensions(80, 60));
+    let restored = graph.advance(3);
+    let mut renderer = font();
+    assert_eq!(
+        image(&restored, 2).2.to_rgb8(),
+        renderer
+            .render(["PREVIOUS"].into_iter(), 12., (80, 18))
+            .unwrap()
+            .to_rgb8()
+    );
     graph.close();
 }

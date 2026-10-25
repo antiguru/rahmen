@@ -11,14 +11,12 @@ use timely::container::CapacityContainerBuilder;
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::capture::Event;
 use timely::dataflow::operators::vec::Map;
-use timely::dataflow::operators::{
-    Capture, Concat, Notificator, Operator, Probe,
-};
+use timely::dataflow::operators::{Capture, Concat, Notificator, Operator, Probe};
 use timely::dataflow::{InputHandle, ProbeHandle};
 use timely::worker::Worker;
 
-pub(super) use super::prefetch::RunControl;
 use super::prefetch::Prepared;
+pub(super) use super::prefetch::RunControl;
 
 #[derive(Clone, Debug)]
 pub(super) enum Update {
@@ -73,56 +71,66 @@ pub(super) fn build(
         let mut current_text = None;
         let mut loading = false;
         let mut next_tick = show_time.then_some(Duration::ZERO);
-        let status_line_stream = updates.clone().flat_map(|update| match update {
-            Update::Image(prepared) => prepared.status.map(StatusUpdate::Text),
-            Update::Loading(loading) => Some(StatusUpdate::Loading(loading)),
-            Update::Terminate => None,
-        }).concat(configuration_stream.clone().flat_map(|c| match c {
-            Configuration::Greeting(text) => Some(StatusUpdate::Text(text)),
-            _ => None,
-        })).unary_notify(
-            Pipeline,
-            "Show time and loading",
-            next_tick,
-            move |input, output, not: &mut Notificator<Duration>| {
-                input.for_each(|cap, data| {
-                    stash.entry(*cap.time()).or_default().append(data);
-                    not.notify_at(cap.retain(0));
-                });
-                not.for_each(|cap, _, not| {
-                    if let Some(updates) = stash.remove(cap.time()) {
-                        for update in updates {
-                            match update {
-                                StatusUpdate::Text(text) => {
-                                    info!("Status line: {}", text);
-                                    current_text = Some(text);
+        let status_line_stream = updates
+            .clone()
+            .flat_map(|update| match update {
+                Update::Image(prepared) => prepared.status.map(StatusUpdate::Text),
+                Update::Loading(loading) => Some(StatusUpdate::Loading(loading)),
+                Update::Terminate => None,
+            })
+            .concat(configuration_stream.clone().flat_map(|c| match c {
+                Configuration::Greeting(text) => Some(StatusUpdate::Text(text)),
+                _ => None,
+            }))
+            .unary_notify(
+                Pipeline,
+                "Show time and loading",
+                next_tick,
+                move |input, output, not: &mut Notificator<Duration>| {
+                    input.for_each(|cap, data| {
+                        stash.entry(*cap.time()).or_default().append(data);
+                        not.notify_at(cap.retain(0));
+                    });
+                    not.for_each(|cap, _, not| {
+                        if let Some(updates) = stash.remove(cap.time()) {
+                            for update in updates {
+                                match update {
+                                    StatusUpdate::Text(text) => {
+                                        info!("Status line: {}", text);
+                                        current_text = Some(text);
+                                    }
+                                    StatusUpdate::Loading(value) => loading = value,
                                 }
-                                StatusUpdate::Loading(value) => loading = value,
                             }
                         }
-                    }
-                    let now = chrono::Local::now();
-                    // Only the outstanding periodic notification schedules another tick.
-                    // Text/loading notifications at the same time cannot multiply the clock.
-                    if next_tick == Some(*cap.time()) {
-                        next_tick = None;
-                        if !not.frontier(0).is_empty() {
-                            let delay = std::cmp::max(50, 1000 - now.timestamp_subsec_millis() as u64);
-                            let mut next = *cap.time() + Duration::from_millis(delay);
-                            while !not.frontier(0).less_equal(&next) {
-                                next += Duration::from_secs(1);
+                        let now = chrono::Local::now();
+                        // Only the outstanding periodic notification schedules another tick.
+                        // Text/loading notifications at the same time cannot multiply the clock.
+                        if next_tick == Some(*cap.time()) {
+                            next_tick = None;
+                            if !not.frontier(0).is_empty() {
+                                let delay =
+                                    std::cmp::max(50, 1000 - now.timestamp_subsec_millis() as u64);
+                                let mut next = *cap.time() + Duration::from_millis(delay);
+                                while !not.frontier(0).less_equal(&next) {
+                                    next += Duration::from_secs(1);
+                                }
+                                next_tick = Some(next);
+                                not.notify_at(cap.delayed(&next));
                             }
-                            next_tick = Some(next);
-                            not.notify_at(cap.delayed(&next));
                         }
-                    }
-                    if let Some(text) = &current_text {
-                        let timestamp = show_time.then(|| now.format(&time_format).to_string());
-                        output.session(&cap).give(status_text(timestamp.as_deref(), text, loading, loading_marker));
-                    }
-                });
-            },
-        );
+                        if let Some(text) = &current_text {
+                            let timestamp = show_time.then(|| now.format(&time_format).to_string());
+                            output.session(&cap).give(status_text(
+                                timestamp.as_deref(),
+                                text,
+                                loading,
+                                loading_marker,
+                            ));
+                        }
+                    });
+                },
+            );
         let status_line_stream =
             status_line_stream.map(|s| s.split('\n').map(Into::into).collect());
 
@@ -180,10 +188,11 @@ pub(super) fn build(
             )
         };
 
-        let img_stream = updates.flat_map(|update| match update {
-            Update::Image(prepared) => Some(prepared.image),
-            _ => None,
-        })
+        let img_stream = updates
+            .flat_map(|update| match update {
+                Update::Image(prepared) => Some(prepared.image),
+                _ => None,
+            })
             .concat(configuration_stream.clone().flat_map(|c| match c {
                 Configuration::Splash(img) => Some(img),
                 _ => None,
@@ -271,8 +280,14 @@ pub(super) fn loading_marker(has_glyph: bool) -> &'static str {
 }
 
 fn status_text(timestamp: Option<&str>, text: &str, loading: bool, marker: &str) -> String {
-    let prefix = timestamp.map(|time| format!("[{time}] ")).unwrap_or_default();
-    if loading { format!("{prefix}{marker} {text}") } else { format!("{prefix}{text}") }
+    let prefix = timestamp
+        .map(|time| format!("[{time}] "))
+        .unwrap_or_default();
+    if loading {
+        format!("{prefix}{marker} {text}")
+    } else {
+        format!("{prefix}{text}")
+    }
 }
 
 fn compute_blanking(key: usize, rect: RectI, old_rect: RectI) -> Vec<Render> {

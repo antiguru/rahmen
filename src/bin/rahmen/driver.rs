@@ -12,7 +12,10 @@ use timely::worker::Worker;
 
 pub(super) fn display_loop<'a>(
     worker: &'a mut Worker,
-    input_configuration: &'a mut InputHandle<Duration, CapacityContainerBuilder<Vec<Configuration>>>,
+    input_configuration: &'a mut InputHandle<
+        Duration,
+        CapacityContainerBuilder<Vec<Configuration>>,
+    >,
     input_updates: &'a mut InputHandle<Duration, CapacityContainerBuilder<Vec<Update>>>,
     probe: &'a ProbeHandle<Duration>,
     output: std::sync::mpsc::Receiver<Event<Duration, Vec<Result<Render, RunControl>>>>,

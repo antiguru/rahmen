@@ -40,28 +40,43 @@ impl Loader {
         std::thread::spawn(move || {
             while request_rx.recv().is_ok() {
                 let outcome = loop {
-                    if stopping.load(Ordering::Acquire) { return; }
+                    if stopping.load(Ordering::Acquire) {
+                        return;
+                    }
                     // obtain next path
                     let path = match fatal_err(provider.next_image()) {
                         Ok(path) => path,
                         Err(_) => break Outcome::Terminate,
                     };
-                    if stopping.load(Ordering::Acquire) { return; }
+                    if stopping.load(Ordering::Acquire) {
+                        return;
+                    }
                     // Load image
                     match suppress_err(load_image_from_path(&path, Some(buffer_max_size))) {
                         Ok(image) => {
-                            if stopping.load(Ordering::Acquire) { return; }
+                            if stopping.load(Ordering::Acquire) {
+                                return;
+                            }
                             // Ordinary metadata failures preserve the existing status line.
                             let status = formatter.format(&path).ok();
-                            break Outcome::Image(Prepared { image: Arc::new(image), status });
+                            break Outcome::Image(Prepared {
+                                image: Arc::new(image),
+                                status,
+                            });
                         }
                         Err(_) => continue,
                     }
                 };
-                if stopping.load(Ordering::Acquire) || result_tx.send(outcome).is_err() { return; }
+                if stopping.load(Ordering::Acquire) || result_tx.send(outcome).is_err() {
+                    return;
+                }
             }
         });
-        Self { requests, results, stop }
+        Self {
+            requests,
+            results,
+            stop,
+        }
     }
 }
 
@@ -88,10 +103,17 @@ pub(super) struct Prefetch {
 
 impl Prefetch {
     pub fn new(loader: Loader, delay: Duration) -> Self {
-        Self { loader, slot: Slot::Dormant, deadline: Duration::ZERO, delay }
+        Self {
+            loader,
+            slot: Slot::Dormant,
+            deadline: Duration::ZERO,
+            delay,
+        }
     }
 
-    pub fn loading(&self) -> bool { matches!(self.slot, Slot::Loading) }
+    pub fn loading(&self) -> bool {
+        matches!(self.slot, Slot::Loading)
+    }
 
     pub fn poll(&mut self) {
         if self.loading() {
@@ -107,9 +129,15 @@ impl Prefetch {
     }
 
     pub fn take_due(&mut self, now: Duration) -> Option<Outcome> {
-        if now < self.deadline || !matches!(self.slot, Slot::Ready(_)) { return None; }
-        let Slot::Ready(outcome) = std::mem::replace(&mut self.slot, Slot::Presenting) else { unreachable!() };
-        if matches!(outcome, Outcome::Terminate) { self.slot = Slot::Stopped; }
+        if now < self.deadline || !matches!(self.slot, Slot::Ready(_)) {
+            return None;
+        }
+        let Slot::Ready(outcome) = std::mem::replace(&mut self.slot, Slot::Presenting) else {
+            unreachable!()
+        };
+        if matches!(outcome, Outcome::Terminate) {
+            self.slot = Slot::Stopped;
+        }
         Some(outcome)
     }
 
