@@ -18,6 +18,63 @@ pub struct FramebufferDisplay {
     image: RgbaImage,
 }
 
+struct FramebufferLayout {
+    row_bytes: usize,
+    height: usize,
+    stride: usize,
+    start: usize,
+    image_bytes: usize,
+}
+
+fn invalid_layout() -> RahmenError {
+    std::io::Error::new(
+        std::io::ErrorKind::InvalidInput,
+        "Invalid framebuffer layout",
+    )
+    .into()
+}
+
+impl FramebufferLayout {
+    fn new(framebuffer: &Framebuffer) -> RahmenResult<Self> {
+        let var = &framebuffer.var_screen_info;
+        let stride = usize::try_from(framebuffer.fix_screen_info.line_length)
+            .map_err(|_| invalid_layout())?;
+        let width = usize::try_from(var.xres).map_err(|_| invalid_layout())?;
+        let height = usize::try_from(var.yres).map_err(|_| invalid_layout())?;
+        let virtual_width = usize::try_from(var.xres_virtual).map_err(|_| invalid_layout())?;
+        let virtual_height = usize::try_from(var.yres_virtual).map_err(|_| invalid_layout())?;
+        let x = usize::try_from(var.xoffset).map_err(|_| invalid_layout())?;
+        let y = usize::try_from(var.yoffset).map_err(|_| invalid_layout())?;
+        let row_bytes = width.checked_mul(4).ok_or_else(invalid_layout)?;
+        let image_bytes = row_bytes.checked_mul(height).ok_or_else(invalid_layout)?;
+        let virtual_row_bytes = virtual_width.checked_mul(4).ok_or_else(invalid_layout)?;
+        let mapped_bytes = stride
+            .checked_mul(virtual_height)
+            .ok_or_else(invalid_layout)?;
+        if var.bits_per_pixel != 32
+            || width == 0
+            || height == 0
+            || x.checked_add(width).ok_or_else(invalid_layout)? > virtual_width
+            || y.checked_add(height).ok_or_else(invalid_layout)? > virtual_height
+            || virtual_row_bytes > stride
+            || mapped_bytes > framebuffer.frame.len()
+        {
+            return Err(invalid_layout());
+        }
+        let start = y
+            .checked_mul(stride)
+            .and_then(|offset| x.checked_mul(4).and_then(|x| offset.checked_add(x)))
+            .ok_or_else(invalid_layout)?;
+        Ok(Self {
+            row_bytes,
+            height,
+            stride,
+            start,
+            image_bytes,
+        })
+    }
+}
+
 impl FramebufferDisplay {
     /// Crate a new framebuffer
     pub fn new(mut framebuffer: Framebuffer) -> Self {
@@ -38,13 +95,15 @@ impl FramebufferDisplay {
     }
 
     fn match_dimensions(&mut self) -> RahmenResult<()> {
+        let layout = FramebufferLayout::new(&self.framebuffer)?;
         if self.image.dimensions() != self.dimensions() {
-            self.image = RgbaImage::from_raw(
-                self.dimensions().0,
-                self.dimensions().1,
-                vec![0u8; (self.dimensions().0 * self.dimensions().1 * 4) as usize],
-            )
-            .ok_or(RahmenError::Terminate)?;
+            let mut pixels = Vec::new();
+            pixels
+                .try_reserve_exact(layout.image_bytes)
+                .map_err(|_| invalid_layout())?;
+            pixels.resize(layout.image_bytes, 0);
+            self.image = RgbaImage::from_raw(self.dimensions().0, self.dimensions().1, pixels)
+                .ok_or_else(invalid_layout)?;
         }
         Ok(())
     }
@@ -84,10 +143,19 @@ impl Display for FramebufferDisplay {
     }
 
     fn update(&mut self) -> RahmenResult<()> {
-        self.framebuffer
-            .frame
-            .as_mut()
-            .copy_from_slice(self.image.as_raw());
+        let layout = FramebufferLayout::new(&self.framebuffer)?;
+        if self.image.dimensions() != self.dimensions()
+            || self.image.as_raw().len() != layout.image_bytes
+        {
+            return Err(invalid_layout());
+        }
+        // The validated virtual geometry bounds every row before any bytes are written.
+        for row in 0..layout.height {
+            let source = row * layout.row_bytes;
+            let target = layout.start + row * layout.stride;
+            self.framebuffer.frame[target..target + layout.row_bytes]
+                .copy_from_slice(&self.image.as_raw()[source..source + layout.row_bytes]);
+        }
         Ok(())
     }
 }
