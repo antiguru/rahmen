@@ -104,6 +104,7 @@ Rahmen targets the Rust 2024 edition and requires Rust 1.85 or newer.
 ### Debian packages for Raspberry Pi Zero 2
 
 The Debian armhf workflow builds packages on Debian Trixie for the Raspberry Pi Zero 2.
+The build image layers cache dependency installation and cargo-deb between workflow runs.
 It runs for pull requests targeting `master`, pushes to `master`, and manual workflow dispatches.
 Download the `rahmen-trixie-armhf` artifact from the workflow run's summary page in GitHub Actions.
 Extract the downloaded artifact and install the package on the Pi as root with `apt install ./filename.deb`, replacing `filename.deb` with the package filename.
