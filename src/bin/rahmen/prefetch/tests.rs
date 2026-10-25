@@ -38,12 +38,14 @@ pub(super) fn formatter() -> StatusLineFormatter {
 fn fixture() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("rahmen-exiv2/testdata/tagged.jpg")
 }
-fn controlled() -> (
+type ControlledPrefetch = (
     Prefetch,
     mpsc::Sender<RahmenResult<Option<PathBuf>>>,
     mpsc::Receiver<()>,
     Arc<AtomicUsize>,
-) {
+);
+
+fn controlled() -> ControlledPrefetch {
     let (tx, paths) = mpsc::channel();
     let (entered, rx) = mpsc::channel();
     let calls = Arc::new(AtomicUsize::new(0));
