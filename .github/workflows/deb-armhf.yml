@@ -15,7 +15,6 @@ on:
         default: ""
         type: string
 
-
 permissions:
   contents: read
 
@@ -25,7 +24,7 @@ jobs:
     timeout-minutes: 60
     outputs:
       release_tag: ${{ steps.version.outputs.release_tag }}
-      version: ${{ steps.version.outputs.version }}
+      source_sha: ${{ steps.version.outputs.source_sha }}
     steps:
       - name: Resolve checkout ref
         id: source
@@ -55,7 +54,9 @@ jobs:
         if: steps.source.outputs.release_tag != ''
         env:
           RELEASE_TAG: ${{ steps.source.outputs.release_tag }}
-        run: python3 .github/scripts/publish_debian_release.py validate
+        run: |
+          python3 .github/scripts/publish_debian_release.py validate
+          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-qemu-action@v4
         with:
           platforms: arm
@@ -115,7 +116,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: refs/tags/${{ needs.package.outputs.release_tag }}
+          ref: ${{ needs.package.outputs.source_sha }}
           persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
