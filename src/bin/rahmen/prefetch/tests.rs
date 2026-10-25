@@ -256,17 +256,36 @@ fn close_during_decoder_read_stops_before_retry() {
     std::fs::remove_dir_all(dir).unwrap();
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn late_image_is_available_immediately_and_metadata_failure_is_not_terminal() {
     let _guard = METADATA.lock().unwrap();
-    let path = std::env::temp_dir().join(format!("rahmen-prefetch-{}.bmp", std::process::id()));
-    image::RgbImage::new(2, 2).save(&path).unwrap();
+    use std::io::{Cursor, Write};
+    let path = std::env::temp_dir().join(format!("rahmen-prefetch-{}.png", std::process::id()));
+    assert!(
+        std::process::Command::new("mkfifo")
+            .arg(&path)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let mut encoded = Cursor::new(Vec::new());
+    image::RgbImage::new(2, 2)
+        .write_to(&mut encoded, image::ImageFormat::Png)
+        .unwrap();
     let (mut p, tx, entered, _) = controlled();
     p.presented(Duration::ZERO);
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
     assert!(p.take_due(Duration::from_secs(20)).is_none());
     tx.send(Ok(Some(path.clone()))).unwrap();
+    let writer = std::thread::spawn(move || {
+        let mut fifo = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+        // The decoder has its file descriptor, but metadata must open the path again.
+        std::fs::remove_file(path).unwrap();
+        fifo.write_all(encoded.get_ref()).unwrap();
+    });
     wait_ready(&mut p);
+    writer.join().unwrap();
     let Some(Outcome::Image(prepared)) = p.take_due(Duration::from_secs(20)) else {
         panic!("late result must be due")
     };
@@ -277,5 +296,4 @@ fn late_image_is_available_immediately_and_metadata_failure_is_not_terminal() {
     );
     drop(p);
     assert!(entered.recv_timeout(Duration::from_secs(5)).is_err());
-    std::fs::remove_file(path).unwrap();
 }
