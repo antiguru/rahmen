@@ -1,6 +1,6 @@
 use super::*;
 use framebuffer::{FixScreeninfo, VarScreeninfo};
-use memmap::MmapMut;
+use memmap2::MmapMut;
 use std::fs::File;
 
 fn display(

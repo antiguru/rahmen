@@ -77,4 +77,4 @@ assets = [
 ]
 
 [dev-dependencies]
-memmap = "0.7"
+memmap2 = "0.9"
