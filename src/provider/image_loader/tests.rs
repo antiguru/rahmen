@@ -28,7 +28,12 @@ impl Drop for Fixture {
 #[test]
 fn jpeg_selects_largest_scale_using_rgb_bytes() {
     let file = Fixture::new(100, 100, ImageFormat::Jpeg);
-    for (budget, dimensions) in [(30_000, (100, 100)), (16_000, (63, 63)), (7_500, (50, 50)), (507, (13, 13))] {
+    for (budget, dimensions) in [
+        (30_000, (100, 100)),
+        (16_000, (63, 63)),
+        (7_500, (50, 50)),
+        (507, (13, 13)),
+    ] {
         let decoded = load_image_from_path(&file.0, Some(budget)).unwrap();
         assert_eq!(decoded.dimensions(), dimensions);
         assert!(decoded.as_bytes().len() <= budget);
@@ -49,7 +54,10 @@ fn jpeg_rounds_nonmultiple_dimensions_before_counting_bytes() {
 fn jpeg_rejects_budgets_below_smallest_scale() {
     let file = Fixture::new(100, 100, ImageFormat::Jpeg);
     for budget in [0, 1, 2, 506] {
-        assert!(load_image_from_path(&file.0, Some(budget)).is_err(), "budget {budget}");
+        assert!(
+            load_image_from_path(&file.0, Some(budget)).is_err(),
+            "budget {budget}"
+        );
     }
 }
 
@@ -57,9 +65,12 @@ fn jpeg_rejects_budgets_below_smallest_scale() {
 fn png_rejects_oversized_raster() {
     let file = Fixture::new(100, 100, ImageFormat::Png);
     for budget in [0, 1, 1_000, 29_999] {
-        assert!(load_image_from_path(&file.0, Some(budget)).is_err(), "budget {budget}");
+        assert!(
+            load_image_from_path(&file.0, Some(budget)).is_err(),
+            "budget {budget}"
+        );
     }
-    let decoded = load_image_from_path(&file.0, Some(60_000)).unwrap();
+    let decoded = load_image_from_path(&file.0, Some(30_000)).unwrap();
     assert_eq!(decoded.as_bytes().len(), 30_000);
 }
 

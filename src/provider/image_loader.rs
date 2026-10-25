@@ -42,7 +42,9 @@ fn load_jpeg<P: AsRef<Path>>(path: P, max_size: Option<usize>) -> RahmenResult<D
                     .checked_mul(usize::from(scale))
                     .zip(d.height().checked_mul(usize::from(scale)));
                 dimensions
-                    .and_then(|(width, height)| pixel_bytes(width.div_ceil(8), height.div_ceil(8), 3))
+                    .and_then(|(width, height)| {
+                        pixel_bytes(width.div_ceil(8), height.div_ceil(8), 3)
+                    })
                     .is_some_and(|bytes| bytes <= budget)
             })
             .ok_or_else(budget_error)?;
