@@ -91,3 +91,6 @@ impl Display for FramebufferDisplay {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

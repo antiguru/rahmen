@@ -1367,6 +1367,7 @@ dependencies = [
  "image",
  "itertools 0.15.0",
  "log",
+ "memmap",
  "minifb",
  "mozjpeg",
  "pathfinder_geometry",

@@ -75,3 +75,6 @@ assets = [
     ["rahmen.toml", "etc/", "644"],
     ["target/release/rahmen", "usr/bin/", "755"],
 ]
+
+[dev-dependencies]
+memmap = "0.7"
