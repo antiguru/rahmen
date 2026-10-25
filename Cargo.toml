@@ -28,7 +28,7 @@ default = []
 name = "rahmen"
 
 [profile.release]
-debug = true
+debug = "line-tables-only"
 
 [dependencies]
 chrono = "0.4"

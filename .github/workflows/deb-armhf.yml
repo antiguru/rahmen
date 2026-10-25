@@ -1,0 +1,154 @@
+name: Debian armhf
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+    tags: ["v*", "rahmen-v*"]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Existing Rahmen version tag to package and publish
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package ${{ matrix.variant }}
+    strategy:
+      matrix: &package-variants
+        include:
+          - variant: trixie-armhf
+            platform: linux/arm/v7
+            debian_arch: armhf
+            qemu_platform: arm
+            cache_scope: rahmen-deb-armhf
+    env:
+      PACKAGE_VARIANT: ${{ matrix.variant }}
+      PACKAGE_PLATFORM: ${{ matrix.platform }}
+      DEBIAN_ARCH: ${{ matrix.debian_arch }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      release_tag: ${{ steps.version.outputs.release_tag }}
+      source_sha: ${{ steps.version.outputs.source_sha }}
+    steps:
+      - name: Resolve checkout ref
+        id: source
+        env:
+          REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          release_tag="$REQUESTED_RELEASE_TAG"
+          if [ -z "$release_tag" ] && [ "$GITHUB_REF_TYPE" = tag ]; then
+            release_tag="$GITHUB_REF_NAME"
+          fi
+          if [ -n "$release_tag" ]; then
+            if [[ ! "$release_tag" =~ ^(rahmen-)?v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.+-]+)?$ ]]; then
+              echo "Invalid Rahmen release tag" >&2
+              exit 1
+            fi
+            echo "ref=refs/tags/$release_tag" >> "$GITHUB_OUTPUT"
+            echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          ref: ${{ steps.source.outputs.ref }}
+      - name: Validate release version
+        id: version
+        if: steps.source.outputs.release_tag != ''
+        env:
+          RELEASE_TAG: ${{ steps.source.outputs.release_tag }}
+        run: |
+          python3 .github/scripts/publish_debian_release.py validate
+          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Test release publication guards
+        run: python3 -B .github/scripts/test_publish_debian_release.py
+      - uses: docker/setup-qemu-action@v4
+        with:
+          platforms: ${{ matrix.qemu_platform }}
+      - uses: docker/setup-buildx-action@v4
+      - name: Build Debian packaging image
+        uses: docker/build-push-action@v7
+        with:
+          context: .github/docker/deb-armhf
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: rahmen-deb-${{ matrix.variant }}:ci
+          cache-from: type=gha,scope=${{ matrix.cache_scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.cache_scope }}
+      - name: Build and verify Debian package
+        run: |
+          docker run --rm --platform "$PACKAGE_PLATFORM" \
+            --volume "$GITHUB_WORKSPACE:/work" \
+            --workdir /work \
+            --env CARGO_INCREMENTAL=0 \
+            --env CARGO_TARGET_DIR="/work/target/build/$PACKAGE_VARIANT" \
+            --env PACKAGE_VARIANT \
+            --env DEBIAN_ARCH \
+            "rahmen-deb-$PACKAGE_VARIANT:ci" bash -euc '
+              output_dir="/work/target/debian/$PACKAGE_VARIANT"
+              mkdir -p "$output_dir"
+              cargo deb --locked --output "$output_dir/"
+
+              found=0
+              for package in "$output_dir"/*.deb; do
+                [ -f "$package" ] || continue
+                found=1
+                dpkg-deb --field "$package" Package Version Architecture Depends
+                if [ "$(dpkg-deb --field "$package" Architecture)" != "$DEBIAN_ARCH" ]; then
+                  echo "Unexpected package architecture: $package" >&2
+                  exit 1
+                fi
+              done
+              if [ "$found" -eq 0 ]; then
+                echo "No Debian package was produced" >&2
+                exit 1
+              fi
+              cd "$output_dir"
+              sha256sum -- *.deb > "SHA256SUMS-$PACKAGE_VARIANT"
+            '
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rahmen-${{ matrix.variant }}
+          path: |
+            target/debian/${{ matrix.variant }}/*.deb
+            target/debian/${{ matrix.variant }}/SHA256SUMS-${{ matrix.variant }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish ${{ matrix.variant }}
+    strategy:
+      matrix: *package-variants
+    env:
+      PACKAGE_VARIANT: ${{ matrix.variant }}
+    needs: package
+    if: >-
+      needs.package.outputs.release_tag != '' &&
+      !startsWith(github.event_name, 'pull_request')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.package.outputs.source_sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: rahmen-${{ matrix.variant }}
+          path: release-assets/${{ matrix.variant }}
+      - name: Publish verified Debian assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.package.outputs.release_tag }}
+          REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: python3 .github/scripts/publish_debian_release.py publish "release-assets/$PACKAGE_VARIANT"
