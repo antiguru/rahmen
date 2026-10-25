@@ -107,7 +107,13 @@ The Debian armhf workflow builds packages on Debian Trixie for the Raspberry Pi 
 The build image layers cache dependency installation and cargo-deb between workflow runs.
 It runs for pull requests targeting `master`, pushes to `master`, and manual workflow dispatches.
 Download the `rahmen-trixie-armhf` artifact from the workflow run's summary page in GitHub Actions.
-Extract the downloaded artifact and install the package on the Pi as root with `apt install ./filename.deb`, replacing `filename.deb` with the package filename.
+Tags named `vVERSION` or `rahmen-vVERSION` also publish packages on [GitHub Releases](https://github.com/antiguru/rahmen/releases) when `VERSION` matches the root package version.
+Release-plz calls the packaging workflow directly for Rahmen releases, including its `rahmen-vVERSION` tags.
+
+Download the `.deb` files and `SHA256SUMS-trixie-armhf` from a release, or extract the workflow artifact into one directory.
+Run `sha256sum --check SHA256SUMS-trixie-armhf` in that directory before installing.
+These checksums detect changed downloads, but do not authenticate the publisher, and the packages are not cryptographically signed.
+Install the package on the Pi as root with `apt install ./filename.deb`, replacing `filename.deb` with the package filename.
 
 ## Running
 

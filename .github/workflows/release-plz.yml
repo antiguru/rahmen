@@ -17,6 +17,8 @@ jobs:
   release-plz:
     name: Release-plz
     runs-on: ubuntu-latest
+    outputs:
+      release_tags: ${{ steps.tags.outputs.release_tags }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -31,6 +33,31 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v2
       - name: Run release-plz
+        id: release
         uses: MarcoIeni/release-plz-action@v0.5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Select Rahmen release tags
+        id: tags
+        env:
+          RELEASES: ${{ steps.release.outputs.releases }}
+          RELEASES_CREATED: ${{ steps.release.outputs.releases_created }}
+        run: |
+          tags='[]'
+          if [ "$RELEASES_CREATED" = true ]; then
+            tags=$(jq -ce '[.[] | select(.package_name == "rahmen") | .tag] | unique' <<< "$RELEASES")
+          fi
+          echo "release_tags=$tags" >> "$GITHUB_OUTPUT"
+
+  # GITHUB_TOKEN-created tag pushes do not start another workflow.
+  debian-release:
+    needs: release-plz
+    if: needs.release-plz.outputs.release_tags != '[]'
+    strategy:
+      matrix:
+        tag: ${{ fromJSON(needs.release-plz.outputs.release_tags) }}
+    uses: ./.github/workflows/deb-armhf.yml
+    with:
+      release_tag: ${{ matrix.tag }}
+    permissions:
+      contents: write
