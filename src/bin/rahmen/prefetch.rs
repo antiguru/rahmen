@@ -162,4 +162,4 @@ fn suppress_err<T>(result: RahmenResult<T>) -> RunResult<T> {
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;

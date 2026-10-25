@@ -453,6 +453,23 @@ via `dlopen` and therefore needs no extra build-time system libraries.
 The `minifb` feature is not enabled by default. Pass `--features minifb` to `cargo build` to enable
 it, then run with `--display minifb`.
 
+## Background image preparation
+
+Rahmen prepares the next image on one background worker after presenting the current image.
+The prefetch slot holds either one in-flight load or one ready outcome, while the current image remains retained.
+Early results wait for the display interval, late results appear when ready, and end-of-input waits for the final interval.
+The interval starts after display update succeeds, so clock and viewport redraws do not restart it.
+
+A static `◷` after the timestamp indicates loading, with `[loading]` used when the selected font lacks that glyph.
+When timestamps are disabled, the marker appears at the start of the status line, and it disappears when preparation finishes.
+Provider reads, decoding, and metadata formatting run on the worker, while resizing and font rasterization still run on the UI thread.
+Closing the UI signals cancellation without waiting for an in-flight provider or decoder call to finish.
+
+The pixel budget applies separately to each decoded source image, rather than to total process memory.
+The retained source and one prefetched source can together consume up to twice that budget in decoded pixels.
+Decoder working memory, resized images, text canvases, display buffers, and the splash image require additional memory.
+A zero-area viewport retains content and advances slideshow deadlines without issuing display operations, allowing end-of-input to complete.
+
 ## License
 
 Rahmen is licensed under the terms of the GNU General Public License version 3. See the [LICENSE](LICENSE) file for a
