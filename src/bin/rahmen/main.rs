@@ -2,6 +2,7 @@ mod dataflow;
 mod driver;
 mod font;
 mod input;
+mod prefetch;
 
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -138,6 +139,7 @@ fn main() -> RahmenResult<()> {
         .expect("Missing buffer_max_size");
 
     let font = font::load(matches.get_one::<String>("font").map(String::as_str));
+    let loading_marker = dataflow::loading_marker(font.glyph_for_char('◷').is_some());
     let font_renderer = FontRenderer::with_font(font);
 
     let duration_millis = (matches
@@ -172,15 +174,17 @@ fn main() -> RahmenResult<()> {
     // to gather information about progress
     let probe = ProbeHandle::new();
 
+    let mut input_updates = InputHandle::new();
+    let loader = prefetch::Loader::new(provider, status_line_formatter, buffer_max_size);
+    let prefetch = prefetch::Prefetch::new(loader, delay);
     let output = dataflow::build(
         &mut worker,
         &mut input_configuration,
         &probe,
-        provider,
-        status_line_formatter,
+        &mut input_updates,
         font_renderer,
         dataflow::Options {
-            buffer_max_size,
+            loading_marker,
             show_time,
             time_format,
         },
@@ -201,7 +205,8 @@ fn main() -> RahmenResult<()> {
     input_configuration.send(Configuration::Greeting(format!("Rahmen {}", VERSION)));
 
     let display_fn = driver::display_loop(
-        &mut worker, &mut input_configuration, &probe, output, start_time, delay,
+        &mut worker, &mut input_configuration, &mut input_updates, &probe, output,
+        prefetch, move || start_time.elapsed(),
     );
 
     match matches
@@ -232,6 +237,7 @@ fn main() -> RahmenResult<()> {
     };
 
     input_configuration.close();
+    input_updates.close();
     while worker.step() {}
     Ok(())
 }

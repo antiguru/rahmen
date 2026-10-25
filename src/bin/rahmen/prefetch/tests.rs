@@ -63,8 +63,8 @@ fn eager_prefetch_has_one_slot_and_preserves_real_image_metadata() {
     for _ in 0..100 { p.poll(); }
     assert_eq!(calls.load(Ordering::SeqCst), 2, "ready slot must stop provider advancement");
     let Outcome::Image(prepared) = p.take_due(Duration::from_secs(1)).unwrap() else { panic!("missing decoded image") };
-    assert_eq!((prepared.image.width(), prepared.image.height()), (1, 1));
-    assert_eq!(prepared.status.as_deref(), Some("Test City"));
+    assert_eq!((prepared.image.width(), prepared.image.height()), (4, 4));
+    assert_eq!(prepared.status.as_deref(), Some("Zurich"));
     assert!(p.take_due(Duration::from_secs(99)).is_none());
     p.presented(Duration::from_secs(3));
     entered.recv_timeout(Duration::from_secs(5)).unwrap();
