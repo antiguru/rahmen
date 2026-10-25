@@ -69,7 +69,7 @@ fn main() -> RahmenResult<()> {
         .arg(
             Arg::new("font")
                 .long("font")
-                .default_value("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"),
+                .default_value("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
         )
         .arg(
             Arg::new("font_size")

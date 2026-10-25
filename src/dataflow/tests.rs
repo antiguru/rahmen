@@ -13,7 +13,7 @@ type Frames = Rc<RefCell<Vec<(u64, usize, Vector, Arc<DynamicImage>)>>>;
 fn font() -> FontRenderer {
     FontRenderer::with_font(
         SystemSource::new()
-            .select_best_match(&[FamilyName::Monospace], &Properties::new())
+            .select_best_match(&[FamilyName::SansSerif], &Properties::new())
             .unwrap()
             .load()
             .unwrap(),

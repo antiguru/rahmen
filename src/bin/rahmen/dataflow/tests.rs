@@ -20,7 +20,7 @@ type Frame = (Duration, RunResult<Render>);
 fn font() -> FontRenderer {
     FontRenderer::with_font(
         SystemSource::new()
-            .select_best_match(&[FamilyName::Monospace], &Properties::new())
+            .select_best_match(&[FamilyName::SansSerif], &Properties::new())
             .unwrap()
             .load()
             .unwrap(),

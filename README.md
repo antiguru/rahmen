@@ -153,7 +153,7 @@ The font size to use in px.
 
 ```shell
         --font <font>
-            [default: /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf]
+            [default: /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf]
 ```
 
 Rahmen will display information from the image's metadata (see above) in a single line below the image in the given
