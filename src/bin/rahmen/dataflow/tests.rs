@@ -1,19 +1,9 @@
 use super::*;
 use font_kit::{family_name::FamilyName, properties::Properties, source::SystemSource};
 use image::{Rgb, RgbImage};
-use rahmen::config::Element;
-use rahmen::errors::RahmenError;
-use std::cell::Cell;
-use std::collections::VecDeque;
-use std::rc::Rc;
-use std::sync::Mutex;
 use std::time::Instant;
 use timely::communication::Allocator;
 use timely::worker::Config;
-
-// Exiv2 initializes native process-wide metadata state. Keep fixture access serial
-// within this binary while the other headless graph tests remain parallel.
-static METADATA: Mutex<()> = Mutex::new(());
 
 type Frame = (Duration, RunResult<Render>);
 
@@ -27,65 +17,31 @@ fn font() -> FontRenderer {
     )
 }
 
-struct Paths {
-    paths: VecDeque<PathBuf>,
-    error: bool,
-    calls: Rc<Cell<usize>>,
-}
-
-impl Provider<PathBuf> for Paths {
-    fn next_image(&mut self) -> RahmenResult<Option<PathBuf>> {
-        self.calls.set(self.calls.get() + 1);
-        if self.error {
-            Err(RahmenError::Retry)
-        } else {
-            Ok(self.paths.pop_front())
-        }
-    }
-}
-
 struct Graph {
     worker: Worker,
     input: InputHandle<Duration, CapacityContainerBuilder<Vec<Configuration>>>,
     probe: ProbeHandle<Duration>,
     output: std::sync::mpsc::Receiver<Event<Duration, Vec<RunResult<Render>>>>,
-    calls: Rc<Cell<usize>>,
+    updates: InputHandle<Duration, CapacityContainerBuilder<Vec<Update>>>,
 }
 
 impl Graph {
-    fn new(paths: Vec<PathBuf>, error: bool, show_time: bool) -> Self {
+    fn new(show_time: bool) -> Self {
         let allocator =
             Allocator::Thread(timely::communication::allocator::thread::Thread::default());
         let mut worker = Worker::new(Config::default(), allocator, Some(Instant::now()));
         let mut input = InputHandle::new();
         let probe = ProbeHandle::new();
-        let calls = Rc::new(Cell::new(0));
-        let provider = Box::new(Paths {
-            paths: paths.into(),
-            error,
-            calls: calls.clone(),
-        });
-        let formatter = StatusLineFormatter::new(
-            std::iter::once(Element {
-                exif_tags: vec!["Iptc.Application2.City".into()],
-                case_conversion: None,
-                capitalize: None,
-                replace: None,
-            }),
-            None,
-            ", ".into(),
-        )
-        .unwrap();
+        let mut updates = InputHandle::new();
         let font = font();
         let output = build(
             &mut worker,
             &mut input,
             &probe,
-            provider,
-            formatter,
+            &mut updates,
             font,
             Options {
-                buffer_max_size: 16_000_000,
+                loading_marker: "◷",
                 show_time,
                 time_format: "FIXED".into(),
             },
@@ -95,7 +51,7 @@ impl Graph {
             input,
             probe,
             output,
-            calls,
+            updates,
         }
     }
 
@@ -121,6 +77,7 @@ impl Graph {
     fn advance(&mut self, millis: u64) -> Vec<Frame> {
         let time = Duration::from_millis(millis);
         self.input.advance_to(time);
+        self.updates.advance_to(time);
         for _ in 0..10_000 {
             if !self.probe.less_than(&time) {
                 return self.drain();
@@ -132,6 +89,7 @@ impl Graph {
 
     fn close(mut self) -> Vec<Frame> {
         std::mem::take(&mut self.input).close();
+        std::mem::take(&mut self.updates).close();
         for _ in 0..10_000 {
             if !self.worker.step() {
                 assert!(self.probe.done());
@@ -154,7 +112,7 @@ fn image(frames: &[Frame], key: usize) -> (&Duration, Vector, &DynamicImage) {
 
 #[test]
 fn splash_greeting_and_configuration_only_updates() {
-    let mut graph = Graph::new(vec![], false, false);
+    let mut graph = Graph::new(false);
     graph.configure();
     graph
         .input
@@ -204,70 +162,45 @@ fn splash_greeting_and_configuration_only_updates() {
 }
 
 #[test]
-fn suppressed_load_retries_within_one_tick_and_renders_real_metadata() {
-    let _guard = METADATA.lock().unwrap();
-    let fixture =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("rahmen-exiv2/testdata/tagged.jpg");
-    let mut graph = Graph::new(
-        vec![PathBuf::from("does-not-exist.jpg"), fixture],
-        false,
-        false,
-    );
+fn completed_image_and_metadata_share_promotion_time() {
+    let mut graph = Graph::new(false);
     graph.configure();
-    graph.input.send(Configuration::Tick);
+    graph.updates.send(Update::Image(Prepared {
+        image: Arc::new(DynamicImage::ImageRgb8(RgbImage::from_pixel(
+            4,
+            4,
+            Rgb([23, 45, 67]),
+        ))),
+        status: Some("Zurich".into()),
+    }));
     let frames = graph.advance(1);
-    assert_eq!(
-        graph.calls.get(),
-        2,
-        "one outer tick must retry the suppressed load"
-    );
-    assert_eq!(
-        frames.len(),
-        2,
-        "suppressed errors stay inside the feedback loop"
-    );
+    assert_eq!(frames.len(), 2);
+    assert_eq!(*image(&frames, 1).0, Duration::ZERO);
+    assert_eq!(*image(&frames, 2).0, Duration::ZERO);
     assert!(
-        frames
-            .iter()
-            .all(|(t, r)| *t == Duration::ZERO && r.is_ok())
-    );
-    assert_eq!(
-        (image(&frames, 1).1, image(&frames, 1).2.dimensions()),
-        (Vector::new(17, 0), (62, 62))
-    );
-    assert!(
-        image(&frames, 2)
+        image(&frames, 1)
             .2
             .to_rgb8()
             .pixels()
-            .any(|p| p.0 != [0, 0, 0]),
-        "fixture metadata must reach the real status formatter"
+            .all(|p| *p == Rgb([23, 45, 67]))
     );
     assert!(graph.close().is_empty());
 }
 
-fn termination(error: bool) {
-    let mut graph = Graph::new(vec![], error, false);
-    graph.input.send(Configuration::Tick);
-    let frames = graph.advance(1);
-    assert_eq!(frames, vec![(Duration::ZERO, Err(RunControl::Terminate))]);
-    assert_eq!(graph.calls.get(), 1);
-    assert!(!graph.probe.less_than(&Duration::from_millis(1)));
+#[test]
+fn terminal_update_terminates_and_progresses() {
+    let mut graph = Graph::new(false);
+    graph.updates.send(Update::Terminate);
+    assert_eq!(
+        graph.advance(1),
+        vec![(Duration::ZERO, Err(RunControl::Terminate))]
+    );
     assert!(graph.close().is_empty());
-}
-
-#[test]
-fn exhausted_provider_terminates_and_progresses() {
-    termination(false);
-}
-#[test]
-fn provider_error_terminates_and_progresses() {
-    termination(true);
 }
 
 #[test]
 fn periodic_clock_emits_later_status_and_releases_notifications_on_close() {
-    let mut graph = Graph::new(vec![], false, true);
+    let mut graph = Graph::new(true);
     graph.configure();
     graph.input.send(Configuration::Greeting("HELLO".into()));
     let first = graph.advance(1);
@@ -332,7 +265,7 @@ fn assert_in_bounds(frames: &[Frame], width: u32, height: u32) {
 }
 
 fn small_viewport_restores_content(width: u32, height: u32) {
-    let mut graph = Graph::new(vec![], false, false);
+    let mut graph = Graph::new(false);
     graph.input.send(Configuration::FontSize(12.));
     graph.input.send(Configuration::FontCanvasVStretch(1.5));
     graph
@@ -400,7 +333,7 @@ fn viewport_zero_width_restores_content() {
 
 #[test]
 fn empty_viewport_clock_progresses_and_closes() {
-    let mut graph = Graph::new(vec![], false, true);
+    let mut graph = Graph::new(true);
     graph.input.send(Configuration::FontSize(12.));
     graph.input.send(Configuration::FontCanvasVStretch(1.5));
     graph.input.send(Configuration::ScreenDimensions(0, 0));
@@ -412,7 +345,7 @@ fn empty_viewport_clock_progresses_and_closes() {
 
 #[test]
 fn viewport_shrink_clips_inferred_blanks() {
-    let mut graph = Graph::new(vec![], false, false);
+    let mut graph = Graph::new(false);
     graph.configure();
     graph
         .input
@@ -436,4 +369,77 @@ fn viewport_shrink_clips_inferred_blanks() {
         assert_eq!(image(&restored, 2).2.dimensions(), (96, 18));
     }
     assert!(graph.close().is_empty());
+}
+
+#[test]
+fn marker_placement_and_font_fallback() {
+    assert_eq!(
+        status_text(Some("21:30:05"), "Zurich", true, loading_marker(true)),
+        "[21:30:05] ◷ Zurich"
+    );
+    assert_eq!(
+        status_text(None, "Zurich", true, loading_marker(true)),
+        "◷ Zurich"
+    );
+    assert_eq!(
+        status_text(Some("21:30:05"), "Zurich", true, loading_marker(false)),
+        "[21:30:05] [loading] Zurich"
+    );
+    assert_eq!(
+        status_text(None, "Zurich", false, loading_marker(false)),
+        "Zurich"
+    );
+}
+
+#[test]
+fn simultaneous_loading_and_text_updates_keep_one_periodic_clock() {
+    let mut graph = Graph::new(true);
+    graph.configure();
+    graph.input.send(Configuration::Greeting("OLD".into()));
+    graph.advance(1);
+    graph.input.send(Configuration::Greeting("NEW".into()));
+    graph.updates.send(Update::Loading(true));
+    let changed = graph.advance(2);
+    assert_eq!(changed.len(), 1);
+    let pixels = image(&changed, 2).2.to_rgb8();
+    for millis in [2000, 4000, 6000] {
+        let frames = graph.advance(millis);
+        assert_eq!(
+            frames.len(),
+            1,
+            "periodic clock must have exactly one outstanding tick"
+        );
+        assert_eq!(image(&frames, 2).2.to_rgb8(), pixels);
+    }
+    graph.updates.send(Update::Loading(false));
+    let ready = graph.advance(6001);
+    assert_ne!(image(&ready, 2).2.to_rgb8(), pixels);
+    assert_eq!(graph.advance(8000).len(), 1);
+    graph.close();
+}
+
+#[test]
+fn missing_metadata_preserves_previous_status() {
+    let mut graph = Graph::new(false);
+    graph.configure();
+    graph.input.send(Configuration::Greeting("PREVIOUS".into()));
+    graph.advance(1);
+    graph.updates.send(Update::Image(Prepared {
+        image: Arc::new(DynamicImage::ImageRgb8(RgbImage::new(4, 4))),
+        status: None,
+    }));
+    let frames = graph.advance(2);
+    assert_eq!(frames.len(), 1);
+    assert!(matches!(frames[0].1, Ok(Render::Image(1, _, _))));
+    graph.input.send(Configuration::ScreenDimensions(80, 60));
+    let restored = graph.advance(3);
+    let mut renderer = font();
+    assert_eq!(
+        image(&restored, 2).2.to_rgb8(),
+        renderer
+            .render(["PREVIOUS"].into_iter(), 12., (80, 18))
+            .unwrap()
+            .to_rgb8()
+    );
+    graph.close();
 }
