@@ -30,6 +30,7 @@ class PublicationTests(unittest.TestCase):
         gh.write_text(
             '#!' + sys.executable + '\n'
             'import json, os, sys\n'
+            'assert os.environ.get("GH_REPO") == os.environ["GITHUB_REPOSITORY"]\n'
             'with open(os.environ["GH_LOG"], "a") as f:\n'
             '    f.write(json.dumps(sys.argv[1:]) + "\\n")\n'
             'if sys.argv[1] == "api":\n'
@@ -132,6 +133,14 @@ class PublicationTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(self.calls(), [])
 
+    def test_retry_reuses_release_and_replaces_only_generated_names(self):
+        for _ in range(2):
+            result = self.run_helper()
+            self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.calls()
+        self.assertEqual(calls[:2], calls[2:])
+        self.assertEqual(calls[-1][-1], "--clobber")
+
     def test_api_error_does_not_create_release(self):
         self.env["GH_STATUS"] = "403"
         result = self.run_helper()
@@ -141,6 +150,9 @@ class PublicationTests(unittest.TestCase):
     def test_validate_outputs_manifest_version(self):
         output = self.root / "outputs"
         self.env["GITHUB_OUTPUT"] = str(output)
+        self.package.unlink()
+        self.checksum.unlink()
+        self.assets.rmdir()
         result = self.run_helper("validate")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(output.read_text(), "release_tag=rahmen-v0.2.0\nversion=0.2.0\n")

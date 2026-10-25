@@ -40,15 +40,19 @@ def publish(assets):
     packages = sorted(assets.glob("*.deb"))
     if not packages:
         raise ValueError("No Debian packages to publish")
-    expected = "".join(
-        f"{hashlib.file_digest(package.open('rb'), 'sha256').hexdigest()}  {package.name}\n"
-        for package in packages
-    )
+    records = []
+    for package in packages:
+        with package.open("rb") as contents:
+            digest = hashlib.file_digest(contents, "sha256").hexdigest()
+        records.append(f"{digest}  {package.name}\n")
+    expected = "".join(records)
     checksum = assets / CHECKSUM
     if checksum.read_text() != expected:
         raise ValueError("Debian package checksums do not match")
 
     repository = os.environ["GITHUB_REPOSITORY"]
+    # Release commands must select the repository even without a Git remote.
+    os.environ["GH_REPO"] = repository
     # Only a confirmed 404 permits creation. Auth and transport failures stop here.
     release = subprocess.run(
         ["gh", "api", "--include", f"repos/{repository}/releases/tags/{quote(tag, safe='')}"],

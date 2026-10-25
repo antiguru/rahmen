@@ -37,6 +37,10 @@ jobs:
             release_tag="$GITHUB_REF_NAME"
           fi
           if [ -n "$release_tag" ]; then
+            if [[ ! "$release_tag" =~ ^(rahmen-)?v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.+-]+)?$ ]]; then
+              echo "Invalid Rahmen release tag" >&2
+              exit 1
+            fi
             echo "ref=refs/tags/$release_tag" >> "$GITHUB_OUTPUT"
             echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
           else
