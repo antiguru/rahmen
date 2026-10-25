@@ -1,7 +1,3 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Duration;
 use image::{DynamicImage, GenericImageView};
 use log::{error, info};
 use pathfinder_geometry::rect::RectI;
@@ -10,12 +6,18 @@ use rahmen::dataflow::{Configuration, FormatText, ResizeImage};
 use rahmen::errors::RahmenResult;
 use rahmen::font::FontRenderer;
 use rahmen::provider::{Provider, StatusLineFormatter, load_image_from_path};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
 use timely::communication::Allocator;
 use timely::container::CapacityContainerBuilder;
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::capture::Event;
 use timely::dataflow::operators::vec::{Branch, Filter, Map, ResultStream};
-use timely::dataflow::operators::{Capture, Concat, ConnectLoop, Enter, Inspect, Leave, LoopVariable, Notificator, Operator, Probe};
+use timely::dataflow::operators::{
+    Capture, Concat, ConnectLoop, Enter, Inspect, Leave, LoopVariable, Notificator, Operator, Probe,
+};
 use timely::dataflow::{InputHandle, ProbeHandle};
 use timely::order::Product;
 use timely::worker::Worker;
@@ -77,7 +79,11 @@ pub(super) fn build(
     font_renderer: FontRenderer,
     options: Options,
 ) -> std::sync::mpsc::Receiver<Event<Duration, Vec<RunResult<Render>>>> {
-    let Options { buffer_max_size, show_time, time_format } = options;
+    let Options {
+        buffer_max_size,
+        show_time,
+        time_format,
+    } = options;
     worker.dataflow(|scope| {
         let configuration_stream = input_configuration.to_stream(scope);
 

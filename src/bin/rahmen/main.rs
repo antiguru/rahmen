@@ -19,7 +19,7 @@ use timely::dataflow::{InputHandle, ProbeHandle};
 use timely::worker::Config;
 
 use rahmen::config::Settings;
-use rahmen::dataflow::{Configuration};
+use rahmen::dataflow::Configuration;
 use rahmen::display::Display;
 use rahmen::display_framebuffer::FramebufferDisplay;
 #[cfg(feature = "minifb")]
@@ -193,7 +193,11 @@ fn main() -> RahmenResult<()> {
         provider,
         status_line_formatter,
         font_renderer,
-        dataflow::Options { buffer_max_size, show_time, time_format },
+        dataflow::Options {
+            buffer_max_size,
+            show_time,
+            time_format,
+        },
     );
 
     let start_time = Instant::now();
