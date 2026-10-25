@@ -45,7 +45,7 @@ pathfinder_geometry = "0.5"
 rahmen-exiv2 = { path = "rahmen-exiv2", version = "0.2.0" }
 regex = "1"
 serde = { version = "1", features = ["derive"] }
-timely = "0.30"
+timely = "0.31"
 xdg = "3"
 
 [dependencies.image]
