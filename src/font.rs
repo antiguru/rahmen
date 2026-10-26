@@ -5,33 +5,40 @@ use font_kit::canvas::{Canvas, Format, RasterizationOptions};
 use font_kit::font::Font;
 use font_kit::hinting::HintingOptions;
 
+use harfrust::font::Blob;
+use harfrust::font::name::NameId;
+use harfrust::{Buffer, ShapeOptions, ShaperFont};
 use image::DynamicImage;
 use pathfinder_geometry::rect::RectI;
 use pathfinder_geometry::transform2d::Transform2F;
 use pathfinder_geometry::vector::{Vector2F, Vector2I};
-use rustybuzz::{Face, UnicodeBuffer};
 use std::collections::HashMap;
+use std::fmt;
 use std::sync::Arc;
 
 /// A font renderer to rasterize text to images
-#[derive(Debug)]
 pub struct FontRenderer {
     font: Font,
-    /// Font file contents and the index of `font` within them, for shaping
-    data: Arc<Vec<u8>>,
-    face_index: u32,
+    /// The same font, parsed for shaping
+    shaping_font: harfrust::Font,
     raster_cache: HashMap<u32, RectI>,
+}
+
+impl fmt::Debug for FontRenderer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FontRenderer")
+            .field("font", &self.font)
+            .finish_non_exhaustive()
+    }
 }
 
 impl FontRenderer {
     /// Create a new font renderer from an given font.
     pub fn with_font(font: Font) -> Self {
-        let data = font.copy_font_data().expect("Failed to read font data");
-        let face_index = face_index(&data, &font);
+        let shaping_font = shaping_font(&font);
         Self {
             font,
-            data,
-            face_index,
+            shaping_font,
             raster_cache: HashMap::new(),
         }
     }
@@ -61,15 +68,15 @@ impl FontRenderer {
         // dimensions are set in dataflow.rs
         let mut canvas = Canvas::new(Vector2I::new(dimensions.0 as _, dimensions.1 as _), format);
         let font = &self.font;
-        let face = Face::from_slice(&self.data, self.face_index)
-            .expect("Failed to parse font for shaping");
+        let shaper = ShaperFont::new(&self.shaping_font);
 
         for (i, line) in text.enumerate() {
             // Shaping maps characters to glyphs, applying ligatures and kerning.
-            let mut buffer = UnicodeBuffer::new();
-            buffer.push_str(line);
-            buffer.guess_segment_properties();
-            let glyphs = rustybuzz::shape(&face, &[], buffer);
+            let mut glyphs = Buffer::new();
+            glyphs.push_str(line);
+            glyphs.guess_segment_properties();
+            harfrust::shape(&shaper, &mut glyphs, ShapeOptions::new())
+                .expect("Text shaping failed");
 
             // horizontal offset from the start of the text
             let mut base_x = 0.;
@@ -118,22 +125,25 @@ impl FontRenderer {
     }
 }
 
-/// Find the face within a font file or collection that `font` was loaded from.
-fn face_index(data: &[u8], font: &Font) -> u32 {
-    let count = rustybuzz::ttf_parser::fonts_in_collection(data).unwrap_or(1);
-    let Some(name) = font.postscript_name() else {
-        return 0;
+/// Parse the font file again for shaping, picking the face `font` was loaded from in a collection.
+fn shaping_font(font: &Font) -> harfrust::Font {
+    let data: Arc<dyn AsRef<[u8]> + Send + Sync> =
+        font.copy_font_data().expect("Failed to read font data");
+    let data = Blob::from(data);
+    let name = font.postscript_name();
+    let faces: Vec<_> = (0..)
+        .map_while(|index| harfrust::Font::new(data.clone(), index))
+        .collect();
+    let matches_name = |face: &&harfrust::Font| {
+        let postscript = face.names().get(NameId::POSTSCRIPT_NAME);
+        let postscript = postscript.as_ref().and_then(|name| name.english_or_first());
+        match (postscript, &name) {
+            (Some(postscript), Some(name)) => postscript.name() == name.as_str(),
+            _ => false,
+        }
     };
-    (0..count)
-        .find(|&index| {
-            Face::from_slice(data, index).is_some_and(|face| {
-                face.names().into_iter().any(|entry| {
-                    entry.name_id == rustybuzz::ttf_parser::name_id::POST_SCRIPT_NAME
-                        && entry.to_string().as_deref() == Some(name.as_str())
-                })
-            })
-        })
-        .unwrap_or(0)
+    let face = faces.iter().find(matches_name).or(faces.first());
+    face.cloned().expect("Failed to parse font for shaping")
 }
 
 #[cfg(test)]
