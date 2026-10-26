@@ -152,3 +152,25 @@ jobs:
           RELEASE_TAG: ${{ needs.package.outputs.release_tag }}
           REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
         run: python3 .github/scripts/publish_debian_release.py publish "release-assets/$PACKAGE_VARIANT"
+
+  release:
+    name: Publish release
+    needs: [package, publish]
+    if: >-
+      needs.package.outputs.release_tag != '' &&
+      !startsWith(github.event_name, 'pull_request')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.package.outputs.source_sha }}
+          persist-credentials: false
+      # Publishing makes an immutable release final, so wait for every variant.
+      - name: Publish draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.package.outputs.release_tag }}
+          REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: python3 .github/scripts/publish_debian_release.py finalize

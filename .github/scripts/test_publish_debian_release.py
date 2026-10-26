@@ -11,6 +11,8 @@ import unittest
 
 
 SCRIPT = Path(__file__).with_name("publish_debian_release.py")
+DRAFT = '{"draft":true,"immutable":false}'
+PUBLISHED = '{"draft":false,"immutable":true}'
 
 
 class PublicationTests(unittest.TestCase):
@@ -34,9 +36,8 @@ class PublicationTests(unittest.TestCase):
             'with open(os.environ["GH_LOG"], "a") as f:\n'
             '    f.write(json.dumps(sys.argv[1:]) + "\\n")\n'
             'if sys.argv[1] == "api":\n'
-            '    status = os.environ.get("GH_STATUS", "200")\n'
-            '    print("HTTP/2.0 " + status + " Status\\n\\n{}")\n'
-            '    sys.exit(0 if status == "200" else 1)\n'
+            '    print(os.environ.get("GH_RELEASES", ""))\n'
+            '    sys.exit(int(os.environ.get("GH_API_EXIT", "0")))\n'
             'if sys.argv[1:3] == os.environ.get("GH_FAIL_COMMAND", "").split():\n'
             '    sys.exit(1)\n'
         )
@@ -51,6 +52,7 @@ class PublicationTests(unittest.TestCase):
             RELEASE_TAG="rahmen-v0.2.0",
             REQUESTED_RELEASE_TAG="",
             PACKAGE_VARIANT="trixie-armhf",
+            GH_RELEASES=DRAFT,
         )
 
     def write_checksum(self):
@@ -100,15 +102,72 @@ class PublicationTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(self.calls(), [])
 
-    def test_new_release_verifies_tag_and_generates_notes(self):
-        self.env["GH_STATUS"] = "404"
+    def test_release_lookup_includes_drafts_for_the_tag(self):
         result = self.run_helper()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.calls()[1], ["release", "create", "rahmen-v0.2.0", "--verify-tag", "--generate-notes"])
+        lookup = self.calls()[0]
+        self.assertEqual(lookup[:3], ["api", "--paginate", "repos/owner/rahmen/releases"])
+        self.assertIn('select(.tag_name == "rahmen-v0.2.0")', lookup[-1])
+
+    def test_new_release_is_a_draft_with_verified_tag_and_notes(self):
+        self.env["GH_RELEASES"] = ""
+        result = self.run_helper()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            self.calls()[1],
+            ["release", "create", "rahmen-v0.2.0", "--verify-tag", "--generate-notes", "--draft"],
+        )
+        self.assertEqual(self.calls()[2][:2], ["release", "upload"])
+
+    def test_published_immutable_release_is_not_uploaded_to(self):
+        self.env["GH_RELEASES"] = PUBLISHED
+        result = self.run_helper()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("immutable", result.stderr)
+        self.assertEqual(len(self.calls()), 1)
+
+    def test_published_mutable_release_still_accepts_assets(self):
+        self.env["GH_RELEASES"] = '{"draft":false,"immutable":false}'
+        result = self.run_helper()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.calls()[-1][:2], ["release", "upload"])
+
+    def test_duplicate_releases_for_a_tag_fail(self):
+        self.env["GH_RELEASES"] = DRAFT + "\n" + DRAFT
+        result = self.run_helper()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(len(self.calls()), 1)
+
+    def test_finalize_publishes_draft_release(self):
+        result = self.run_helper("finalize")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.calls()[-1], ["release", "edit", "rahmen-v0.2.0", "--draft=false"])
+
+    def test_finalize_leaves_published_release_alone(self):
+        self.env["GH_RELEASES"] = PUBLISHED
+        result = self.run_helper("finalize")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(self.calls()), 1)
+
+    def test_finalize_requires_existing_release(self):
+        self.env["GH_RELEASES"] = ""
+        result = self.run_helper("finalize")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(len(self.calls()), 1)
+
+    def test_finalize_applies_publication_guards(self):
+        for changes in ({"GITHUB_EVENT_NAME": "pull_request"}, {"GITHUB_REF": "refs/heads/master"}):
+            with self.subTest(changes=changes):
+                original = self.env.copy()
+                self.env.update(changes)
+                result = self.run_helper("finalize")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(self.calls(), [])
+                self.env = original
 
     def test_prerelease_flag_and_manual_v_tag(self):
         (self.root / "Cargo.toml").write_text('[package]\nversion = "0.2.0-rc.1"\n')
-        self.env.update(GH_STATUS="404", RELEASE_TAG="v0.2.0-rc.1", GITHUB_REF="refs/tags/v0.2.0-rc.1")
+        self.env.update(GH_RELEASES="", RELEASE_TAG="v0.2.0-rc.1", GITHUB_REF="refs/tags/v0.2.0-rc.1")
         result = self.run_helper()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--prerelease", self.calls()[1])
@@ -170,13 +229,13 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(calls[-1][-1], "--clobber")
 
     def test_api_error_does_not_create_release(self):
-        self.env["GH_STATUS"] = "403"
+        self.env["GH_API_EXIT"] = "1"
         result = self.run_helper()
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(len(self.calls()), 1)
 
     def test_failed_tag_verification_does_not_upload(self):
-        self.env.update(GH_STATUS="404", GH_FAIL_COMMAND="release create")
+        self.env.update(GH_RELEASES="", GH_FAIL_COMMAND="release create")
         result = self.run_helper()
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(len(self.calls()), 2)
