@@ -61,7 +61,11 @@ fn channel_byte(field: &Bitfield) -> RahmenResult<Option<usize>> {
     if field.length == 0 {
         return Ok(None);
     }
-    if field.length != 8 || field.offset % 8 != 0 || field.offset >= 32 || field.msb_right != 0 {
+    if field.length != 8
+        || !field.offset.is_multiple_of(8)
+        || field.offset >= 32
+        || field.msb_right != 0
+    {
         return Err(invalid_layout());
     }
     // Bit offsets refer to the pixel as a native-endian 32-bit value.
@@ -197,9 +201,10 @@ impl FramebufferDisplay {
         for y in 0..clip.height {
             let source_start = (clip.source_y + y) * source_stride + clip.source_x * channels;
             let source = &img.as_raw()[source_start..source_start + clip.width * channels];
-            for (target, pixel) in row.chunks_exact_mut(4).zip(source.chunks_exact(channels)) {
+            let targets = row.as_chunks_mut::<4>().0.iter_mut();
+            for (target, pixel) in targets.zip(source.chunks_exact(channels)) {
                 let [red, green, blue] = P::from_slice(pixel).to_rgb().0;
-                target.copy_from_slice(&black);
+                *target = black;
                 target[format.red] = red;
                 target[format.green] = green;
                 target[format.blue] = blue;
