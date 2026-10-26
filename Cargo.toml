@@ -47,6 +47,7 @@ mozjpeg = { version = "0.10", default-features = false }
 pathfinder_geometry = "0.5"
 rahmen-exiv2 = { path = "rahmen-exiv2", version = "0.2.1" }
 regex = "1"
+rustybuzz = "0.20"
 serde = { version = "1", features = ["derive"] }
 timely = "0.31"
 xdg = "3"
