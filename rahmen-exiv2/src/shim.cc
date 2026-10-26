@@ -1,11 +1,36 @@
 #include "src/shim.h"
 
+#include <mutex>
 #include <stdexcept>
 #include <string>
 
 namespace rahmen_exiv2 {
 
+namespace {
+
+std::mutex xmp_mutex;
+
+void xmp_lock(void *, bool lock) {
+  if (lock) {
+    xmp_mutex.lock();
+  } else {
+    xmp_mutex.unlock();
+  }
+}
+
+// exiv2 otherwise initializes the XMP toolkit on first decode, which is not
+// thread-safe and crashes or deadlocks when threads open images concurrently.
+// A function-local static runs the initialization exactly once, and the lock
+// serializes later XMP namespace registration.
+void initialize_xmp() {
+  static const bool initialized = Exiv2::XmpParser::initialize(xmp_lock, nullptr);
+  (void)initialized;
+}
+
+}  // namespace
+
 std::unique_ptr<Image> open_image(rust::Str path) {
+  initialize_xmp();
   // exiv2 wants a std::string; rust::Str is not NUL-terminated.
   std::string p(path);
   // ImageFactory::open never returns null; it throws on failure.
