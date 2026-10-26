@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/antiguru/rahmen/compare/rahmen-v0.3.0...rahmen-v0.4.0) - 2026-10-26
+
+### Added
+
+* Shape text with HarfBuzz (`harfrust`), applying the font's ligatures such as `ff` and `fi`, kerning, and mark positioning. Glyphs are spaced by the font's own advances instead of an extra 5%, and characters missing from the font render as its placeholder glyph instead of being skipped. ([#63](https://github.com/antiguru/rahmen/pull/63))
+
+### Changed
+
+* **Breaking:** `FontRenderer` no longer implements `UnwindSafe` or `RefUnwindSafe`. ([#63](https://github.com/antiguru/rahmen/pull/63))
+
+### Fixed
+
+* Attach Debian packages to a draft release and publish it once they are uploaded, so releases succeed with immutable releases enabled. ([#62](https://github.com/antiguru/rahmen/pull/62))
+
 ## [0.3.0](https://github.com/antiguru/rahmen/compare/rahmen-v0.2.0...rahmen-v0.3.0) - 2026-10-25
 
 ### Added
