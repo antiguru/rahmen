@@ -1,6 +1,6 @@
 [package]
 name = "rahmen"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Moritz Hoffmann <antiguru@gmail.com>", "sys3175 <https://github.com/sys3175>"]
 edition = "2024"
 rust-version.workspace = true

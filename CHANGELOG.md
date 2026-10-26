@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/antiguru/rahmen/compare/rahmen-v0.3.0...rahmen-v0.4.0) - 2026-10-26
+
+### Other
+
+- Publish Debian assets to a draft release before publishing it ([#62](https://github.com/antiguru/rahmen/pull/62))
+- Shape text with rustybuzz for ligatures and kerning ([#63](https://github.com/antiguru/rahmen/pull/63))
+
 ## [0.3.0](https://github.com/antiguru/rahmen/compare/rahmen-v0.2.0...rahmen-v0.3.0) - 2026-10-25
 
 ### Added
