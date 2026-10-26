@@ -8,6 +8,9 @@ name = "rahmen"
 changelog_update = true
 # set the path of the changelog to the root of the repository
 changelog_path = "./CHANGELOG.md"
+# immutable releases reject later uploads, so the Debian workflow attaches its
+# packages to this draft and then publishes it
+git_release_draft = true
 
 [[package]]
 name = "rahmen-exiv2"

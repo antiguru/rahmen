@@ -1,13 +1,13 @@
-"""Validate a version tag and publish verified Debian assets to its release."""
+"""Validate a version tag, attach verified Debian assets to its draft release, and publish it."""
 
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
 import subprocess
 import sys
 import tomllib
-from urllib.parse import quote
 
 
 def validated_version():
@@ -23,12 +23,9 @@ def validated_version():
     return tag, version
 
 
-def publish(assets):
-    """Upload the checked Debian packages and checksum file to an existing tag."""
+def publication_tag():
+    """Return the validated tag when this run may change its release."""
     tag, version = validated_version()
-    variant = os.environ.get("PACKAGE_VARIANT", "trixie-armhf")
-    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", variant):
-        raise ValueError("Invalid Debian package variant")
     event = os.environ.get("GITHUB_EVENT_NAME", "")
     if event.startswith("pull_request"):
         raise ValueError("Pull requests cannot publish release assets")
@@ -37,6 +34,34 @@ def publish(assets):
     # A reusable call from release-plz runs on master with an explicit tag input.
     if ref != f"refs/tags/{tag}" and requested != tag:
         raise ValueError("Publication requires a tag ref or an explicit release tag")
+    return tag, version
+
+
+def find_release(tag):
+    """Return the release for a tag, including drafts, or None when none exists."""
+    repository = os.environ["GITHUB_REPOSITORY"]
+    # Release commands must select the repository even without a Git remote.
+    os.environ["GH_REPO"] = repository
+    # The tag endpoint hides drafts, so search the listing. Any failure stops here.
+    listing = subprocess.run(
+        ["gh", "api", "--paginate", f"repos/{repository}/releases",
+         "--jq", f".[] | select(.tag_name == {json.dumps(tag)}) | {{draft, immutable}}"],
+        capture_output=True, text=True,
+    )
+    if listing.returncode != 0:
+        raise RuntimeError(f"Cannot list releases: {listing.stderr}")
+    releases = [json.loads(line) for line in listing.stdout.splitlines() if line.strip()]
+    if len(releases) > 1:
+        raise RuntimeError(f"Multiple releases use tag {tag}")
+    return releases[0] if releases else None
+
+
+def publish(assets):
+    """Upload the checked Debian packages and checksum file to a draft release."""
+    tag, version = publication_tag()
+    variant = os.environ.get("PACKAGE_VARIANT", "trixie-armhf")
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", variant):
+        raise ValueError("Invalid Debian package variant")
     packages = sorted(assets.glob("*.deb"))
     if not packages:
         raise ValueError("No Debian packages to publish")
@@ -50,29 +75,30 @@ def publish(assets):
     if checksum.read_text() != expected:
         raise ValueError("Debian package checksums do not match")
 
-    repository = os.environ["GITHUB_REPOSITORY"]
-    # Release commands must select the repository even without a Git remote.
-    os.environ["GH_REPO"] = repository
-    # Only a confirmed 404 permits creation. Auth and transport failures stop here.
-    release = subprocess.run(
-        ["gh", "api", "--include", f"repos/{repository}/releases/tags/{quote(tag, safe='')}"],
-        capture_output=True, text=True,
-    )
-    status = release.stdout.splitlines()[0].split() if release.stdout else []
-    if len(status) < 2 or status[0] not in ("HTTP/1.1", "HTTP/2.0", "HTTP/2"):
-        raise RuntimeError(f"Cannot determine release status: {release.stderr}")
-    if status[1] == "404":
-        command = ["gh", "release", "create", tag, "--verify-tag", "--generate-notes"]
+    release = find_release(tag)
+    if release is None:
+        # Stay a draft until every variant is attached; immutable releases reject later uploads.
+        command = ["gh", "release", "create", tag, "--verify-tag", "--generate-notes", "--draft"]
         if "-" in version.split("+", 1)[0]:
             command.append("--prerelease")
         subprocess.run(command, check=True)
-    elif status[1] != "200" or release.returncode != 0:
-        raise RuntimeError(f"Cannot inspect release: {release.stderr}")
+    elif not release["draft"] and release["immutable"]:
+        raise RuntimeError(f"Release {tag} is already published and immutable; assets cannot be added")
     # Replace only generated filenames on retries, preserving notes and other assets.
     subprocess.run(
         ["gh", "release", "upload", tag, *map(str, packages), str(checksum), "--clobber"],
         check=True,
     )
+
+
+def finalize():
+    """Publish the draft release once all Debian assets are attached."""
+    tag, _ = publication_tag()
+    release = find_release(tag)
+    if release is None:
+        raise RuntimeError(f"No release exists for tag {tag}")
+    if release["draft"]:
+        subprocess.run(["gh", "release", "edit", tag, "--draft=false"], check=True)
 
 
 def main():
@@ -83,6 +109,8 @@ def main():
             output.write(f"release_tag={tag}\nversion={version}\n")
     elif command == "publish":
         publish(Path(sys.argv[2]))
+    elif command == "finalize":
+        finalize()
     else:
         raise ValueError(f"Unknown command: {command}")
 
