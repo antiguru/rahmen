@@ -25,13 +25,13 @@ jobs:
       matrix: &package-variants
         include:
           - variant: trixie-armhf
-            platform: linux/arm/v7
+            rust_target: armv7-unknown-linux-gnueabihf
             debian_arch: armhf
             qemu_platform: arm
             cache_scope: rahmen-deb-armhf
     env:
       PACKAGE_VARIANT: ${{ matrix.variant }}
-      PACKAGE_PLATFORM: ${{ matrix.platform }}
+      RUST_TARGET: ${{ matrix.rust_target }}
       DEBIAN_ARCH: ${{ matrix.debian_arch }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -72,6 +72,7 @@ jobs:
           echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Test release publication guards
         run: python3 -B .github/scripts/test_publish_debian_release.py
+      # The package is cross-compiled; QEMU only runs the target's test binaries.
       - uses: docker/setup-qemu-action@v4
         with:
           platforms: ${{ matrix.qemu_platform }}
@@ -80,24 +81,27 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .github/docker/deb-armhf
-          platforms: ${{ matrix.platform }}
           load: true
           tags: rahmen-deb-${{ matrix.variant }}:ci
           cache-from: type=gha,scope=${{ matrix.cache_scope }}
           cache-to: type=gha,mode=max,scope=${{ matrix.cache_scope }}
       - name: Build and verify Debian package
         run: |
-          docker run --rm --platform "$PACKAGE_PLATFORM" \
+          docker run --rm \
             --volume "$GITHUB_WORKSPACE:/work" \
             --workdir /work \
             --env CARGO_INCREMENTAL=0 \
             --env CARGO_TARGET_DIR="/work/target/build/$PACKAGE_VARIANT" \
             --env PACKAGE_VARIANT \
             --env DEBIAN_ARCH \
+            --env RUST_TARGET \
             "rahmen-deb-$PACKAGE_VARIANT:ci" bash -euc '
+              # Run the test suite on the target architecture through QEMU.
+              cargo test --locked --workspace --target "$RUST_TARGET"
+
               output_dir="/work/target/debian/$PACKAGE_VARIANT"
               mkdir -p "$output_dir"
-              cargo deb --locked --output "$output_dir/"
+              cargo deb --locked --target "$RUST_TARGET" --output "$output_dir/"
 
               found=0
               for package in "$output_dir"/*.deb; do
