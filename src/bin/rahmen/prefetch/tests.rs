@@ -169,6 +169,23 @@ fn loads_prepare_pictures_for_the_display() {
 }
 
 #[test]
+fn loads_keep_full_size_without_native_format() {
+    let _guard = METADATA.lock().unwrap();
+    let (mut p, mut worker, tx, entered, _) = controlled_with(worker(), 2);
+    // A window can grow later, so its images must not be shrunk ahead of time.
+    p.set_display((2, 4), None);
+    p.presented(Duration::ZERO);
+    entered.recv_timeout(Duration::from_secs(5)).unwrap();
+    tx.send(Ok(Some(fixture()))).unwrap();
+    wait_ready(&mut p, &mut worker);
+    let Outcome::Image(prepared) = p.take_due(Duration::from_secs(1)).unwrap() else {
+        panic!("missing decoded image")
+    };
+    assert!(matches!(*prepared.image, Picture::Image(_)));
+    assert_eq!(prepared.image.dimensions(), (4, 4));
+}
+
+#[test]
 fn late_terminal_and_provider_error_wait_for_deadline() {
     for error in [false, true] {
         let (mut p, mut worker, tx, entered, _) = controlled();

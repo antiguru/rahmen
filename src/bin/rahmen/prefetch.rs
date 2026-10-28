@@ -72,12 +72,17 @@ impl Loader {
                         return;
                     }
                     // Prepare the image for the display's image area, above the status line.
+                    // Only displays with a native format (framebuffers) have a fixed size. For
+                    // others, the dataflow resizes the full image, which avoids upscaling a
+                    // shrunken copy when a window grows.
                     let target = display_info
                         .lock()
                         .unwrap_or_else(PoisonError::into_inner)
-                        .map(|((width, height), format)| LoadTarget {
-                            format,
-                            size: (width, height.saturating_sub(reserved_height)),
+                        .and_then(|((width, height), format)| {
+                            format.map(|format| LoadTarget {
+                                format: Some(format),
+                                size: (width, height.saturating_sub(reserved_height)),
+                            })
                         });
                     // Load image
                     match suppress_err(load_picture(&path, Some(buffer_max_size), target)) {

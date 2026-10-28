@@ -91,7 +91,7 @@ impl PixelFormat {
     }
 
     /// The JPEG decoder output color space producing pixels in this format, if there is one.
-    pub fn jpeg_color_space(&self) -> Option<mozjpeg::ColorSpace> {
+    pub(crate) fn jpeg_color_space(&self) -> Option<mozjpeg::ColorSpace> {
         use mozjpeg::ColorSpace::*;
         // The `*A` spaces set the fourth byte to 0xFF, while the `*X` spaces leave it undefined.
         match (self.red, self.green, self.blue) {

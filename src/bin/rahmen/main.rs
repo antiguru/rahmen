@@ -64,8 +64,9 @@ fn main() -> RahmenResult<()> {
         .arg(
             Arg::new("buffer_max_size")
                 .long("buffer_max_size")
+                .help("Maximum size in bytes of a decoded image")
                 .value_parser(value_parser!(usize))
-                .default_value("16000000"),
+                .default_value("24000000"),
         )
         .arg(
             Arg::new("font")
