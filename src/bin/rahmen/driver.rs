@@ -50,6 +50,7 @@ pub(super) fn display_loop<'a>(
 
         if Some(display.dimensions()) != dimensions {
             dimensions = Some(display.dimensions());
+            prefetch.set_display(display.dimensions(), display.pixel_format());
             input_configuration.send(Configuration::ScreenDimensions(
                 display.dimensions().0,
                 display.dimensions().1,

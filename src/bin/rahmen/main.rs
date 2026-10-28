@@ -29,6 +29,8 @@ use rahmen::provider::StatusLineFormatter;
 
 static SPLASH: &[u8] = include_bytes!("rahmen.png");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+/// Factor by which the status line canvas is higher than the font size
+const FONT_CANVAS_VSTRETCH: f32 = 1.4;
 
 #[cfg(unix)]
 const SYSTEM_CONFIG_PATH: &str = "/etc/rahmen.toml";
@@ -180,6 +182,7 @@ fn main() -> RahmenResult<()> {
         provider,
         status_line_formatter,
         buffer_max_size,
+        (font_size_f * FONT_CANVAS_VSTRETCH).ceil() as u32,
     );
     let prefetch = prefetch::Prefetch::new(loader, delay);
     let output = dataflow::build(
@@ -198,8 +201,7 @@ fn main() -> RahmenResult<()> {
     let start_time = Instant::now();
 
     input_configuration.send(Configuration::FontSize(font_size_f));
-    // enlarge font canvas vertically by this factor (default given here: 1.4)
-    input_configuration.send(Configuration::FontCanvasVStretch(1.4));
+    input_configuration.send(Configuration::FontCanvasVStretch(FONT_CANVAS_VSTRETCH));
     match image::load_from_memory(SPLASH) {
         Ok(image) => {
             info!("Sending splash screen");

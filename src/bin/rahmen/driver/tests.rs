@@ -96,6 +96,7 @@ fn blocked_provider_does_not_block_clock_progress() {
             }),
             StatusLineFormatter::new(std::iter::empty(), None, ", ".into()).unwrap(),
             16_000_000,
+            0,
         );
         let clock = Rc::new(Cell::new(Duration::ZERO));
         let mut display = DisplayState {
@@ -209,6 +210,7 @@ fn with_driver(
         provider,
         StatusLineFormatter::new(std::iter::empty(), None, ", ".into()).unwrap(),
         16_000_000,
+        0,
     );
     let clock = Rc::new(Cell::new(Duration::ZERO));
     let mut display = DisplayState {
