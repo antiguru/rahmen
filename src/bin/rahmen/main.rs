@@ -203,7 +203,7 @@ fn main() -> RahmenResult<()> {
     match image::load_from_memory(SPLASH) {
         Ok(image) => {
             info!("Sending splash screen");
-            input_configuration.send(Configuration::Splash(Arc::new(image)));
+            input_configuration.send(Configuration::Splash(Arc::new(image.into())));
         }
         Err(err) => warn!("Failed to load splash screen: {}", err),
     }

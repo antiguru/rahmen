@@ -4,9 +4,9 @@ use crate::display::Display;
 use crate::errors::{RahmenError, RahmenResult};
 
 use crate::Vector;
-use crate::picture::PixelFormat;
+use crate::picture::{Picture, PixelFormat};
 use framebuffer::Framebuffer;
-use image::{DynamicImage, ImageBuffer, Pixel};
+use image::{DynamicImage, ImageBuffer, Pixel, RgbaImage};
 use std::time::Duration;
 
 /// A display driver for Linux framebuffers.
@@ -150,16 +150,41 @@ impl FramebufferDisplay {
         }
         Ok(())
     }
+
+    /// Copy rows of an image whose bytes are already in the framebuffer's pixel format.
+    fn copy_native(&mut self, anchor: Vector, img: &RgbaImage) -> RahmenResult<()> {
+        let layout = FramebufferLayout::new(&self.framebuffer)?;
+        let Some(clip) = layout.clip(anchor, img.dimensions()) else {
+            return Ok(());
+        };
+        let source_stride = img.width() as usize * 4;
+        for y in 0..clip.height {
+            let source = (clip.source_y + y) * source_stride + clip.source_x * 4;
+            let target = layout.offset(clip.x, clip.y + y);
+            self.framebuffer.frame[target..target + clip.width * 4]
+                .copy_from_slice(&img.as_raw()[source..source + clip.width * 4]);
+        }
+        Ok(())
+    }
 }
 
 impl Display for FramebufferDisplay {
-    fn render(&mut self, _key: usize, anchor: Vector, img: &DynamicImage) -> RahmenResult<()> {
+    fn render(&mut self, _key: usize, anchor: Vector, picture: &Picture) -> RahmenResult<()> {
         let _t = crate::Timer::new(|e| debug!("Rendering {}ms", e.as_millis()));
-        match img {
-            DynamicImage::ImageRgb8(img) => self.write_image(anchor, img),
-            DynamicImage::ImageRgba8(img) => self.write_image(anchor, img),
-            img => self.write_image(anchor, &img.to_rgb8()),
+        match picture {
+            Picture::Native(format, img) if Some(*format) == self.pixel_format() => {
+                self.copy_native(anchor, img)
+            }
+            Picture::Image(DynamicImage::ImageRgb8(img)) => self.write_image(anchor, img),
+            Picture::Image(DynamicImage::ImageRgba8(img)) => self.write_image(anchor, img),
+            picture => self.write_image(anchor, &picture.to_rgb8()),
         }
+    }
+
+    fn pixel_format(&self) -> Option<PixelFormat> {
+        FramebufferLayout::new(&self.framebuffer)
+            .ok()
+            .map(|layout| layout.format)
     }
 
     fn blank(&mut self, _key: usize, anchor: Vector, size: Vector) -> RahmenResult<()> {

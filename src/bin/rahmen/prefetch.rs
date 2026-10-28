@@ -1,6 +1,6 @@
-use image::DynamicImage;
 use log::error;
 use rahmen::errors::RahmenResult;
+use rahmen::picture::Picture;
 use rahmen::provider::{Provider, StatusLineFormatter, load_image_from_path};
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -15,7 +15,7 @@ use timely::worker::Worker;
 
 #[derive(Clone, Debug)]
 pub(super) struct Prepared {
-    pub image: Arc<DynamicImage>,
+    pub image: Arc<Picture>,
     pub status: Option<String>,
 }
 
@@ -73,7 +73,7 @@ impl Loader {
                             // Ordinary metadata failures preserve the existing status line.
                             let status = formatter.format(&path).ok();
                             break Outcome::Image(Prepared {
-                                image: Arc::new(image),
+                                image: Arc::new(image.into()),
                                 status,
                             });
                         }

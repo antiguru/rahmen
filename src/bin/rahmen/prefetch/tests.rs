@@ -114,7 +114,7 @@ fn eager_prefetch_has_one_slot_and_preserves_real_image_metadata() {
     let Outcome::Image(prepared) = p.take_due(Duration::from_secs(1)).unwrap() else {
         panic!("missing decoded image")
     };
-    assert_eq!((prepared.image.width(), prepared.image.height()), (4, 4));
+    assert_eq!(prepared.image.dimensions(), (4, 4));
     assert_eq!(prepared.status.as_deref(), Some("Zurich"));
     assert!(p.take_due(Duration::from_secs(99)).is_none());
     p.presented(Duration::from_secs(3));
@@ -316,7 +316,7 @@ fn late_image_is_available_immediately_and_metadata_failure_is_not_terminal() {
     let Some(Outcome::Image(prepared)) = p.take_due(Duration::from_secs(20)) else {
         panic!("late result must be due")
     };
-    assert_eq!((prepared.image.width(), prepared.image.height()), (2, 2));
+    assert_eq!(prepared.image.dimensions(), (2, 2));
     assert!(
         prepared.status.is_none(),
         "unsupported metadata must retain previous status"
