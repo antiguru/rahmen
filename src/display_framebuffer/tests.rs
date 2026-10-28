@@ -1,4 +1,5 @@
 use super::*;
+use framebuffer::Bitfield;
 use framebuffer::{FixScreeninfo, VarScreeninfo};
 use image::{RgbImage, RgbaImage};
 use memmap2::MmapMut;
@@ -85,7 +86,7 @@ fn render_follows_reported_channel_offsets() {
     display.render(0, Vector::new(0, 0), &rgb_image()).unwrap();
     assert_eq!(
         &display.framebuffer.frame[..],
-        &[1, 2, 3, 0, 4, 5, 6, 0, 7, 8, 9, 0, 10, 11, 12, 0]
+        &[1, 2, 3, 255, 4, 5, 6, 255, 7, 8, 9, 255, 10, 11, 12, 255]
     );
 }
 

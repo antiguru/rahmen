@@ -4,7 +4,8 @@ use crate::display::Display;
 use crate::errors::{RahmenError, RahmenResult};
 
 use crate::Vector;
-use framebuffer::{Bitfield, Framebuffer, VarScreeninfo};
+use crate::picture::PixelFormat;
+use framebuffer::Framebuffer;
 use image::{DynamicImage, ImageBuffer, Pixel};
 use std::time::Duration;
 
@@ -15,66 +16,6 @@ use std::time::Duration;
 #[derive(Debug)]
 pub struct FramebufferDisplay {
     framebuffer: Framebuffer,
-}
-
-/// Byte positions of the color channels within a 32-bit framebuffer pixel.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct PixelFormat {
-    red: usize,
-    green: usize,
-    blue: usize,
-    alpha: Option<usize>,
-}
-
-impl PixelFormat {
-    fn new(var: &VarScreeninfo) -> RahmenResult<Self> {
-        let red = channel_byte(&var.red)?.ok_or_else(invalid_layout)?;
-        let green = channel_byte(&var.green)?.ok_or_else(invalid_layout)?;
-        let blue = channel_byte(&var.blue)?.ok_or_else(invalid_layout)?;
-        let alpha = channel_byte(&var.transp)?;
-        let mut bytes = [Some(red), Some(green), Some(blue), alpha];
-        bytes.sort();
-        if bytes.windows(2).any(|w| w[0].is_some() && w[0] == w[1]) {
-            return Err(invalid_layout());
-        }
-        Ok(Self {
-            red,
-            green,
-            blue,
-            alpha,
-        })
-    }
-
-    /// An opaque black pixel, used as the base for every converted pixel.
-    fn black(&self) -> [u8; 4] {
-        let mut pixel = [0; 4];
-        if let Some(alpha) = self.alpha {
-            pixel[alpha] = u8::MAX;
-        }
-        pixel
-    }
-}
-
-/// Map a channel's bit field to its byte position within a 32-bit pixel. Only byte-aligned
-/// 8-bit channels are supported. Returns `None` for an absent channel.
-fn channel_byte(field: &Bitfield) -> RahmenResult<Option<usize>> {
-    if field.length == 0 {
-        return Ok(None);
-    }
-    if field.length != 8
-        || !field.offset.is_multiple_of(8)
-        || field.offset >= 32
-        || field.msb_right != 0
-    {
-        return Err(invalid_layout());
-    }
-    // Bit offsets refer to the pixel as a native-endian 32-bit value.
-    let byte = (field.offset / 8) as usize;
-    Ok(Some(if cfg!(target_endian = "little") {
-        byte
-    } else {
-        3 - byte
-    }))
 }
 
 struct FramebufferLayout {
@@ -139,7 +80,7 @@ impl FramebufferLayout {
             height,
             stride,
             start,
-            format: PixelFormat::new(var)?,
+            format: PixelFormat::from_var_screen_info(var)?,
         })
     }
 
@@ -193,7 +134,6 @@ impl FramebufferDisplay {
             return Ok(());
         };
         let format = layout.format;
-        let black = format.black();
         // Convert one row at a time and copy it in bulk, which suits uncached framebuffer memory.
         let channels = usize::from(P::CHANNEL_COUNT);
         let source_stride = img.width() as usize * channels;
@@ -203,11 +143,7 @@ impl FramebufferDisplay {
             let source = &img.as_raw()[source_start..source_start + clip.width * channels];
             let targets = row.as_chunks_mut::<4>().0.iter_mut();
             for (target, pixel) in targets.zip(source.chunks_exact(channels)) {
-                let [red, green, blue] = P::from_slice(pixel).to_rgb().0;
-                *target = black;
-                target[format.red] = red;
-                target[format.green] = green;
-                target[format.blue] = blue;
+                *target = format.encode(P::from_slice(pixel).to_rgb().0);
             }
             let target = layout.offset(clip.x, clip.y + y);
             self.framebuffer.frame[target..target + row.len()].copy_from_slice(&row);
