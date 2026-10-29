@@ -1,14 +1,13 @@
 //! Functionality to render images on a display
 
-use image::DynamicImage;
-
 use crate::Vector;
 use crate::errors::RahmenResult;
+use crate::picture::{Picture, PixelFormat};
 
 /// Trait describing the interface to display an image
 pub trait Display {
     /// Reveal an image to the user
-    fn render(&mut self, key: usize, anchor: Vector, img: &DynamicImage) -> RahmenResult<()>;
+    fn render(&mut self, key: usize, anchor: Vector, picture: &Picture) -> RahmenResult<()>;
 
     /// Reveal an image to the user
     fn blank(&mut self, key: usize, anchor: Vector, size: Vector) -> RahmenResult<()>;
@@ -19,4 +18,10 @@ pub trait Display {
 
     /// Return the dimensions of the display as `(width, height)`
     fn dimensions(&self) -> (u32, u32);
+
+    /// The display's native pixel format, if it has one. Pictures in this format can be shown
+    /// without conversion.
+    fn pixel_format(&self) -> Option<PixelFormat> {
+        None
+    }
 }

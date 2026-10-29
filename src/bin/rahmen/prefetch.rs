@@ -1,13 +1,13 @@
-use image::DynamicImage;
 use log::error;
 use rahmen::errors::RahmenResult;
-use rahmen::provider::{Provider, StatusLineFormatter, load_image_from_path};
+use rahmen::picture::{Picture, PixelFormat};
+use rahmen::provider::{LoadTarget, Provider, StatusLineFormatter, load_picture};
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, SyncSender, TryRecvError};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 use timely::dataflow::operators::generic::builder_raw::OperatorBuilder;
 use timely::scheduling::{Activator, SyncActivator};
@@ -15,7 +15,7 @@ use timely::worker::Worker;
 
 #[derive(Clone, Debug)]
 pub(super) struct Prepared {
-    pub image: Arc<DynamicImage>,
+    pub image: Arc<Picture>,
     pub status: Option<String>,
 }
 
@@ -25,8 +25,12 @@ pub(super) enum Outcome {
     Terminate,
 }
 
+/// The display's dimensions and pixel format, as last reported.
+type DisplayInfo = Arc<Mutex<Option<((u32, u32), Option<PixelFormat>)>>>;
+
 pub(super) struct Loader {
     requests: SyncSender<()>,
+    display: DisplayInfo,
     slot: Rc<RefCell<Slot>>,
     consumer: Activator,
     stop: Arc<AtomicBool>,
@@ -38,6 +42,7 @@ impl Loader {
         mut provider: Box<dyn Provider<PathBuf> + Send>,
         formatter: StatusLineFormatter,
         buffer_max_size: usize,
+        reserved_height: u32,
     ) -> Self {
         let (requests, request_rx) = mpsc::sync_channel(1);
         let (result_tx, results) = mpsc::sync_channel(1);
@@ -49,6 +54,8 @@ impl Loader {
         };
         let stop = Arc::new(AtomicBool::new(false));
         let stopping = stop.clone();
+        let display = DisplayInfo::default();
+        let display_info = display.clone();
         // Dropping the handle detaches the worker. Closing the UI must not join I/O.
         std::thread::spawn(move || {
             while request_rx.recv().is_ok() {
@@ -64,8 +71,21 @@ impl Loader {
                     if stopping.load(Ordering::Acquire) {
                         return;
                     }
+                    // Prepare the image for the display's image area, above the status line.
+                    // Only displays with a native format (framebuffers) have a fixed size. For
+                    // others, the dataflow resizes the full image, which avoids upscaling a
+                    // shrunken copy when a window grows.
+                    let target = display_info
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .and_then(|((width, height), format)| {
+                            format.map(|format| LoadTarget {
+                                format: Some(format),
+                                size: (width, height.saturating_sub(reserved_height)),
+                            })
+                        });
                     // Load image
-                    match suppress_err(load_image_from_path(&path, Some(buffer_max_size))) {
+                    match suppress_err(load_picture(&path, Some(buffer_max_size), target)) {
                         Ok(image) => {
                             if stopping.load(Ordering::Acquire) {
                                 return;
@@ -87,6 +107,7 @@ impl Loader {
         });
         Self {
             requests,
+            display,
             slot,
             consumer,
             stop,
@@ -177,6 +198,15 @@ impl Prefetch {
             deadline: Duration::ZERO,
             delay,
         }
+    }
+
+    /// Report the display's dimensions and pixel format, which later loads prepare images for.
+    pub fn set_display(&self, dimensions: (u32, u32), format: Option<PixelFormat>) {
+        *self
+            .loader
+            .display
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Some((dimensions, format));
     }
 
     pub fn loading(&self) -> bool {

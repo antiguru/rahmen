@@ -4,6 +4,7 @@ use crate::prefetch::Loader;
 use image::{DynamicImage, Rgb, RgbImage};
 use rahmen::Vector;
 use rahmen::font::FontRenderer;
+use rahmen::picture::Picture;
 use rahmen::provider::{Provider, StatusLineFormatter};
 use std::cell::Cell;
 use std::path::PathBuf;
@@ -14,7 +15,7 @@ use timely::communication::Allocator;
 use timely::worker::Config;
 
 struct DisplayState {
-    images: Vec<(usize, DynamicImage)>,
+    images: Vec<(usize, Picture)>,
     updates: usize,
     dimensions: (u32, u32),
     clock: Rc<Cell<Duration>>,
@@ -22,7 +23,7 @@ struct DisplayState {
     fail: bool,
 }
 impl Display for DisplayState {
-    fn render(&mut self, key: usize, _: Vector, image: &DynamicImage) -> RahmenResult<()> {
+    fn render(&mut self, key: usize, _: Vector, image: &Picture) -> RahmenResult<()> {
         self.images.push((key, image.clone()));
         Ok(())
     }
@@ -84,9 +85,9 @@ fn blocked_provider_does_not_block_clock_progress() {
         input.send(Configuration::FontSize(12.));
         input.send(Configuration::FontCanvasVStretch(1.5));
         input.send(Configuration::Greeting("HELLO".into()));
-        input.send(Configuration::Splash(Arc::new(DynamicImage::ImageRgb8(
-            RgbImage::from_pixel(4, 4, Rgb([23, 45, 67])),
-        ))));
+        input.send(Configuration::Splash(Arc::new(
+            DynamicImage::ImageRgb8(RgbImage::from_pixel(4, 4, Rgb([23, 45, 67]))).into(),
+        )));
         let loader = Loader::new(
             &mut worker,
             Box::new(Blocked {
@@ -95,6 +96,7 @@ fn blocked_provider_does_not_block_clock_progress() {
             }),
             StatusLineFormatter::new(std::iter::empty(), None, ", ".into()).unwrap(),
             16_000_000,
+            0,
         );
         let clock = Rc::new(Cell::new(Duration::ZERO));
         let mut display = DisplayState {
@@ -200,14 +202,15 @@ fn with_driver(
     input.send(Configuration::FontSize(12.));
     input.send(Configuration::FontCanvasVStretch(1.5));
     input.send(Configuration::Greeting("HELLO".into()));
-    input.send(Configuration::Splash(Arc::new(DynamicImage::ImageRgb8(
-        RgbImage::from_pixel(4, 4, Rgb([23, 45, 67])),
-    ))));
+    input.send(Configuration::Splash(Arc::new(
+        DynamicImage::ImageRgb8(RgbImage::from_pixel(4, 4, Rgb([23, 45, 67]))).into(),
+    )));
     let loader = Loader::new(
         &mut worker,
         provider,
         StatusLineFormatter::new(std::iter::empty(), None, ", ".into()).unwrap(),
         16_000_000,
+        0,
     );
     let clock = Rc::new(Cell::new(Duration::ZERO));
     let mut display = DisplayState {
@@ -318,9 +321,9 @@ fn early_image_waits_and_final_interval_starts_after_display_update() {
                 .render(["[FIXED] "].into_iter(), 12., (240, 18))
                 .unwrap();
             wait_until(drive, display, |d| {
-                d.images
-                    .last()
-                    .is_some_and(|(key, image)| *key == 2 && image == &ready_status)
+                d.images.last().is_some_and(|(key, image)| {
+                    *key == 2 && *image == Picture::from(ready_status.clone())
+                })
             });
             display.images.clear();
             display.clock.set(Duration::from_secs(12));

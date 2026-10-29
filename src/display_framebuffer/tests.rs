@@ -1,4 +1,5 @@
 use super::*;
+use framebuffer::Bitfield;
 use framebuffer::{FixScreeninfo, VarScreeninfo};
 use image::{RgbImage, RgbaImage};
 use memmap2::MmapMut;
@@ -49,8 +50,8 @@ fn display(
 }
 
 /// A 2x2 RGB image with pixels (1, 2, 3), (4, 5, 6), ...
-fn rgb_image() -> DynamicImage {
-    DynamicImage::ImageRgb8(RgbImage::from_raw(2, 2, (1..=12).collect()).unwrap())
+fn rgb_image() -> Picture {
+    DynamicImage::ImageRgb8(RgbImage::from_raw(2, 2, (1..=12).collect()).unwrap()).into()
 }
 
 const BGRA: [u8; 16] = [3, 2, 1, 255, 6, 5, 4, 255, 9, 8, 7, 255, 12, 11, 10, 255];
@@ -67,7 +68,11 @@ fn render_drops_alpha_of_rgba_images() {
     let mut display = display(8, 2, 2, 0, 0, 16);
     let source = RgbaImage::from_raw(2, 2, (1..=16).collect()).unwrap();
     display
-        .render(0, Vector::new(0, 0), &DynamicImage::ImageRgba8(source))
+        .render(
+            0,
+            Vector::new(0, 0),
+            &DynamicImage::ImageRgba8(source).into(),
+        )
         .unwrap();
     assert_eq!(
         &display.framebuffer.frame[..],
@@ -85,7 +90,7 @@ fn render_follows_reported_channel_offsets() {
     display.render(0, Vector::new(0, 0), &rgb_image()).unwrap();
     assert_eq!(
         &display.framebuffer.frame[..],
-        &[1, 2, 3, 0, 4, 5, 6, 0, 7, 8, 9, 0, 10, 11, 12, 0]
+        &[1, 2, 3, 255, 4, 5, 6, 255, 7, 8, 9, 255, 10, 11, 12, 255]
     );
 }
 
@@ -208,8 +213,42 @@ fn render_rejects_overflowing_geometry_without_writes() {
     display.framebuffer.fix_screen_info.line_length = u32::MAX;
     assert!(
         display
-            .render(0, Vector::new(0, 0), &DynamicImage::new_rgba8(1, 1))
+            .render(0, Vector::new(0, 0), &DynamicImage::new_rgba8(1, 1).into())
             .is_err()
     );
     assert!(display.framebuffer.frame.iter().all(|byte| *byte == 0xa5));
+}
+
+#[test]
+fn render_copies_matching_native_rows() {
+    let mut display = display(20, 4, 4, 1, 1, 80);
+    let format = display.pixel_format().unwrap();
+    let native = Picture::Native(format, RgbaImage::from_raw(2, 2, BGRA.to_vec()).unwrap());
+    display.render(0, Vector::new(0, 0), &native).unwrap();
+    let mut expected = vec![0xa5; 80];
+    expected[24..32].copy_from_slice(&BGRA[..8]);
+    expected[44..52].copy_from_slice(&BGRA[8..]);
+    assert_eq!(&display.framebuffer.frame[..], expected);
+}
+
+#[test]
+fn render_converts_mismatched_native() {
+    let mut display = display(8, 2, 2, 0, 0, 16);
+    let rgba = PixelFormat::from_var_screen_info(&VarScreeninfo {
+        bits_per_pixel: 32,
+        red: bitfield(0, 8),
+        green: bitfield(8, 8),
+        blue: bitfield(16, 8),
+        transp: bitfield(24, 8),
+        ..Default::default()
+    })
+    .unwrap();
+    let pixels = (1..=12)
+        .collect::<Vec<u8>>()
+        .chunks(3)
+        .flat_map(|rgb| [rgb[0], rgb[1], rgb[2], 255])
+        .collect();
+    let native = Picture::Native(rgba, RgbaImage::from_raw(2, 2, pixels).unwrap());
+    display.render(0, Vector::new(0, 0), &native).unwrap();
+    assert_eq!(&display.framebuffer.frame[..], &BGRA);
 }

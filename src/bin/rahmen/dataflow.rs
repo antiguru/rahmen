@@ -1,9 +1,9 @@
-use image::{DynamicImage, GenericImageView};
 use log::info;
 use pathfinder_geometry::rect::RectI;
 use rahmen::Vector;
 use rahmen::dataflow::{Configuration, FormatText, ResizeImage};
 use rahmen::font::FontRenderer;
+use rahmen::picture::Picture;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -31,10 +31,10 @@ enum StatusUpdate {
     Loading(bool),
 }
 
-// `DynamicImage` only implements `PartialEq` (not `Eq`) since it can hold floating-point pixels.
+// `Picture` only implements `PartialEq` (not `Eq`) since it can hold floating-point pixels.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum Render {
-    Image(usize, Vector, Arc<DynamicImage>),
+    Image(usize, Vector, Arc<Picture>),
     Blank(usize, Vector, Vector),
 }
 

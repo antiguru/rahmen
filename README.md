@@ -138,16 +138,17 @@ FLAGS:
 -V, --version    Prints version information
 
 OPTIONS:
---buffer_max_size <buffer_max_size>    [default: 16000000]
+--buffer_max_size <buffer_max_size>    [default: 24000000]
 ```
 
 The buffer size limits the decoded pixel bytes of each loaded image, including all color channels.
+On the framebuffer display, JPEG images are decoded straight into the framebuffer's pixel layout with 4 bytes per pixel; otherwise they use 3.
 JPEG images use the largest decoder scale that fits, down to one eighth of each original dimension.
 Images that cannot fit, including PNG images that would require downscaling, are skipped with a load error.
 Decoder allocation limits also apply to non-JPEG images and can reject files whose pixels fit but whose decoder needs more memory.
 This is not a global process memory limit, so leave room for decoder state, metadata, rendering, and other loaded images.
 
-Rule of thumb: `long side of the monitor ^ 2 * 2`, e.g. for a 1600 * 1200 monitor: `1600 * 1600 * 2 = 5120000`.
+Rule of thumb: `long side of the monitor ^ 2 * 3`, e.g. for a 1600 * 1200 monitor: `1600 * 1600 * 3 = 7680000`.
 
 (Images smaller than your monitor will be scaled up to the monitor size and will possibly appear blurred. Avoid them if
 you don't like this.)
