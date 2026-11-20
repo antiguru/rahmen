@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1](https://github.com/antiguru/rahmen/compare/rahmen-v0.4.0...rahmen-v0.4.1) - 2026-11-20
+
+### Other
+
+- Pin the Rust toolchain in CI and release-plz ([#75](https://github.com/antiguru/rahmen/pull/75))
+- Bump timely from 0.31.0 to 0.32.0 ([#72](https://github.com/antiguru/rahmen/pull/72))
+- Bump harfrust from 0.15.0 to 0.16.0 ([#73](https://github.com/antiguru/rahmen/pull/73))
+- Prepare images in the framebuffer's layout in the background loader ([#69](https://github.com/antiguru/rahmen/pull/69))
+- Drop package.homepage, which duplicates repository ([#74](https://github.com/antiguru/rahmen/pull/74))
+- Bump log from 0.4.34 to 0.4.35 ([#71](https://github.com/antiguru/rahmen/pull/71))
+- Write framebuffer pixels directly in the device's layout ([#68](https://github.com/antiguru/rahmen/pull/68))
+
 ## [0.4.0](https://github.com/antiguru/rahmen/compare/rahmen-v0.3.0...rahmen-v0.4.0) - 2026-10-26
 
 ### Added
