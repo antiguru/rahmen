@@ -8,7 +8,6 @@ license = "GPL-3.0-only"
 description = "Rahmen is a lightweight image presenter"
 readme = "README.md"
 repository = "https://github.com/antiguru/rahmen"
-homepage = "https://github.com/antiguru/rahmen"
 documentation = "https://docs.rs/rahmen"
 keywords = ["slideshow", "image", "framebuffer", "exif", "picture-frame"]
 categories = ["multimedia::images", "command-line-utilities"]
