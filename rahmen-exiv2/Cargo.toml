@@ -7,7 +7,6 @@ rust-version.workspace = true
 license = "GPL-3.0-only"
 description = "Minimal safe wrapper over libexiv2 for rahmen"
 repository = "https://github.com/antiguru/rahmen"
-homepage = "https://github.com/antiguru/rahmen"
 documentation = "https://docs.rs/rahmen-exiv2"
 readme = "README.md"
 keywords = ["exiv2", "exif", "metadata", "image", "iptc"]
