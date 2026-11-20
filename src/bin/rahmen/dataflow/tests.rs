@@ -67,7 +67,7 @@ impl Graph {
             .flat_map(|event| match event {
                 Event::Messages(t, messages) => messages
                     .into_iter()
-                    .map(move |message| (t, message))
+                    .map(move |message| (*t.expect_singleton(), message))
                     .collect(),
                 Event::Progress(_) => vec![],
             })
