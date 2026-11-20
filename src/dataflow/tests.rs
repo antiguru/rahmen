@@ -1,6 +1,6 @@
 use super::*;
 use font_kit::{family_name::FamilyName, properties::Properties, source::SystemSource};
-use image::{Rgb, RgbImage};
+use image::{DynamicImage, Rgb, RgbImage};
 use std::cell::RefCell;
 use std::rc::Rc;
 use timely::container::CapacityContainerBuilder;
@@ -8,7 +8,7 @@ use timely::dataflow::InputHandle;
 use timely::dataflow::operators::{Inspect, Probe};
 
 type Input<D> = InputHandle<u64, CapacityContainerBuilder<Vec<D>>>;
-type Frames = Rc<RefCell<Vec<(u64, usize, Vector, Arc<DynamicImage>)>>>;
+type Frames = Rc<RefCell<Vec<(u64, usize, Vector, Arc<Picture>)>>>;
 
 fn font() -> FontRenderer {
     FontRenderer::with_font(
@@ -50,20 +50,15 @@ fn resize_order(configuration_first: bool) {
                 .probe()
                 .0
         });
-        let red = Arc::new(DynamicImage::ImageRgb8(RgbImage::from_pixel(
-            4,
-            2,
-            Rgb([255, 0, 0]),
-        )));
+        let red: Arc<Picture> =
+            Arc::new(DynamicImage::ImageRgb8(RgbImage::from_pixel(4, 2, Rgb([255, 0, 0]))).into());
         if configuration_first {
             config.send(Configuration::ScreenDimensions(8, 8));
             config.advance_to(1);
         } else {
-            images.send(Arc::new(DynamicImage::ImageRgb8(RgbImage::from_pixel(
-                4,
-                2,
-                Rgb([0, 0, 255]),
-            ))));
+            images.send(Arc::new(
+                DynamicImage::ImageRgb8(RgbImage::from_pixel(4, 2, Rgb([0, 0, 255]))).into(),
+            ));
             images.send(red.clone());
             images.advance_to(1);
         }
@@ -76,11 +71,9 @@ fn resize_order(configuration_first: bool) {
         );
         assert!(probe.less_equal(&0));
         if configuration_first {
-            images.send(Arc::new(DynamicImage::ImageRgb8(RgbImage::from_pixel(
-                4,
-                2,
-                Rgb([0, 0, 255]),
-            ))));
+            images.send(Arc::new(
+                DynamicImage::ImageRgb8(RgbImage::from_pixel(4, 2, Rgb([0, 0, 255]))).into(),
+            ));
             images.send(red);
             images.advance_to(1);
         } else {
@@ -105,11 +98,9 @@ fn resize_order(configuration_first: bool) {
         assert_eq!(frames.borrow()[1].0, 1);
         assert_eq!(frames.borrow()[1].2, Vector::new(0, 3));
         assert_eq!(frames.borrow()[1].3.dimensions(), (4, 2));
-        images.send(Arc::new(DynamicImage::ImageRgb8(RgbImage::from_pixel(
-            2,
-            4,
-            Rgb([0, 255, 0]),
-        ))));
+        images.send(Arc::new(
+            DynamicImage::ImageRgb8(RgbImage::from_pixel(2, 4, Rgb([0, 255, 0]))).into(),
+        ));
         images.advance_to(3);
         config.advance_to(3);
         advance(worker, &probe, 3);
@@ -141,6 +132,36 @@ fn resize_configuration_first() {
 #[test]
 fn resize_image_first() {
     resize_order(false);
+}
+
+#[test]
+fn resize_reuses_fitting_picture() {
+    timely::execute_directly(move |worker| {
+        let mut images = Input::new();
+        let mut config = Input::new();
+        let frames: Frames = Default::default();
+        let captured = frames.clone();
+        let probe = worker.dataflow(|scope| {
+            images
+                .to_stream(scope)
+                .resize_image(&config.to_stream(scope), 7)
+                .inspect_time(move |t, (key, pos, img)| {
+                    captured.borrow_mut().push((*t, *key, *pos, img.clone()))
+                })
+                .probe()
+                .0
+        });
+        let fitting: Arc<Picture> = Arc::new(DynamicImage::new_rgb8(8, 4).into());
+        config.send(Configuration::ScreenDimensions(8, 8));
+        images.send(fitting.clone());
+        config.advance_to(1);
+        images.advance_to(1);
+        advance(worker, &probe, 1);
+        let frames = frames.borrow();
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0].2, Vector::new(0, 2));
+        assert!(Arc::ptr_eq(&frames[0].3, &fitting));
+    });
 }
 
 fn text_order(configuration_first: bool) {

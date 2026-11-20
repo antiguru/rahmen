@@ -4,18 +4,18 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::font::FontRenderer;
+use crate::picture::Picture;
 use crate::{Timer, Vector};
-use image::{DynamicImage, GenericImageView};
 use timely::dataflow::Stream;
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::Operator;
 use timely::progress::Timestamp;
 
 /// A stream of images
-pub type ImageStream<'a, T> = Stream<'a, T, Vec<Arc<DynamicImage>>>;
+pub type ImageStream<'a, T> = Stream<'a, T, Vec<Arc<Picture>>>;
 
 /// A keyed stream of offset and image
-pub type ImagePosStream<'a, T> = Stream<'a, T, Vec<(usize, Vector, Arc<DynamicImage>)>>;
+pub type ImagePosStream<'a, T> = Stream<'a, T, Vec<(usize, Vector, Arc<Picture>)>>;
 
 /// A configuration stream
 pub type ConfigurationStream<'a, T> = Stream<'a, T, Vec<Configuration>>;
@@ -32,7 +32,7 @@ pub enum Configuration {
     /// Show a new image
     Tick,
     /// Splash screen
-    Splash(Arc<DynamicImage>),
+    Splash(Arc<Picture>),
     /// Greeting message
     Greeting(String),
 }
@@ -132,7 +132,7 @@ impl<'a, T: Timestamp + std::hash::Hash> FormatText<'a, T> for Stream<'a, T, Vec
                         out.session(&time).give((
                             key,
                             Vector::new(0, dimension.1 as i32 - canvas_height as i32),
-                            Arc::new(img),
+                            Arc::new(img.into()),
                         ));
                     }
                 });
@@ -203,17 +203,17 @@ impl<'a, T: Timestamp + std::hash::Hash> ResizeImage<'a, T> for ImageStream<'a, 
                         if screen_size.0 == 0 || screen_size.1 == 0 {
                             return;
                         }
-                        let resized = image.resize(
-                            screen_size.0,
-                            screen_size.1,
-                            image::imageops::FilterType::Triangle,
-                        );
+                        // Pictures prepared for this screen size pass through unchanged.
+                        let resized = match image.resize_to_fit(screen_size.0, screen_size.1) {
+                            Some(resized) => Arc::new(resized),
+                            None => Arc::clone(image),
+                        };
                         let x_offset = (screen_size.0 - resized.dimensions().0) / 2;
                         let y_offset = (screen_size.1 - resized.dimensions().1) / 2;
                         out.session(&time).give((
                             key,
                             Vector::new(x_offset as _, y_offset as _),
-                            Arc::new(resized),
+                            resized,
                         ));
                     }
                 })
