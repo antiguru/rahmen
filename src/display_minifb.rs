@@ -8,7 +8,7 @@ use crate::Vector;
 use crate::display::Display;
 use crate::errors::{RahmenError, RahmenResult};
 
-use image::DynamicImage;
+use crate::picture::Picture;
 use minifb::{Key, ScaleMode, Window, WindowOptions};
 use std::time::Duration;
 
@@ -93,12 +93,12 @@ impl MinifbDisplay {
 }
 
 impl Display for MinifbDisplay {
-    fn render(&mut self, _key: usize, anchor: Vector, img: &DynamicImage) -> RahmenResult<()> {
+    fn render(&mut self, _key: usize, anchor: Vector, picture: &Picture) -> RahmenResult<()> {
         let _t = crate::Timer::new(|e| debug!("Rendering {}ms", e.as_millis()));
         self.match_dimensions()?;
-        let rgba = img.to_rgba8();
-        let (img_width, img_height) = rgba.dimensions();
-        let raw = rgba.as_raw();
+        let rgb = picture.to_rgb8();
+        let (img_width, img_height) = rgb.dimensions();
+        let raw = rgb.as_raw();
         for y in 0..img_height as i32 {
             let dest_y = anchor.y() + y;
             if dest_y < 0 || dest_y >= self.height as i32 {
@@ -109,7 +109,7 @@ impl Display for MinifbDisplay {
                 if dest_x < 0 || dest_x >= self.width as i32 {
                     continue;
                 }
-                let src = ((y as u32 * img_width + x as u32) * 4) as usize;
+                let src = ((y as u32 * img_width + x as u32) * 3) as usize;
                 let value = (u32::from(raw[src]) << 16)
                     | (u32::from(raw[src + 1]) << 8)
                     | u32::from(raw[src + 2]);

@@ -29,7 +29,7 @@ impl<D> Provider<D> for Box<dyn Provider<D>> {
 }
 
 mod image_loader;
-pub use image_loader::load_image_from_path;
+pub use image_loader::{LoadTarget, load_image_from_path, load_picture};
 
 /// settings for the status line formatter
 #[derive(Debug, Deserialize, Clone)]
