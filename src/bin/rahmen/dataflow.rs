@@ -1,7 +1,7 @@
 use log::info;
 use pathfinder_geometry::rect::RectI;
 use rahmen::Vector;
-use rahmen::dataflow::{Configuration, FormatText, ResizeImage};
+use rahmen::dataflow::{Configuration, FormatText, Pending, ResizeImage};
 use rahmen::font::FontRenderer;
 use rahmen::picture::Picture;
 use std::collections::HashMap;
@@ -11,7 +11,7 @@ use timely::container::CapacityContainerBuilder;
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::capture::Event;
 use timely::dataflow::operators::vec::Map;
-use timely::dataflow::operators::{Capture, Concat, Notificator, Operator, Probe};
+use timely::dataflow::operators::{Capture, Concat, Operator, Probe};
 use timely::dataflow::{InputHandle, ProbeHandle};
 use timely::worker::Worker;
 
@@ -82,53 +82,64 @@ pub(super) fn build(
                 Configuration::Greeting(text) => Some(StatusUpdate::Text(text)),
                 _ => None,
             }))
-            .unary_notify(
+            .unary_frontier(
                 Pipeline,
                 "Show time and loading",
-                next_tick,
-                move |input, output, not: &mut Notificator<Duration>| {
-                    input.for_each(|cap, data| {
-                        stash.entry(*cap.time()).or_default().append(data);
-                        not.notify_at(cap.retain(0));
-                    });
-                    not.for_each(|cap, _, not| {
-                        if let Some(updates) = stash.remove(cap.time()) {
-                            for update in updates {
-                                match update {
-                                    StatusUpdate::Text(text) => {
-                                        info!("Status line: {}", text);
-                                        current_text = Some(text);
+                move |capability, _info| {
+                    let mut pending = Pending::default();
+                    if next_tick.is_some() {
+                        pending.notify_at(capability);
+                    }
+                    move |(input, frontier), output| {
+                        input.for_each(|cap, data| {
+                            let Some(cap) = cap.retain_least(0) else {
+                                return;
+                            };
+                            stash.entry(*cap.time()).or_default().append(data);
+                            pending.notify_at(cap);
+                        });
+                        while let Some(cap) = pending.next(&[frontier]) {
+                            if let Some(updates) = stash.remove(cap.time()) {
+                                for update in updates {
+                                    match update {
+                                        StatusUpdate::Text(text) => {
+                                            info!("Status line: {}", text);
+                                            current_text = Some(text);
+                                        }
+                                        StatusUpdate::Loading(value) => loading = value,
                                     }
-                                    StatusUpdate::Loading(value) => loading = value,
                                 }
                             }
-                        }
-                        let now = chrono::Local::now();
-                        // Only the outstanding periodic notification schedules another tick.
-                        // Text/loading notifications at the same time cannot multiply the clock.
-                        if next_tick == Some(*cap.time()) {
-                            next_tick = None;
-                            if !not.frontier(0).is_empty() {
-                                let delay =
-                                    std::cmp::max(50, 1000 - now.timestamp_subsec_millis() as u64);
-                                let mut next = *cap.time() + Duration::from_millis(delay);
-                                while !not.frontier(0).less_equal(&next) {
-                                    next += Duration::from_secs(1);
+                            let now = chrono::Local::now();
+                            // Only the outstanding periodic notification schedules another tick.
+                            // Text/loading notifications at the same time cannot multiply the clock.
+                            if next_tick == Some(*cap.time()) {
+                                next_tick = None;
+                                if !frontier.is_empty() {
+                                    let delay = std::cmp::max(
+                                        50,
+                                        1000 - now.timestamp_subsec_millis() as u64,
+                                    );
+                                    let mut next = *cap.time() + Duration::from_millis(delay);
+                                    while !frontier.less_equal(&next) {
+                                        next += Duration::from_secs(1);
+                                    }
+                                    next_tick = Some(next);
+                                    pending.notify_at(cap.delayed(&next));
                                 }
-                                next_tick = Some(next);
-                                not.notify_at(cap.delayed(&next));
+                            }
+                            if let Some(text) = &current_text {
+                                let timestamp =
+                                    show_time.then(|| now.format(&time_format).to_string());
+                                output.session(&cap).give(status_text(
+                                    timestamp.as_deref(),
+                                    text,
+                                    loading,
+                                    loading_marker,
+                                ));
                             }
                         }
-                        if let Some(text) = &current_text {
-                            let timestamp = show_time.then(|| now.format(&time_format).to_string());
-                            output.session(&cap).give(status_text(
-                                timestamp.as_deref(),
-                                text,
-                                loading,
-                                loading_marker,
-                            ));
-                        }
-                    });
+                    }
                 },
             );
         let status_line_stream =
@@ -143,47 +154,56 @@ pub(super) fn build(
             let mut current_font_size = None;
             let mut current_font_canvas_vstretch = None;
 
-            configuration_stream.clone().unary_notify(
+            configuration_stream.clone().unary_frontier(
                 Pipeline,
                 "Adjust configuration",
-                None,
-                move |input, output, not| {
-                    input.for_each(|cap, data| {
-                        stash.entry(*cap.time()).or_default().append(data);
-                        not.notify_at(cap.retain(0));
-                    });
-                    not.for_each(|cap, _, _not| {
-                        if let Some(updates) = stash.remove(cap.time()) {
-                            output.session(&cap).give_iterator(updates.into_iter().map(
-                                |configuration| {
-                                    match configuration {
-                                        Configuration::FontSize(font_size) => {
-                                            current_font_size = Some(font_size);
-                                            Configuration::FontSize(font_size)
+                |_capability, _info| {
+                    let mut pending = Pending::default();
+                    move |(input, frontier), output| {
+                        input.for_each(|cap, data| {
+                            let Some(cap) = cap.retain_least(0) else {
+                                return;
+                            };
+                            stash.entry(*cap.time()).or_default().append(data);
+                            pending.notify_at(cap);
+                        });
+                        while let Some(cap) = pending.next(&[frontier]) {
+                            if let Some(updates) = stash.remove(cap.time()) {
+                                output.session(&cap).give_iterator(updates.into_iter().map(
+                                    |configuration| {
+                                        match configuration {
+                                            Configuration::FontSize(font_size) => {
+                                                current_font_size = Some(font_size);
+                                                Configuration::FontSize(font_size)
+                                            }
+                                            Configuration::FontCanvasVStretch(
+                                                font_canvas_vstretch,
+                                            ) => {
+                                                current_font_canvas_vstretch =
+                                                    Some(font_canvas_vstretch);
+                                                Configuration::FontCanvasVStretch(
+                                                    font_canvas_vstretch,
+                                                )
+                                            }
+                                            Configuration::ScreenDimensions(width, height) => {
+                                                Configuration::ScreenDimensions(
+                                                    width,
+                                                    height.saturating_sub(
+                                                        (current_font_size.unwrap_or(0.)
+                                                            * current_font_canvas_vstretch
+                                                                .unwrap_or(1.0))
+                                                        .ceil()
+                                                            as u32,
+                                                    ),
+                                                )
+                                            }
+                                            configuration => configuration,
                                         }
-                                        Configuration::FontCanvasVStretch(font_canvas_vstretch) => {
-                                            current_font_canvas_vstretch =
-                                                Some(font_canvas_vstretch);
-                                            Configuration::FontCanvasVStretch(font_canvas_vstretch)
-                                        }
-                                        Configuration::ScreenDimensions(width, height) => {
-                                            Configuration::ScreenDimensions(
-                                                width,
-                                                height.saturating_sub(
-                                                    (current_font_size.unwrap_or(0.)
-                                                        * current_font_canvas_vstretch
-                                                            .unwrap_or(1.0))
-                                                    .ceil()
-                                                        as u32,
-                                                ),
-                                            )
-                                        }
-                                        configuration => configuration,
-                                    }
-                                },
-                            ));
+                                    },
+                                ));
+                            }
                         }
-                    });
+                    }
                 },
             )
         };
@@ -204,66 +224,82 @@ pub(super) fn build(
         let mut viewport_stash: HashMap<_, Vec<_>> = HashMap::new();
         let mut viewport = None;
 
-        let composed_img_stream = img_stream.concat(text_img_stream).binary_notify(
+        let composed_img_stream = img_stream.concat(text_img_stream).binary_frontier(
             configuration_stream.clone(),
             Pipeline,
             Pipeline,
             "Infer blanking",
-            None,
-            move |input, configuration, output, not| {
-                input.for_each(|time, data| {
-                    input_buffer.entry(*time.time()).or_default().append(data);
-                    not.notify_at(time.retain(0));
-                });
-                configuration.for_each(|time, data| {
-                    viewport_stash.entry(*time.time()).or_default().append(data);
-                    not.notify_at(time.retain(0));
-                });
-                not.for_each(|time, _count, _not| {
-                    if let Some(configurations) = viewport_stash.remove(time.time()) {
-                        for configuration in configurations {
-                            if let Configuration::ScreenDimensions(width, height) = configuration {
-                                viewport = Some(RectI::new(
-                                    Vector::new(0, 0),
-                                    Vector::new(width as _, height as _),
-                                ));
+            |_capability, _info| {
+                let mut pending = Pending::default();
+                move |(input, frontier1), (configuration, frontier2), output| {
+                    input.for_each(|time, data| {
+                        let Some(time) = time.retain_least(0) else {
+                            return;
+                        };
+                        input_buffer.entry(*time.time()).or_default().append(data);
+                        pending.notify_at(time);
+                    });
+                    configuration.for_each(|time, data| {
+                        let Some(time) = time.retain_least(0) else {
+                            return;
+                        };
+                        viewport_stash.entry(*time.time()).or_default().append(data);
+                        pending.notify_at(time);
+                    });
+                    while let Some(time) = pending.next(&[frontier1, frontier2]) {
+                        if let Some(configurations) = viewport_stash.remove(time.time()) {
+                            for configuration in configurations {
+                                if let Configuration::ScreenDimensions(width, height) =
+                                    configuration
+                                {
+                                    viewport = Some(RectI::new(
+                                        Vector::new(0, 0),
+                                        Vector::new(width as _, height as _),
+                                    ));
+                                }
                             }
                         }
+                        if let Some(updates) = input_buffer.remove(time.time()) {
+                            output
+                                .session(&time)
+                                .give_iterator(updates.into_iter().flat_map(
+                                    |(key, anchor, img)| {
+                                        let rect = RectI::new(
+                                            anchor,
+                                            Vector::new(
+                                                img.dimensions().0 as _,
+                                                img.dimensions().1 as _,
+                                            ),
+                                        );
+                                        size_stash
+                                            .insert(key, rect)
+                                            .into_iter()
+                                            .flat_map(move |old_rect| {
+                                                compute_blanking(key, rect, old_rect)
+                                            })
+                                            .filter_map(|render| {
+                                                // Old rectangles can extend beyond a newly reduced viewport.
+                                                if let Render::Blank(key, origin, size) = render {
+                                                    let clipped = RectI::new(origin, size)
+                                                        .intersection(viewport?)?;
+                                                    (clipped.width() > 0 && clipped.height() > 0)
+                                                        .then(|| {
+                                                            Render::Blank(
+                                                                key,
+                                                                clipped.origin(),
+                                                                clipped.size(),
+                                                            )
+                                                        })
+                                                } else {
+                                                    Some(render)
+                                                }
+                                            })
+                                            .chain(Some(Render::Image(key, anchor, img)))
+                                    },
+                                ));
+                        }
                     }
-                    if let Some(updates) = input_buffer.remove(time.time()) {
-                        output
-                            .session(&time)
-                            .give_iterator(updates.into_iter().flat_map(|(key, anchor, img)| {
-                                let rect = RectI::new(
-                                    anchor,
-                                    Vector::new(img.dimensions().0 as _, img.dimensions().1 as _),
-                                );
-                                size_stash
-                                    .insert(key, rect)
-                                    .into_iter()
-                                    .flat_map(move |old_rect| compute_blanking(key, rect, old_rect))
-                                    .filter_map(|render| {
-                                        // Old rectangles can extend beyond a newly reduced viewport.
-                                        if let Render::Blank(key, origin, size) = render {
-                                            let clipped =
-                                                RectI::new(origin, size).intersection(viewport?)?;
-                                            (clipped.width() > 0 && clipped.height() > 0).then(
-                                                || {
-                                                    Render::Blank(
-                                                        key,
-                                                        clipped.origin(),
-                                                        clipped.size(),
-                                                    )
-                                                },
-                                            )
-                                        } else {
-                                            Some(render)
-                                        }
-                                    })
-                                    .chain(Some(Render::Image(key, anchor, img)))
-                            }));
-                    }
-                })
+                }
             },
         );
 
