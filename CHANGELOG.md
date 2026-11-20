@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/antiguru/rahmen/compare/rahmen-v0.4.0...rahmen-v0.5.0) - 2026-11-20
+
+### Changed
+
+* The framebuffer display writes pixels directly in the device's layout, derived from the framebuffer's channel bit fields instead of assuming BGRA, and converts images row by row without a screen-sized shadow buffer. Placements outside the screen are clipped instead of failing. ([#68](https://github.com/antiguru/rahmen/pull/68))
+* The background loader prepares images for the framebuffer: JPEG images are decoded straight into its pixel layout and resized to the image area, so the display only copies rows. ([#69](https://github.com/antiguru/rahmen/pull/69))
+* The default `--buffer_max_size` rises from 16 MB to 24 MB, because JPEG images decoded for the framebuffer count 4 bytes per pixel. ([#69](https://github.com/antiguru/rahmen/pull/69))
+* **Breaking:** Images travel through the dataflow and to displays as `Picture`, which holds either a `DynamicImage` or pixels in a display's native layout. This changes `Display::render`, `Configuration::Splash`, `ImageStream` and `ImagePosStream`. ([#69](https://github.com/antiguru/rahmen/pull/69))
+* **Breaking:** Update timely to 0.32. `FormatText` and `ResizeImage` now require totally ordered timestamps. ([#72](https://github.com/antiguru/rahmen/pull/72))
+* Update harfrust to 0.16 and log to 0.4.35. ([#73](https://github.com/antiguru/rahmen/pull/73), [#71](https://github.com/antiguru/rahmen/pull/71))
+
+### Fixed
+
+* Build with Rust 1.100, which warns about `package.homepage` duplicating `package.repository`. CI and release-plz pin their Rust versions. ([#74](https://github.com/antiguru/rahmen/pull/74), [#75](https://github.com/antiguru/rahmen/pull/75))
+
 ## [0.4.0](https://github.com/antiguru/rahmen/compare/rahmen-v0.3.0...rahmen-v0.4.0) - 2026-10-26
 
 ### Added
