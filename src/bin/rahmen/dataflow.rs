@@ -103,7 +103,7 @@ pub(super) fn build(
                                 for update in updates {
                                     match update {
                                         StatusUpdate::Text(text) => {
-                                            info!("Status line: {}", text);
+                                            info!("Status line: {text}");
                                             current_text = Some(text);
                                         }
                                         StatusUpdate::Loading(value) => loading = value,

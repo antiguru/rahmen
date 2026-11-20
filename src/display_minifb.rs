@@ -68,7 +68,7 @@ impl MinifbDisplay {
             // Present every iteration so the window keeps processing input even when no new image
             // was produced.
             if let Err(e) = self.present() {
-                error!("minifb error: {}", e);
+                error!("minifb error: {e}");
                 break;
             }
             std::thread::sleep(Duration::from_millis(50));

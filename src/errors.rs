@@ -38,17 +38,17 @@ pub type RahmenResult<T> = Result<T, RahmenError>;
 impl fmt::Display for RahmenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
-            RahmenError::CaseUnknown(err) => write!(f, "Unknown case: {}", err),
+            RahmenError::CaseUnknown(err) => write!(f, "Unknown case: {err}"),
             RahmenError::ConfigError(err) => err.fmt(f),
             RahmenError::IoError(err) => err.fmt(f),
             RahmenError::ImageError(err) => err.fmt(f),
             RahmenError::ParseFloatError(err) => err.fmt(f),
-            RahmenError::PythonError(err) => write!(f, "Python error: {}", err),
+            RahmenError::PythonError(err) => write!(f, "Python error: {err}"),
             RahmenError::RegexError(err) => err.fmt(f),
             RahmenError::Retry => write!(f, "Retry"),
             RahmenError::Exiv2Error(err) => err.fmt(f),
             RahmenError::Terminate => write!(f, "Terminate"),
-            RahmenError::WindowError(err) => write!(f, "Window error: {}", err),
+            RahmenError::WindowError(err) => write!(f, "Window error: {err}"),
         }
     }
 }

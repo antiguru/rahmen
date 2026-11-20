@@ -32,6 +32,11 @@ jobs:
           sudo apt-get install -y pkg-config libexiv2-dev libfontconfig1-dev python3-dev
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          # Pinned so new lints do not fail the warnings-denied build of the published crates
+          # that cargo-semver-checks compares against. Not the MSRV: cargo-semver-checks only
+          # reads the rustdoc JSON of recent toolchains.
+          toolchain: "1.99"
       - name: Run release-plz
         id: release
         uses: MarcoIeni/release-plz-action@v0.5

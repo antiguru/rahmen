@@ -46,7 +46,7 @@ pub struct LineSettings {
 pub fn str_to_case(s: String) -> RahmenResult<Case<'static>> {
     let case_str = s.to_case(Case::Flat);
     for case in Case::all_cases() {
-        if case_str == format!("{:?}", case).to_case(Case::Flat) {
+        if case_str == format!("{case:?}").to_case(Case::Flat) {
             return Ok(*case);
         }
     }
