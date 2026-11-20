@@ -261,7 +261,7 @@ fn fatal_err<T>(result: RahmenResult<Option<T>>) -> RunResult<T> {
         Ok(Some(t)) => Ok(t),
         // display error and terminate
         Err(e) => {
-            error!("Encountered error, terminating: {}", e);
+            error!("Encountered error, terminating: {e}");
             Err(RunControl::Terminate)
         }
     }
@@ -271,7 +271,7 @@ fn fatal_err<T>(result: RahmenResult<Option<T>>) -> RunResult<T> {
 fn suppress_err<T>(result: RahmenResult<T>) -> RunResult<T> {
     result.map_err(|e| {
         // just notify about error but keep processing
-        error!("Encountered error, suppressing: {}", e);
+        error!("Encountered error, suppressing: {e}");
         RunControl::Suppressed
     })
 }

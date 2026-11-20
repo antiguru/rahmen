@@ -74,14 +74,14 @@ pub(super) fn display_loop<'a>(
                         Ok(Render::Image(key, anchor, ref img)) => {
                             has_update = true;
                             if let Err(err) = display.render(key, anchor, img.as_ref()) {
-                                error!("Render failed: {}", err);
+                                error!("Render failed: {err}");
                                 terminate = true;
                             }
                         }
                         Ok(Render::Blank(key, anchor, size)) => {
                             has_update = true;
                             if let Err(err) = display.blank(key, anchor, size) {
-                                error!("Blank failed: {}", err);
+                                error!("Blank failed: {err}");
                                 terminate = true;
                             }
                         }

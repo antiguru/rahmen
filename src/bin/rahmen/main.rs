@@ -152,7 +152,7 @@ fn main() -> RahmenResult<()> {
         .unwrap_or(90.)
         * 1000f64) as u64;
     let delay = Duration::from_millis(duration_millis);
-    info!("Delay: {:?}", delay);
+    info!("Delay: {delay:?}");
 
     // font size to use (px)
     let font_size_f = matches
@@ -208,9 +208,9 @@ fn main() -> RahmenResult<()> {
             info!("Sending splash screen");
             input_configuration.send(Configuration::Splash(Arc::new(image.into())));
         }
-        Err(err) => warn!("Failed to load splash screen: {}", err),
+        Err(err) => warn!("Failed to load splash screen: {err}"),
     }
-    input_configuration.send(Configuration::Greeting(format!("Rahmen {}", VERSION)));
+    input_configuration.send(Configuration::Greeting(format!("Rahmen {VERSION}")));
 
     let display_fn = driver::display_loop(
         &mut worker,
