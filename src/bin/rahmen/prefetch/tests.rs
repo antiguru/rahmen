@@ -1,6 +1,7 @@
 use super::*;
 use rahmen::config::Element;
 use rahmen::errors::{RahmenError, RahmenResult};
+use rahmen::picture::Picture;
 use std::sync::atomic::AtomicUsize;
 use std::sync::mpsc;
 use std::time::Instant;
@@ -58,7 +59,11 @@ fn controlled() -> ControlledPrefetch {
     controlled_on(worker())
 }
 
-fn controlled_on(mut worker: Worker) -> ControlledPrefetch {
+fn controlled_on(worker: Worker) -> ControlledPrefetch {
+    controlled_with(worker, 0)
+}
+
+fn controlled_with(mut worker: Worker, reserved_height: u32) -> ControlledPrefetch {
     let (tx, paths) = mpsc::channel();
     let (entered, rx) = mpsc::channel();
     let calls = Arc::new(AtomicUsize::new(0));
@@ -71,6 +76,7 @@ fn controlled_on(mut worker: Worker) -> ControlledPrefetch {
         }),
         formatter(),
         16_000_000,
+        reserved_height,
     );
     (
         Prefetch::new(loader, Duration::from_secs(10)),
@@ -114,7 +120,7 @@ fn eager_prefetch_has_one_slot_and_preserves_real_image_metadata() {
     let Outcome::Image(prepared) = p.take_due(Duration::from_secs(1)).unwrap() else {
         panic!("missing decoded image")
     };
-    assert_eq!((prepared.image.width(), prepared.image.height()), (4, 4));
+    assert_eq!(prepared.image.dimensions(), (4, 4));
     assert_eq!(prepared.status.as_deref(), Some("Zurich"));
     assert!(p.take_due(Duration::from_secs(99)).is_none());
     p.presented(Duration::from_secs(3));
@@ -129,6 +135,54 @@ fn eager_prefetch_has_one_slot_and_preserves_real_image_metadata() {
         p.take_due(Duration::from_secs(13)),
         Some(Outcome::Terminate)
     ));
+}
+
+#[test]
+fn loads_prepare_pictures_for_the_display() {
+    let _guard = METADATA.lock().unwrap();
+    let (mut p, mut worker, tx, entered, _) = controlled_with(worker(), 2);
+    let field = |offset| framebuffer::Bitfield {
+        offset,
+        length: 8,
+        msb_right: 0,
+    };
+    let bgra = PixelFormat::from_var_screen_info(&framebuffer::VarScreeninfo {
+        bits_per_pixel: 32,
+        red: field(16),
+        green: field(8),
+        blue: field(0),
+        transp: field(24),
+        ..Default::default()
+    })
+    .unwrap();
+    // The image area excludes the status line's 2 rows.
+    p.set_display((2, 4), Some(bgra));
+    p.presented(Duration::ZERO);
+    entered.recv_timeout(Duration::from_secs(5)).unwrap();
+    tx.send(Ok(Some(fixture()))).unwrap();
+    wait_ready(&mut p, &mut worker);
+    let Outcome::Image(prepared) = p.take_due(Duration::from_secs(1)).unwrap() else {
+        panic!("missing decoded image")
+    };
+    assert!(matches!(*prepared.image, Picture::Native(format, _) if format == bgra));
+    assert_eq!(prepared.image.dimensions(), (2, 2));
+}
+
+#[test]
+fn loads_keep_full_size_without_native_format() {
+    let _guard = METADATA.lock().unwrap();
+    let (mut p, mut worker, tx, entered, _) = controlled_with(worker(), 2);
+    // A window can grow later, so its images must not be shrunk ahead of time.
+    p.set_display((2, 4), None);
+    p.presented(Duration::ZERO);
+    entered.recv_timeout(Duration::from_secs(5)).unwrap();
+    tx.send(Ok(Some(fixture()))).unwrap();
+    wait_ready(&mut p, &mut worker);
+    let Outcome::Image(prepared) = p.take_due(Duration::from_secs(1)).unwrap() else {
+        panic!("missing decoded image")
+    };
+    assert!(matches!(*prepared.image, Picture::Image(_)));
+    assert_eq!(prepared.image.dimensions(), (4, 4));
 }
 
 #[test]
@@ -208,7 +262,7 @@ fn unexpected_worker_panic_is_a_terminal_outcome() {
     }
     let mut worker = worker();
     let mut p = Prefetch::new(
-        Loader::new(&mut worker, Box::new(Panics), formatter(), 16_000_000),
+        Loader::new(&mut worker, Box::new(Panics), formatter(), 16_000_000, 0),
         Duration::ZERO,
     );
     // Drain the initial activation so only the unwind notification can expose disconnect.
@@ -316,7 +370,7 @@ fn late_image_is_available_immediately_and_metadata_failure_is_not_terminal() {
     let Some(Outcome::Image(prepared)) = p.take_due(Duration::from_secs(20)) else {
         panic!("late result must be due")
     };
-    assert_eq!((prepared.image.width(), prepared.image.height()), (2, 2));
+    assert_eq!(prepared.image.dimensions(), (2, 2));
     assert!(
         prepared.status.is_none(),
         "unsupported metadata must retain previous status"
@@ -369,6 +423,7 @@ fn python_postprocessor_created_on_ui_thread_runs_on_worker() {
         }),
         formatter,
         16_000_000,
+        0,
     );
     let mut p = Prefetch::new(loader, Duration::ZERO);
     p.presented(Duration::ZERO);

@@ -1,6 +1,6 @@
 use super::*;
 use font_kit::{family_name::FamilyName, properties::Properties, source::SystemSource};
-use image::{Rgb, RgbImage};
+use image::{DynamicImage, Rgb, RgbImage};
 use std::time::Instant;
 use timely::communication::Allocator;
 use timely::worker::Config;
@@ -100,7 +100,7 @@ impl Graph {
     }
 }
 
-fn image(frames: &[Frame], key: usize) -> (&Duration, Vector, &DynamicImage) {
+fn image(frames: &[Frame], key: usize) -> (&Duration, Vector, &Picture) {
     frames
         .iter()
         .find_map(|(time, render)| match render {
@@ -114,11 +114,9 @@ fn image(frames: &[Frame], key: usize) -> (&Duration, Vector, &DynamicImage) {
 fn splash_greeting_and_configuration_only_updates() {
     let mut graph = Graph::new(false);
     graph.configure();
-    graph
-        .input
-        .send(Configuration::Splash(Arc::new(DynamicImage::ImageRgb8(
-            RgbImage::from_pixel(4, 4, Rgb([23, 45, 67])),
-        ))));
+    graph.input.send(Configuration::Splash(Arc::new(
+        DynamicImage::ImageRgb8(RgbImage::from_pixel(4, 4, Rgb([23, 45, 67]))).into(),
+    )));
     graph.input.send(Configuration::Greeting("HELLO".into()));
     for _ in 0..100 {
         graph.worker.step();
@@ -166,11 +164,9 @@ fn completed_image_and_metadata_share_promotion_time() {
     let mut graph = Graph::new(false);
     graph.configure();
     graph.updates.send(Update::Image(Prepared {
-        image: Arc::new(DynamicImage::ImageRgb8(RgbImage::from_pixel(
-            4,
-            4,
-            Rgb([23, 45, 67]),
-        ))),
+        image: Arc::new(
+            DynamicImage::ImageRgb8(RgbImage::from_pixel(4, 4, Rgb([23, 45, 67]))).into(),
+        ),
         status: Some("Zurich".into()),
     }));
     let frames = graph.advance(1);
@@ -271,11 +267,9 @@ fn small_viewport_restores_content(width: u32, height: u32) {
     graph
         .input
         .send(Configuration::ScreenDimensions(width, height));
-    graph
-        .input
-        .send(Configuration::Splash(Arc::new(DynamicImage::ImageRgb8(
-            RgbImage::from_pixel(4, 4, Rgb([23, 45, 67])),
-        ))));
+    graph.input.send(Configuration::Splash(Arc::new(
+        DynamicImage::ImageRgb8(RgbImage::from_pixel(4, 4, Rgb([23, 45, 67]))).into(),
+    )));
     graph.input.send(Configuration::Greeting("HELLO".into()));
     let frames = graph.advance(1);
     assert_in_bounds(&frames, width, height);
@@ -347,11 +341,9 @@ fn empty_viewport_clock_progresses_and_closes() {
 fn viewport_shrink_clips_inferred_blanks() {
     let mut graph = Graph::new(false);
     graph.configure();
-    graph
-        .input
-        .send(Configuration::Splash(Arc::new(DynamicImage::ImageRgb8(
-            RgbImage::from_pixel(4, 4, Rgb([23, 45, 67])),
-        ))));
+    graph.input.send(Configuration::Splash(Arc::new(
+        DynamicImage::ImageRgb8(RgbImage::from_pixel(4, 4, Rgb([23, 45, 67]))).into(),
+    )));
     graph.input.send(Configuration::Greeting("HELLO".into()));
     assert_in_bounds(&graph.advance(1), 96, 80);
     for (i, (width, height)) in [(96, 10), (96, 18), (96, 0), (0, 80)]
@@ -425,7 +417,7 @@ fn missing_metadata_preserves_previous_status() {
     graph.input.send(Configuration::Greeting("PREVIOUS".into()));
     graph.advance(1);
     graph.updates.send(Update::Image(Prepared {
-        image: Arc::new(DynamicImage::ImageRgb8(RgbImage::new(4, 4))),
+        image: Arc::new(DynamicImage::ImageRgb8(RgbImage::new(4, 4)).into()),
         status: None,
     }));
     let frames = graph.advance(2);
