@@ -44,8 +44,13 @@ fn resize_order(configuration_first: bool) {
             images
                 .to_stream(scope)
                 .resize_image(&config.to_stream(scope), 7)
-                .inspect_time(move |t, (key, pos, img)| {
-                    captured.borrow_mut().push((*t, *key, *pos, img.clone()))
+                .inspect_core(move |event| {
+                    if let Ok((stamp, data)) = event {
+                        let time = *stamp.expect_singleton();
+                        for (key, pos, img) in data {
+                            captured.borrow_mut().push((time, *key, *pos, img.clone()))
+                        }
+                    }
                 })
                 .probe()
                 .0
@@ -145,8 +150,13 @@ fn resize_reuses_fitting_picture() {
             images
                 .to_stream(scope)
                 .resize_image(&config.to_stream(scope), 7)
-                .inspect_time(move |t, (key, pos, img)| {
-                    captured.borrow_mut().push((*t, *key, *pos, img.clone()))
+                .inspect_core(move |event| {
+                    if let Ok((stamp, data)) = event {
+                        let time = *stamp.expect_singleton();
+                        for (key, pos, img) in data {
+                            captured.borrow_mut().push((time, *key, *pos, img.clone()))
+                        }
+                    }
                 })
                 .probe()
                 .0
@@ -173,8 +183,13 @@ fn text_order(configuration_first: bool) {
         let probe = worker.dataflow(|scope| {
             text.to_stream(scope)
                 .format_text(&config.to_stream(scope), font(), 9)
-                .inspect_time(move |t, (key, pos, img)| {
-                    captured.borrow_mut().push((*t, *key, *pos, img.clone()))
+                .inspect_core(move |event| {
+                    if let Ok((stamp, data)) = event {
+                        let time = *stamp.expect_singleton();
+                        for (key, pos, img) in data {
+                            captured.borrow_mut().push((time, *key, *pos, img.clone()))
+                        }
+                    }
                 })
                 .probe()
                 .0
